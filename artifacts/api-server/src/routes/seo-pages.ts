@@ -1,12 +1,17 @@
-import { Router, type Request, type Response } from "express";
+﻿import { Router, type Request, type Response } from "express";
 import { supabase } from "../lib/supabase.js";
 import { logger } from "../lib/logger.js";
 
 const router = Router();
 const SITE_URL = "https://chuglii.in";
 const DETAIL_INDEXING_ENABLED = process.env.SEO_INDEX_DETAIL_PAGES !== "false";
-const TEMPLATE_TTL_MS = 60_000;
-const templateCache = new Map<string, { html: string; expiresAt: number }>();
+// Key the template cache on the Vercel deployment ID so stale HTML from a previous
+// deployment is never served after a new deploy. Each new deployment gets a fresh
+// function instance with a new VERCEL_DEPLOYMENT_ID, so the cache is implicitly cleared.
+// Fall back to a short TTL (10 s) so local dev / non-Vercel envs self-heal quickly.
+const DEPLOY_ID = process.env.VERCEL_DEPLOYMENT_ID ?? null;
+const TEMPLATE_TTL_MS = DEPLOY_ID ? 300_000 : 10_000;
+const templateCache = new Map<string, { html: string; deployId: string | null; expiresAt: number }>();
 
 const INDEX_ROBOTS = "index, follow, max-image-preview:large, max-video-preview:-1, max-snippet:-1";
 const NOINDEX_ROBOTS = "noindex, follow";
@@ -105,7 +110,7 @@ export function renderSeoDocument(template: string, page: SeoPage): string {
 
   const fallback = '<main style="max-width:960px;margin:0 auto;padding:40px 20px;font:16px/1.6 system-ui,sans-serif;color:#e5e7eb">' +
     "<h1>" + escapeHtml(page.heading) + "</h1><p>" + escapeHtml(page.intro) + "</p>" +
-    '<nav aria-label="Main links"><a href="/browse">Browse</a> · <a href="/performers">Performers</a> · <a href="/tags">Tags</a> · <a href="/content-removal">Report content / request removal</a></nav>' +
+    '<nav aria-label="Main links"><a href="/browse">Browse</a> Â· <a href="/performers">Performers</a> Â· <a href="/tags">Tags</a> Â· <a href="/content-removal">Report content / request removal</a></nav>' +
     "<p>Adults only (18+).</p></main>";
   html = html.replace(/<div\s+id=["']root["']\s*>\s*<\/div>/i, '<div id="root">' + fallback + "</div>");
   return html;
@@ -122,16 +127,21 @@ function requestOrigin(req: Request): string {
 
 async function getHtmlTemplate(origin: string): Promise<string> {
   const cached = templateCache.get(origin);
-  if (cached && cached.expiresAt > Date.now()) return cached.html;
+  // Invalidate the cache when a new Vercel deployment is live (DEPLOY_ID changed)
+  // or when the TTL has expired. Prevents stale asset hashes from being served
+  // after a deploy, which causes text/html MIME errors for .css/.js requests.
+  if (cached && cached.deployId === DEPLOY_ID && cached.expiresAt > Date.now()) {
+    return cached.html;
+  }
 
   const response = await fetch(new URL("/index.html", origin), {
-    headers: { Accept: "text/html" },
+    headers: { Accept: "text/html", "Cache-Control": "no-cache" },
     signal: AbortSignal.timeout(5_000),
   });
   if (!response.ok) throw new Error("Could not load frontend HTML template (" + response.status + ")");
   const html = await response.text();
   if (!html.includes('id="root"')) throw new Error("Frontend HTML template is missing #root");
-  templateCache.set(origin, { html, expiresAt: Date.now() + TEMPLATE_TTL_MS });
+  templateCache.set(origin, { html, deployId: DEPLOY_ID, expiresAt: Date.now() + TEMPLATE_TTL_MS });
   return html;
 }
 
@@ -156,7 +166,7 @@ async function describePage(req: Request): Promise<SeoPage | null> {
       "Adult Cam Recording Archive & Performer Directory",
       "Search VAULT's public adult cam recording archive by performer, title and tag. Explore public listings and performer profiles. Adults only (18+).",
       SITE_URL + "/",
-      "VAULT — Adult Cam Recording Archive & Performer Directory",
+      "VAULT â€” Adult Cam Recording Archive & Performer Directory",
       "Discover public archive listings by performer, recording title and topic tag. Browse the catalogue, explore the performer directory, and find relevant listings. Adults only (18+).",
     );
   }
@@ -212,7 +222,7 @@ async function describePage(req: Request): Promise<SeoPage | null> {
 
   if (path === "/premium") {
     return basePage(
-      "VAULT Premium — Ad-Free Archive Access",
+      "VAULT Premium â€” Ad-Free Archive Access",
       "Learn about VAULT Premium and account benefits across the archive. Adults only (18+).",
       SITE_URL + "/premium",
       "VAULT Premium",
@@ -267,7 +277,7 @@ async function describePage(req: Request): Promise<SeoPage | null> {
     const tags = (row.tags ?? []).slice(0, 5).map((tag) => "#" + tag).join(", ");
     return {
       ...basePage(
-        name + " — " + performer,
+        name + " â€” " + performer,
         "View a public archive listing for " + performer + ". " + (tags ? "Topics: " + tags + ". " : "") + "Adults only (18+).",
         SITE_URL + "/video/" + encodeURIComponent(id),
         name,
@@ -305,7 +315,7 @@ async function describePage(req: Request): Promise<SeoPage | null> {
     const total = count ?? 1;
     return {
       ...basePage(
-        username + " — " + total.toLocaleString() + " Archive Listings",
+        username + " â€” " + total.toLocaleString() + " Archive Listings",
         "Explore the public VAULT catalogue for " + username + ", with " + total.toLocaleString() + " linked recording listings. Adults only (18+).",
         SITE_URL + "/performers/" + encodeURIComponent(username),
         username,
@@ -333,7 +343,15 @@ router.get(
       const html = renderSeoDocument(template, page);
       res.status(200);
       res.set("Content-Type", "text/html; charset=utf-8");
-      res.set("Cache-Control", "public, max-age=0, s-maxage=300, stale-while-revalidate=3600");
+      // Use a short s-maxage so the CDN re-validates on every deploy.
+      // s-maxage=0 forces the CDN to revalidate on every request; stale-while-revalidate
+      // lets it serve stale while async revalidating but NOT across deployments since
+      // the ETag changes. No stale-while-revalidate to avoid serving old asset-hash HTML.
+      const cacheControl = DEPLOY_ID
+        ? `public, max-age=0, s-maxage=60, no-cache`
+        : "public, max-age=0, must-revalidate";
+      res.set("Cache-Control", cacheControl);
+      if (DEPLOY_ID) res.set("ETag", `"${DEPLOY_ID}"`);
       res.set("X-Robots-Tag", page.indexable ? "index, follow" : "noindex, follow");
       res.send(html);
     } catch (err) {
