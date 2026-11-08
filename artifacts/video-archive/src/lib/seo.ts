@@ -141,11 +141,13 @@ export function applySeo(config: SeoConfig) {
   const canonical =
     config.canonical ??
     canonicalUrl(config.path ?? "/");
+  // Public archive policy: every route is indexable, including detail pages.
+  // The optional kill switch only suppresses detail pages when explicitly set
+  // to "false"; it is on by default.
   const canonicalPath = new URL(canonical, SITE_URL).pathname;
   const detailPath = /^\/video\/[^/]+\/?$/.test(canonicalPath) || /^\/performers\/[^/]+\/?$/.test(canonicalPath);
-  const privatePath = /^\/(login|signup|forgot-password|auth|bookmarks|watch-later|history|analytics|collections|following|notifications|my-requests|profile|user|settings|admin|request|content-removal)(\/|$)/.test(canonicalPath);
-  const detailIndexingEnabled = import.meta.env.VITE_SEO_INDEX_DETAIL_PAGES === "true";
-  const indexable = config.indexable ?? (!privatePath && (!detailPath || detailIndexingEnabled));
+  const detailIndexingEnabled = import.meta.env.VITE_SEO_INDEX_DETAIL_PAGES !== "false";
+  const indexable = config.indexable ?? (!detailPath || detailIndexingEnabled);
   const robotsContent = indexable ? ROBOTS_CONTENT : "noindex, follow";
   const image = absoluteUrl(config.image) ?? DEFAULT_OG_IMAGE;
   const imageAlt = config.imageAlt ?? `${BRAND} — adult cam recording archive`;

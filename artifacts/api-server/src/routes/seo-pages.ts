@@ -4,7 +4,7 @@ import { logger } from "../lib/logger.js";
 
 const router = Router();
 const SITE_URL = "https://chuglii.in";
-const DETAIL_INDEXING_ENABLED = process.env.SEO_INDEX_DETAIL_PAGES === "true";
+const DETAIL_INDEXING_ENABLED = process.env.SEO_INDEX_DETAIL_PAGES !== "false";
 const TEMPLATE_TTL_MS = 60_000;
 const templateCache = new Map<string, { html: string; expiresAt: number }>();
 

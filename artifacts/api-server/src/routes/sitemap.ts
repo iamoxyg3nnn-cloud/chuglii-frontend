@@ -9,9 +9,9 @@ import { logger } from "../lib/logger.js";
  */
 const router=Router();
 const SITE="https://chuglii.in";
-const DETAIL_INDEXING_ENABLED=process.env.SEO_INDEX_DETAIL_PAGES==="true";
+const DETAIL_INDEXING_ENABLED=process.env.SEO_INDEX_DETAIL_PAGES!=="false";
 const MAX_RECORDINGS=10_000,MAX_PERFORMERS=5_000,MAX_TAGS=2_500;
-const MIN_TAG_RECORDINGS=5,PAGE_SIZE=1_000,CACHE_TTL_MS=6*60*60*1_000;
+const MIN_TAG_RECORDINGS=1,PAGE_SIZE=1_000,CACHE_TTL_MS=6*60*60*1_000;
 interface SitemapEntry{loc:string;lastmod?:string|null}
 interface RecordingRow{id?:string|number|null;username?:string|null;updated_at?:string|null;timestamp?:string|null}
 interface PerformerRow{username?:string|null;latest_timestamp?:string|null}

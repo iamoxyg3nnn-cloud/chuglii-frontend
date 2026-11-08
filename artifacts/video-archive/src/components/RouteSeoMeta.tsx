@@ -109,7 +109,7 @@ function describeRoute(path: string, params: URLSearchParams): RouteSeo {
       if (value) kept.set(key, value);
     }
     const canonicalQuery = hasFilters ? kept.toString() : "";
-    const indexable = !hasFilters || (tags.length === 1 && !search && !gender && !resolution && !sort && pageNumber === 1);
+    const indexable = true;
 
     return {
       title,
@@ -241,7 +241,7 @@ function describeRoute(path: string, params: URLSearchParams): RouteSeo {
   }
 
   if (path === "/content-removal") {
-    return { title: "Report Content or Request Removal", description: "Report a listing that may violate privacy, consent, copyright or applicable law.", type: "website", indexable: false };
+    return { title: "Report Content or Request Removal", description: "Report a listing that may violate privacy, consent, copyright or applicable law.", type: "website", indexable: true };
   }
 
   if (path === "/request") {
