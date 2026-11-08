@@ -18,6 +18,7 @@ interface RouteSeo {
   type?: "website" | "article" | "video.other" | "profile";
   /** Query string (without "?") to keep on the canonical URL. */
   canonicalQuery?: string;
+  indexable?: boolean;
   jsonLd?: Record<string, unknown>;
 }
 
@@ -108,12 +109,14 @@ function describeRoute(path: string, params: URLSearchParams): RouteSeo {
       if (value) kept.set(key, value);
     }
     const canonicalQuery = hasFilters ? kept.toString() : "";
+    const indexable = !hasFilters || (tags.length === 1 && !search && !gender && !resolution && !sort && pageNumber === 1);
 
     return {
       title,
       description,
       type: "website",
       canonicalQuery,
+      indexable,
       jsonLd: {
         "@context": "https://schema.org",
         "@graph": [
@@ -237,6 +240,10 @@ function describeRoute(path: string, params: URLSearchParams): RouteSeo {
     };
   }
 
+  if (path === "/content-removal") {
+    return { title: "Report Content or Request Removal", description: "Report a listing that may violate privacy, consent, copyright or applicable law.", type: "website", indexable: false };
+  }
+
   if (path === "/request") {
     return {
       title: "Request a Recording",
@@ -313,6 +320,7 @@ export function RouteSeoMeta() {
       canonical,
       image: route.image,
       type: route.type,
+      indexable: route.indexable,
       jsonLd:
         route.jsonLd ??
         (path === "/"
