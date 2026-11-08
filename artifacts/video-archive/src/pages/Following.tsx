@@ -53,7 +53,7 @@ export default function Following() {
         {isLoading ? (
           <div className="space-y-2">
             {[...Array(5)].map((_, i) => (
-              <div key={i} className="h-14 bg-secondary/30 border border-border/30 rounded-sm animate-pulse" />
+              <div key={i} className="h-14 bg-secondary/30 border border-border/30 rounded-xl animate-pulse" />
             ))}
           </div>
         ) : follows.length === 0 ? (
@@ -72,7 +72,7 @@ export default function Following() {
             {follows.map((f: PerformerFollow) => (
               <div
                 key={f.performer_username}
-                className="flex items-center gap-3 px-4 py-3 border border-border/40 hover:border-border/70 rounded-sm transition-all group"
+                className="flex items-center gap-3 px-4 py-3 border border-border/40 hover:border-border/70 rounded-xl transition-all group"
               >
                 <div className="w-8 h-8 rounded-full bg-secondary flex items-center justify-center shrink-0">
                   <User2 className="w-4 h-4 text-muted-foreground/50" />
@@ -85,7 +85,7 @@ export default function Following() {
                 </div>
                 <div className="flex items-center gap-1 shrink-0">
                   <Link href={`/performers/${f.performer_username}`}>
-                    <span className="flex items-center gap-1 h-7 px-2.5 text-[11px] text-muted-foreground hover:text-primary border border-border/40 hover:border-primary/40 rounded-sm transition-all">
+                    <span className="flex items-center gap-1 h-7 px-2.5 text-[11px] text-muted-foreground hover:text-primary border border-border/40 hover:border-primary/40 rounded-lg transition-all">
                       View <ArrowRight className="w-3 h-3" />
                     </span>
                   </Link>

@@ -10,6 +10,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { userApi, type PublicPlaylist } from "@/lib/user-api";
 import { trackActivity } from "@/lib/rum";
 import { ListVideo, Plus, Clapperboard, FolderHeart } from "lucide-react";
+import { toast } from "@/hooks/use-toast";
 
 function PlaylistSkeleton() {
   return (
@@ -44,7 +45,7 @@ export default function Playlists() {
       setLocation("/login");
       return;
     }
-    if (!newName.trim()) return;
+    if (!newName.trim() || creating) return;
 
     setCreating(true);
     try {
@@ -55,9 +56,14 @@ export default function Playlists() {
       setNewName("");
       setNewDesc("");
       setShowCreate(false);
+      toast({ title: "Playlist created", description: `"${newName.trim()}" has been created.` });
       setLocation(`/collections/${col.id}`);
-    } catch {
-      // Error handled gracefully
+    } catch (err) {
+      toast({
+        title: "Failed to create playlist",
+        description: err instanceof Error ? err.message : "An error occurred",
+        variant: "destructive",
+      });
     } finally {
       setCreating(false);
     }

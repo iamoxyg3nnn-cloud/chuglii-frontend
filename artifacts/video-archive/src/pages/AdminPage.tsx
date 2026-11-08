@@ -310,7 +310,7 @@ export default function AdminPage() {
                         <button
                           onClick={() => updateStatus(req.id!, "done")}
                           disabled={updating === req.id}
-                          className="h-7 px-3 text-[11px] font-medium border border-primary/30 text-primary hover:border-primary/60 transition-colors rounded-sm"
+                          className="h-7 px-3 text-[11px] font-medium border border-primary/30 text-primary hover:border-primary/60 transition-colors rounded-lg"
                         >
                           Mark Done
                         </button>
@@ -363,7 +363,7 @@ export default function AdminPage() {
                           {req.status !== "approved" && (
                             <button
                               onClick={() => updateStatus(req.id!, "approved")}
-                              className="h-7 px-3 text-[11px] font-medium border border-green-500/40 text-green-400 hover:border-green-500/60 transition-colors rounded-sm"
+                              className="h-7 px-3 text-[11px] font-medium border border-green-500/40 text-green-400 hover:border-green-500/60 transition-colors rounded-lg"
                             >
                               Approve
                             </button>
@@ -371,7 +371,7 @@ export default function AdminPage() {
                           {req.status !== "rejected" && (
                             <button
                               onClick={() => updateStatus(req.id!, "rejected")}
-                              className="h-7 px-3 text-[11px] font-medium border border-red-500/40 text-red-400 hover:border-red-500/60 transition-colors rounded-sm"
+                              className="h-7 px-3 text-[11px] font-medium border border-red-500/40 text-red-400 hover:border-red-500/60 transition-colors rounded-lg"
                             >
                               Reject
                             </button>
@@ -379,14 +379,14 @@ export default function AdminPage() {
                           {req.status === "approved" && (
                             <button
                               onClick={() => updateStatus(req.id!, "done")}
-                              className="h-7 px-3 text-[11px] font-medium border border-primary/30 text-primary hover:border-primary/60 transition-colors rounded-sm"
+                              className="h-7 px-3 text-[11px] font-medium border border-primary/30 text-primary hover:border-primary/60 transition-colors rounded-lg"
                             >
                               Mark Done
                             </button>
                           )}
                           <button
                             onClick={() => updateStatus(req.id!, "pending")}
-                            className="h-7 px-3 text-[11px] font-medium border border-border/50 text-muted-foreground hover:text-foreground transition-colors rounded-sm"
+                            className="h-7 px-3 text-[11px] font-medium border border-border/50 text-muted-foreground hover:text-foreground transition-colors rounded-lg"
                           >
                             Reset to Pending
                           </button>

@@ -69,7 +69,7 @@ export function AdGridCard() {
   return (
     <div className="group block animate-fade-in-up">
       <div
-        className="relative aspect-video overflow-hidden bg-secondary rounded-sm"
+        className="relative aspect-video overflow-hidden bg-secondary rounded-xl"
         role="complementary"
         aria-label="Advertisement"
         onClick={(e) => {

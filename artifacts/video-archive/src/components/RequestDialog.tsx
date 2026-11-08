@@ -1,4 +1,4 @@
-﻿import { useState, useRef, useCallback } from "react";
+import { useState, useRef, useCallback } from "react";
 import Stepper, { Step } from "@/components/Stepper";
 import { PerformerDetailsCard, PerformerLookupLoading, PerformerLookupNotFound, PerformerLookupError } from "@/components/PerformerDetailsCard";
 import { usePerformerLookup, useCreateRequest, type PerformerLookupResult } from "@/lib/api";
@@ -90,7 +90,7 @@ function RequestDialogInner({ open, onOpenChange }: RequestDialogProps) {
   };
 
   const handleSubmit = useCallback(async () => {
-    if (!platform || !lookupUsername) return;
+    if (!platform || !lookupUsername || createRequest.isPending) return;
 
     try {
       const result = await createRequest.mutateAsync({
@@ -163,13 +163,13 @@ function RequestDialogInner({ open, onOpenChange }: RequestDialogProps) {
             <div className="flex gap-2 justify-center">
               <button
                 onClick={() => onOpenChange(false)}
-                className="px-3 py-1.5 text-xs border border-border/60 text-muted-foreground hover:text-foreground rounded-sm transition-colors"
+                className="px-3 py-1.5 text-xs border border-border/60 text-muted-foreground hover:text-foreground rounded-lg transition-colors"
               >
                 Close
               </button>
               <button
                 onClick={resetForm}
-                className="px-3 py-1.5 text-xs border border-primary/30 text-primary hover:border-primary/60 rounded-sm transition-colors"
+                className="px-3 py-1.5 text-xs border border-primary/30 text-primary hover:border-primary/60 rounded-lg transition-colors"
               >
                 Submit another
               </button>
@@ -326,7 +326,7 @@ function Step2UsernameInput({
             spellCheck={false}
             autoComplete="off"
             autoFocus
-            className="w-full h-9 bg-secondary/80 border border-border/60 focus:border-primary/50 rounded-sm px-3 text-sm outline-none transition-all placeholder:text-muted-foreground/40 pr-8"
+            className="w-full h-9 bg-secondary/80 border border-border/60 focus:border-primary/50 rounded-lg px-3 text-sm outline-none transition-all placeholder:text-muted-foreground/40 pr-8"
           />
           {value && (
             <button
@@ -522,7 +522,7 @@ function Step4Submit({
           onChange={(e) => onNotesChange(e.target.value)}
           placeholder="Any specific details about this request..."
           rows={2}
-          className="w-full bg-secondary border border-border/60 focus:border-primary/50 rounded-sm px-3 py-1.5 text-sm outline-none transition-all placeholder:text-muted-foreground/40 resize-none"
+          className="w-full bg-secondary border border-border/60 focus:border-primary/50 rounded-lg px-3 py-1.5 text-sm outline-none transition-all placeholder:text-muted-foreground/40 resize-none"
         />
       </div>
 
@@ -535,7 +535,7 @@ function Step4Submit({
             <button
               key={p}
               onClick={() => onPriorityChange(p)}
-              className={`flex-1 h-7 text-[11px] font-medium rounded-sm border transition-colors ${
+              className={`flex-1 h-7 text-[11px] font-medium rounded-lg border transition-colors ${
                 priority === p
                   ? "border-primary/50 bg-primary/8 text-primary"
                   : "border-border/60 text-muted-foreground hover:text-foreground hover:border-border"

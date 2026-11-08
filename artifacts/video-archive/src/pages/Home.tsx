@@ -31,7 +31,7 @@ type Tab = "recent" | "popular";
 function VideoSkeleton() {
   return (
     <div className="space-y-2.5">
-      <Skeleton className="w-full aspect-video rounded-sm" />
+      <Skeleton className="w-full aspect-video rounded-xl" />
       <Skeleton className="h-3 w-3/4" />
       <Skeleton className="h-3 w-1/2" />
     </div>

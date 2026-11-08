@@ -14,6 +14,7 @@ import {
   FolderOpen, Plus, Trash2, Film, ListVideo, ChevronRight, AlertCircle, RefreshCw,
 } from "lucide-react";
 import { formatRelativeTime } from "@/lib/formatters";
+import { toast } from "@/hooks/use-toast";
 
 export default function Collections() {
   const { user, loading } = useAuth();
@@ -42,7 +43,7 @@ export default function Collections() {
 
   const handleCreate = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!newName.trim()) return;
+    if (!newName.trim() || creating) return;
     setCreating(true);
     try {
       await userApi.createCollection(newName.trim(), newDesc.trim() || undefined);
@@ -52,8 +53,13 @@ export default function Collections() {
       setNewName("");
       setNewDesc("");
       setShowCreate(false);
-    } catch {
-      // Error is non-fatal — user can retry
+      toast({ title: "Collection created", description: `"${newName.trim()}" has been created.` });
+    } catch (err) {
+      toast({
+        title: "Failed to create collection",
+        description: err instanceof Error ? err.message : "An error occurred",
+        variant: "destructive",
+      });
     } finally {
       setCreating(false);
     }

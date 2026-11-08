@@ -1,4 +1,4 @@
-﻿import { createContext, useContext, useEffect, useRef, useState, useCallback, useMemo } from "react";
+import { createContext, useContext, useEffect, useRef, useState, useCallback, useMemo } from "react";
 import type { Session, User } from "@supabase/supabase-js";
 import { getSupabase } from "@/lib/supabase";
 import { resolveApiPath } from "@/lib/api-base";
@@ -30,7 +30,7 @@ function friendlyAuthError(raw: string): string {
   const lower = raw.toLowerCase();
 
   if (lower.includes("error sending confirmation email") || lower.includes("smtp") || lower.includes("email provider")) {
-    return "We couldn't send the verification email. The email service is not configured on the server â€” please contact support or try again later.";
+    return "We couldn't send the verification email. The email service is not configured on the server — please contact support or try again later.";
   }
   if (lower.includes("email address not confirmed")) {
     return "Your email hasn't been confirmed yet. Check your inbox for the verification link, or try resetting your password.";
@@ -48,7 +48,7 @@ function friendlyAuthError(raw: string): string {
     return "Please enter a valid email address.";
   }
   if (lower.includes("rate limit")) {
-    return "Too many attempts â€” please wait a moment and try again.";
+    return "Too many attempts — please wait a moment and try again.";
   }
   return raw;
 }

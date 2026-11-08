@@ -75,7 +75,7 @@ export default function Stepper({
             {currentStep !== 1 && (
               <button
                 onClick={() => updateStep(currentStep - 1)}
-                className="px-3 py-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors rounded-sm"
+                className="px-3 py-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors rounded-lg"
                 {...backButtonProps}
               >
                 {backButtonText}
@@ -84,7 +84,7 @@ export default function Stepper({
             <button
               onClick={isLastStep ? () => updateStep(totalSteps + 1) : () => updateStep(currentStep + 1)}
               disabled={!canNext}
-              className="px-4 py-1.5 text-xs font-medium rounded-sm border border-primary/30 text-primary hover:border-primary/60 transition-colors disabled:opacity-40 disabled:pointer-events-none"
+              className="px-4 py-1.5 text-xs font-medium rounded-lg border border-primary/30 text-primary hover:border-primary/60 transition-colors disabled:opacity-40 disabled:pointer-events-none"
               {...nextButtonProps}
             >
               {nextButtonText}

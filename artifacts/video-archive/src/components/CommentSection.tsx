@@ -36,7 +36,7 @@ const CommentForm = memo(function CommentForm({ placeholder = "Write a commentâ€
 
   const handleSubmit = useCallback(async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!content.trim()) return;
+    if (!content.trim() || loading) return;
     setLoading(true);
     try {
       await onSubmit(author.trim() || "Anonymous", content.trim());
@@ -45,7 +45,7 @@ const CommentForm = memo(function CommentForm({ placeholder = "Write a commentâ€
     } finally {
       setLoading(false);
     }
-  }, [content, author, onSubmit, compact]);
+  }, [content, author, onSubmit, compact, loading]);
 
   return (
     <form onSubmit={handleSubmit} className="space-y-2">
@@ -140,12 +140,12 @@ const CommentNode = memo(function CommentNode({ comment, depth = 0, recordingId,
           </div>
           <div className="flex-1 min-w-0">
             <div className="flex items-center gap-2 mb-1">
-              <span className="text-xs font-semibold text-foreground/80">{comment.author}</span>
-              <span className="text-[10px] text-muted-foreground/40">
+              <span className="text-xs font-semibold text-foreground/80 truncate max-w-[200px]">{comment.author}</span>
+              <span className="text-[10px] text-muted-foreground/40 tabular-nums">
                 {formatRelativeTime(comment.created_at)}
               </span>
             </div>
-            <p className={`text-xs leading-relaxed ${comment.deleted ? "text-muted-foreground/40 italic" : "text-foreground/70"}`}>
+            <p className={`text-xs leading-relaxed break-words [overflow-wrap:anywhere] ${comment.deleted ? "text-muted-foreground/40 italic" : "text-foreground/70"}`}>
               {comment.content}
             </p>
             {!comment.deleted && (

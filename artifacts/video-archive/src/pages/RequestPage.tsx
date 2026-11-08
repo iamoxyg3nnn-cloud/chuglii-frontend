@@ -194,7 +194,7 @@ export default function RequestPage() {
                   {viewedRequest.notes && (
                     <div>
                       <p className="text-[11px] text-muted-foreground uppercase tracking-wide mb-1">Notes</p>
-                      <p className="text-xs text-muted-foreground/80 bg-secondary/50 rounded-sm px-3 py-2">{viewedRequest.notes}</p>
+                      <p className="text-xs text-muted-foreground/80 bg-secondary/50 rounded-lg px-3 py-2">{viewedRequest.notes}</p>
                     </div>
                   )}
                 </div>
@@ -213,7 +213,7 @@ export default function RequestPage() {
                         toast({ title: "Error", description: "Failed to delete request.", variant: "destructive" });
                       }
                     }}
-                    className="inline-flex items-center gap-1.5 px-4 py-2 text-xs border border-destructive/30 text-destructive hover:border-destructive/60 rounded-sm transition-colors"
+                    className="inline-flex items-center gap-1.5 px-4 py-2 text-xs border border-destructive/30 text-destructive hover:border-destructive/60 rounded-lg transition-colors"
                   >
                     <Trash2 className="w-3 h-3" />
                     Delete request
@@ -221,7 +221,7 @@ export default function RequestPage() {
                 )}
                 <Link
                   href="/request"
-                  className="inline-flex items-center gap-1.5 px-4 py-2 text-xs border border-primary/30 text-primary hover:border-primary/60 rounded-sm transition-colors"
+                  className="inline-flex items-center gap-1.5 px-4 py-2 text-xs border border-primary/30 text-primary hover:border-primary/60 rounded-lg transition-colors"
                 >
                   Submit a new request
                 </Link>
@@ -493,7 +493,7 @@ function Step2PerformerLookup({
               <div className="rounded-lg border border-amber-500/30 bg-amber-500/5 p-4">
                 <p className="text-xs font-medium text-amber-500">Could not verify performer on {platform}</p>
                 <p className="text-[11px] text-muted-foreground mt-1">
-                  The platform check failed â€” you can still submit this request and it will be reviewed manually.
+                  The platform check failed — you can still submit this request and it will be reviewed manually.
                 </p>
               </div>
             ) : (

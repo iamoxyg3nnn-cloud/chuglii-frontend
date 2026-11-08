@@ -306,6 +306,8 @@ export default function VideoDetail() {
   const [cloudCollections, setCloudCollections] = useState<CloudCollection[]>([]);
   const [newColName, setNewColName] = useState("");
   const [addedToCol, setAddedToCol] = useState<string | null>(null);
+  const [creatingCol, setCreatingCol] = useState(false);
+  const [addingColId, setAddingColId] = useState<string | null>(null);
 
   useEffect(() => {
     if (!collectionOpen) return;
@@ -443,7 +445,8 @@ export default function VideoDetail() {
 
   const handleAddToCollection = async (colId: string) => {
     const meta = getVideoMeta();
-    if (!meta || !user) return;
+    if (!meta || !user || addingColId !== null) return;
+    setAddingColId(colId);
     try {
       await userApi.addCollectionItem(colId, meta.id, recordingToMeta(meta));
       // Analytics: recording added to an existing collection.
@@ -458,13 +461,16 @@ export default function VideoDetail() {
       }, 1200);
     } catch (err) {
       console.error("Failed to add to collection:", err);
+    } finally {
+      setAddingColId(null);
     }
   };
 
   const handleCreateAndAdd = async () => {
-    if (!newColName.trim() || !user) return;
+    if (!newColName.trim() || !user || creatingCol) return;
     const meta = getVideoMeta();
     if (!meta) return;
+    setCreatingCol(true);
     try {
       const col = await userApi.createCollection(newColName.trim());
       await userApi.addCollectionItem(col.id, meta.id, recordingToMeta(meta));
@@ -482,6 +488,8 @@ export default function VideoDetail() {
       }, 1200);
     } catch (err) {
       console.error("Failed to create collection and add video:", err);
+    } finally {
+      setCreatingCol(false);
     }
   };
 
@@ -1050,17 +1058,17 @@ export default function VideoDetail() {
               </div>
             ) : video ? (
               <div className="space-y-5">
-                {/* Performer name â€” large heading */}
-                <div>
+                {/* Performer name — large heading */}
+                <div className="min-w-0">
                   <Link
                     href={`/performers/${video.username}`}
-                    className="text-xl sm:text-2xl font-bold tracking-tight text-foreground hover:text-primary transition-colors"
+                    className="text-xl sm:text-2xl font-bold tracking-tight text-foreground hover:text-primary transition-colors break-words [overflow-wrap:anywhere]"
                   >
                     {video.username}
                   </Link>
                 </div>
 
-                {/* Compact metadata â€” pipe-separated, no icons */}
+                {/* Compact metadata — pipe-separated, no icons */}
                 <div className="flex flex-wrap items-center gap-x-1.5 text-xs text-muted-foreground/70">
                   {video.timestamp && (
                     <span>{new Date(video.timestamp).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' })}</span>
@@ -1081,7 +1089,7 @@ export default function VideoDetail() {
 
                 {/* Room topic (if available) */}
                 {video.room_title && video.room_title !== video.username && (
-                  <p className="text-sm text-muted-foreground/50 italic leading-relaxed">
+                  <p className="text-sm text-muted-foreground/50 italic leading-relaxed break-words [overflow-wrap:anywhere]">
                     {video.room_title}
                   </p>
                 )}
@@ -1197,7 +1205,7 @@ export default function VideoDetail() {
                               autoFocus
                               type="text"
                               aria-label="New collection name"
-                              placeholder="New collectionâ€¦"
+                              placeholder="New collection…"
                               value={newColName}
                               onChange={(e) => setNewColName(e.target.value)}
                               onKeyDown={(e) => { if (e.key === "Enter") handleCreateAndAdd(); }}
@@ -1206,7 +1214,7 @@ export default function VideoDetail() {
                             />
                             <button
                               onClick={handleCreateAndAdd}
-                              disabled={!newColName.trim()}
+                              disabled={!newColName.trim() || creatingCol}
                               className="w-7 h-7 flex items-center justify-center border border-primary/30 text-primary rounded-md disabled:opacity-40 hover:border-primary/60 transition-opacity"
                               title="Create and add"
                             >
@@ -1225,7 +1233,8 @@ export default function VideoDetail() {
                               <button
                                 key={col.id}
                                 onClick={() => handleAddToCollection(col.id)}
-                                className="w-full text-left px-3 py-2 text-xs flex items-center gap-2 hover:bg-secondary transition-colors"
+                                disabled={addingColId !== null}
+                                className="w-full text-left px-3 py-2 text-xs flex items-center gap-2 hover:bg-secondary transition-colors disabled:opacity-50"
                               >
                                 {addedToCol === col.id ? (
                                   <Check className="w-3 h-3 text-green-500 shrink-0" />
@@ -1287,7 +1296,7 @@ export default function VideoDetail() {
 
                 {/* Sign-in prompt for unauthenticated users */}
                 {!user && (
-                  <div className="flex items-center gap-2 p-3 border border-border/40 rounded-sm bg-secondary">
+                  <div className="flex items-center gap-2 p-3 border border-border/40 rounded-lg bg-secondary">
                     <LogIn className="w-4 h-4 text-muted-foreground/40" />
                     <p className="text-xs text-muted-foreground/60">
                       <Link href="/login" className="text-primary hover:underline font-medium">Sign in</Link> to like, save, or add to collections
@@ -1301,12 +1310,12 @@ export default function VideoDetail() {
                       href={`/browse?gender=${encodeURIComponent(video.gender)}`}
                       className="hover:text-muted-foreground transition-colors capitalize"
                     >
-                      Browse {video.gender} recordings â†’
+                      Browse {video.gender} recordings →
                     </Link>
                   </div>
                 )}
 
-                {/* In-content ad above comments â€” full-width 300Ã—100 row */}
+                {/* In-content ad above comments — full-width 300×100 row */}
                 <AdBanner file="rect-300x100" fluid />
 
                 {/* Comments */}
@@ -1396,7 +1405,7 @@ export default function VideoDetail() {
                     href={`/performers/${video.username}`}
                     className="block pt-2 text-[11px] text-primary/70 hover:text-primary transition-colors"
                   >
-                    All recordings by {video.username} â†’
+                    All recordings by {video.username} →
                   </Link>
                 )}
               </div>

@@ -611,7 +611,7 @@ export const VideoCard = memo(function VideoCard({ recording, showRemove, onRemo
         </div>
 
         <div className="px-0.5 space-y-1">
-          <div className="flex items-center gap-1.5">
+          <div className="flex items-center gap-1.5 min-w-0">
             <span className="text-[13px] font-medium text-foreground group-hover:text-primary transition-colors truncate">
               {recording.username}
             </span>

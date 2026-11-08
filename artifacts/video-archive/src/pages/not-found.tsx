@@ -18,13 +18,13 @@ export default function NotFound() {
         <div className="flex items-center gap-4">
           <Link
             href="/"
-            className="h-9 px-5 border border-primary/30 text-primary text-sm font-medium hover:border-primary/60 transition-colors rounded-sm inline-flex items-center"
+            className="h-9 px-5 border border-primary/30 text-primary text-sm font-medium hover:border-primary/60 transition-colors rounded-lg inline-flex items-center"
           >
             Home
           </Link>
           <Link
             href="/browse"
-            className="h-9 px-5 border border-border text-sm text-muted-foreground hover:text-foreground hover:border-foreground/30 transition-colors rounded-sm inline-flex items-center"
+            className="h-9 px-5 border border-border text-sm text-muted-foreground hover:text-foreground hover:border-foreground/30 transition-colors rounded-lg inline-flex items-center"
           >
             Browse
           </Link>

@@ -15,7 +15,7 @@ interface SkeletonVideoCardProps {
 export function SkeletonVideoCard({ className }: SkeletonVideoCardProps) {
   return (
     <div className={cn("space-y-2.5", className)}>
-      <Skeleton className="w-full aspect-video rounded-sm" />
+      <Skeleton className="w-full aspect-video rounded-xl" />
       <Skeleton className="h-3 w-3/4" />
       <Skeleton className="h-3 w-1/2" />
     </div>
@@ -95,7 +95,7 @@ export function SkeletonDetailPage() {
         </div>
         <div className="space-y-3">
           {Array.from({ length: 4 }).map((_, i) => (
-            <Skeleton key={i} className="h-28 w-full rounded-sm" />
+            <Skeleton key={i} className="h-28 w-full rounded-xl" />
           ))}
         </div>
       </div>
