@@ -48,6 +48,7 @@ Thumbs.db
 # Replit
 .cache/
 .local/
+.freebuff/
 .vercel
 .vercel-output/
 

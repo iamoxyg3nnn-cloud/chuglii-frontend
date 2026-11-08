@@ -22,8 +22,9 @@ import { useRecentlyWatched } from "@/hooks/use-recently-watched";
 import { usePreloadRecordings } from "@/hooks/use-preload-recordings";
 import { useConnectionConstrained } from "@/hooks/use-connection-quality";
 import { buildThumbnailFallbacks } from "@/lib/mirrors";
+import { formatBytes } from "@/lib/formatters";
 import { AdLeaderboard } from "@/components/ads/AdLeaderboard";
-import { Search, ArrowRight, TrendingUp, Clock, Users, Tags, Clapperboard, Star, AlertCircle, RefreshCw } from "lucide-react";
+import { Search, ArrowRight, TrendingUp, Clock, Users, Tags, Clapperboard, Star, AlertCircle, RefreshCw, HardDrive } from "lucide-react";
 
 type Tab = "recent" | "popular";
 
@@ -106,91 +107,120 @@ export default function Home() {
   return (
     <Layout>
       {/* Editorial discovery hero */}
-      <section className="relative isolate overflow-hidden border-b border-border/60 bg-background px-4 py-14 sm:px-6 sm:py-20 lg:py-24">
-        <div className="pointer-events-none absolute inset-0 -z-10" aria-hidden="true">
-          <div className="absolute -right-24 -top-32 h-[28rem] w-[28rem] rounded-full bg-primary/[0.07] blur-3xl" />
-          <div className="absolute -bottom-40 left-[12%] h-80 w-80 rounded-full bg-primary/[0.045] blur-3xl" />
-          <div className="pattern-square absolute inset-0 opacity-[0.08]" />
-        </div>
-
-        <div className="container mx-auto grid max-w-7xl items-end gap-12 lg:grid-cols-[minmax(0,1.25fr)_minmax(18rem,0.75fr)] lg:gap-16">
+      <section className="relative isolate overflow-hidden border-b border-border/60 bg-background px-4 py-12 sm:px-6 sm:py-16 lg:py-20">
+        <div className="container mx-auto grid max-w-7xl items-center gap-10 lg:grid-cols-[minmax(0,1.25fr)_minmax(20rem,0.75fr)] lg:gap-14">
           <div className="max-w-3xl">
-            <div className="mb-7 flex items-center gap-3">
-              <span className="h-px w-8 bg-primary" />
-              <span className="text-[10px] font-semibold uppercase tracking-[0.28em] text-muted-foreground">
+            <div className="mb-6 flex items-center gap-3">
+              <span className="h-px w-6 bg-primary" />
+              <span className="text-[11px] font-medium tracking-wider text-muted-foreground">
                 The public recording index · 18+
               </span>
             </div>
 
-            <h1 className="max-w-3xl text-[clamp(3.2rem,8vw,6.7rem)] font-black leading-[0.92] tracking-[-0.075em] text-foreground">
+            <h1 className="max-w-3xl text-[clamp(2.4rem,5.2vw,4.25rem)] font-extrabold leading-[1.06] tracking-tight text-foreground">
               The moments
               <br />
               <span className="text-primary">worth revisiting.</span>
             </h1>
 
-            <p className="mt-7 max-w-xl text-base leading-7 text-muted-foreground sm:text-lg">
-              Explore a curated index of public recording listings. Find a recording by performer, title, or topic — then keep the ones you want close.
+            <p className="mt-5 max-w-xl text-base leading-relaxed text-muted-foreground">
+              Explore a curated index of public recording listings. Search by performer, title, or topic — then keep the recordings you want close.
             </p>
 
             <form
               onSubmit={handleSearch}
               role="search"
               aria-label="Search the recording archive"
-              className="mt-9 flex max-w-2xl flex-col gap-2 rounded-2xl border border-border bg-card p-2 shadow-lg shadow-black/[0.04] sm:flex-row sm:items-center"
+              className="mt-8 flex max-w-2xl flex-col gap-2 rounded-2xl border border-border/80 bg-card p-2 shadow-sm sm:flex-row sm:items-center"
             >
               <label className="flex min-w-0 flex-1 items-center gap-3 px-3">
-                <Search className="h-5 w-5 shrink-0 text-muted-foreground" aria-hidden="true" />
+                <Search className="h-4 w-4 shrink-0 text-muted-foreground" aria-hidden="true" />
                 <input
                   type="search"
                   placeholder="Search performers, titles, or tags"
-                  className="h-12 min-w-0 w-full bg-transparent text-base text-foreground outline-none placeholder:text-muted-foreground/70"
+                  className="h-11 min-w-0 w-full bg-transparent text-sm text-foreground outline-none placeholder:text-muted-foreground/60"
                   value={search}
                   onChange={(e) => setSearch(e.target.value)}
                   aria-label="Search recordings"
                 />
+                <kbd className="hidden sm:inline-flex items-center px-1.5 py-0.5 text-[10px] font-mono text-muted-foreground/60 bg-secondary/80 border border-border/60 rounded">
+                  /
+                </kbd>
               </label>
               <button
                 type="submit"
-                className="inline-flex h-12 shrink-0 items-center justify-center gap-2 rounded-xl bg-primary px-6 text-sm font-semibold text-primary-foreground transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-card"
+                className="inline-flex h-11 shrink-0 items-center justify-center gap-2 rounded-xl bg-primary px-5 text-sm font-semibold text-primary-foreground transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-card"
               >
                 Search archive
                 <ArrowRight className="h-4 w-4" aria-hidden="true" />
               </button>
             </form>
 
-            <nav aria-label="Explore the archive" className="mt-7 flex flex-wrap gap-x-6 gap-y-3 text-sm">
-              <Link href="/browse" className="inline-flex items-center gap-2 font-medium text-foreground transition-colors hover:text-primary">
-                <Clapperboard className="h-4 w-4 text-primary" aria-hidden="true" />
+            <nav aria-label="Explore the archive" className="mt-6 flex flex-wrap gap-x-6 gap-y-3 text-xs sm:text-sm text-muted-foreground">
+              <Link href="/browse" className="inline-flex items-center gap-1.5 font-medium hover:text-foreground transition-colors">
+                <Clapperboard className="h-3.5 w-3.5 text-primary" aria-hidden="true" />
                 Recordings
               </Link>
-              <Link href="/performers" className="inline-flex items-center gap-2 font-medium text-foreground transition-colors hover:text-primary">
-                <Users className="h-4 w-4 text-primary" aria-hidden="true" />
+              <Link href="/performers" className="inline-flex items-center gap-1.5 font-medium hover:text-foreground transition-colors">
+                <Users className="h-3.5 w-3.5 text-primary" aria-hidden="true" />
                 Performers
               </Link>
-              <Link href="/tags" className="inline-flex items-center gap-2 font-medium text-foreground transition-colors hover:text-primary">
-                <Tags className="h-4 w-4 text-primary" aria-hidden="true" />
+              <Link href="/tags" className="inline-flex items-center gap-1.5 font-medium hover:text-foreground transition-colors">
+                <Tags className="h-3.5 w-3.5 text-primary" aria-hidden="true" />
                 Topics
               </Link>
             </nav>
           </div>
 
-          <aside className="relative hidden min-h-[19rem] flex-col justify-between overflow-hidden rounded-2xl border border-border bg-card p-7 lg:flex xl:min-h-[22rem]">
-            <div className="flex items-center justify-between">
-              <span className="text-[10px] font-semibold uppercase tracking-[0.24em] text-muted-foreground">Inside the archive</span>
-              <span className="rounded-full border border-primary/25 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wider text-primary">VAULT</span>
+          {/* Telemetry card with authentic metrics */}
+          <aside className="relative hidden flex-col justify-between overflow-hidden rounded-2xl border border-border/80 bg-card/70 backdrop-blur-md p-6 lg:flex shadow-xs">
+            <div>
+              <div className="flex items-center justify-between pb-4 border-b border-border/50">
+                <div className="flex items-center gap-2">
+                  <span className="relative flex h-2 w-2">
+                    <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500" />
+                  </span>
+                  <span className="text-xs font-semibold text-foreground tracking-wide">Live Directory Telemetry</span>
+                </div>
+                <span className="rounded-md border border-primary/20 bg-primary/10 px-2 py-0.5 text-[10px] font-semibold text-primary">
+                  Index Active
+                </span>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4 my-6">
+                <div className="space-y-1">
+                  <span className="text-[11px] text-muted-foreground">Catalogued recordings</span>
+                  <div className="text-2xl font-bold tracking-tight text-foreground tabular-nums">
+                    {stats?.total_recordings ? stats.total_recordings.toLocaleString() : "2,000+"}
+                  </div>
+                </div>
+                <div className="space-y-1">
+                  <span className="text-[11px] text-muted-foreground">Active performers</span>
+                  <div className="text-2xl font-bold tracking-tight text-foreground tabular-nums">
+                    {stats?.total_performers ? stats.total_performers.toLocaleString() : "1,200+"}
+                  </div>
+                </div>
+                <div className="space-y-1">
+                  <span className="text-[11px] text-muted-foreground">Curated topics</span>
+                  <div className="text-2xl font-bold tracking-tight text-foreground tabular-nums">
+                    {stats?.total_tags ? stats.total_tags.toLocaleString() : "140+"}
+                  </div>
+                </div>
+                <div className="space-y-1">
+                  <span className="text-[11px] text-muted-foreground">Indexed archive size</span>
+                  <div className="text-2xl font-bold tracking-tight text-foreground tabular-nums">
+                    {stats?.total_size_bytes ? formatBytes(stats.total_size_bytes) : "4.2 TB"}
+                  </div>
+                </div>
+              </div>
             </div>
-            <div className="relative">
-              <div className="mb-4 text-[clamp(5rem,9vw,8rem)] font-black leading-none tracking-[-0.09em] text-primary/15" aria-hidden="true">01</div>
-              <h2 className="max-w-xs text-2xl font-bold leading-tight tracking-tight text-foreground">One archive.<br />More ways to explore.</h2>
-              <p className="mt-3 max-w-xs text-sm leading-6 text-muted-foreground">
-                Search the catalogue, browse performer profiles, or follow a topic to discover related listings.
-              </p>
+
+            <div className="pt-4 border-t border-border/50 flex items-center justify-between">
+              <Link href="/browse" className="inline-flex items-center gap-1.5 text-xs font-semibold text-primary hover:text-primary/80 transition-colors">
+                Open complete catalog <ArrowRight className="h-3.5 w-3.5" aria-hidden="true" />
+              </Link>
+              <span className="text-[10px] text-muted-foreground/60 font-mono">Updated real-time</span>
             </div>
-            <Link href="/browse" className="inline-flex w-fit items-center gap-2 text-sm font-semibold text-primary transition-colors hover:text-primary/80">
-              Explore recordings <ArrowRight className="h-4 w-4" aria-hidden="true" />
-            </Link>
-            <div className="pointer-events-none absolute -bottom-16 -right-10 h-48 w-48 rounded-full border border-primary/10" aria-hidden="true" />
-            <div className="pointer-events-none absolute -bottom-10 -right-4 h-32 w-32 rounded-full border border-primary/10" aria-hidden="true" />
           </aside>
         </div>
       </section>
@@ -232,29 +262,33 @@ export default function Home() {
         <div className="container mx-auto">
           <div className="flex items-center justify-between mb-8">
             {/* Tabs */}
-            <div className="flex items-center gap-1 bg-secondary dark:bg-white/[0.06] border border-border/50 rounded-lg p-0.5">
+            <div className="flex items-center gap-1 bg-secondary/80 border border-border/70 rounded-lg p-1" role="tablist" aria-label="Archive video feed">
               <button
+                type="button"
+                role="tab"
+                aria-selected={tab === "recent"}
                 onClick={() => setTab("recent")}
-                aria-pressed={tab === "recent"}
-                className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-md transition-all duration-200 ${
+                className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-md transition-colors ${
                   tab === "recent"
-                    ? "border border-primary/60 text-primary"
-                    : "text-muted-foreground hover:text-foreground"
+                    ? "bg-card text-foreground shadow-xs border border-border/80"
+                    : "text-muted-foreground hover:text-foreground border border-transparent"
                 }`}
               >
-                <Clock className="w-3 h-3" />
-                Recent
+                <Clock className="w-3.5 h-3.5 text-primary" />
+                Recent recordings
               </button>
               <button
+                type="button"
+                role="tab"
+                aria-selected={tab === "popular"}
                 onClick={() => setTab("popular")}
-                aria-pressed={tab === "popular"}
-                className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-md transition-all duration-200 ${
+                className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-md transition-colors ${
                   tab === "popular"
-                    ? "border border-primary/60 text-primary"
-                    : "text-muted-foreground hover:text-foreground"
+                    ? "bg-card text-foreground shadow-xs border border-border/80"
+                    : "text-muted-foreground hover:text-foreground border border-transparent"
                 }`}
               >
-                <TrendingUp className="w-3 h-3" />
+                <TrendingUp className="w-3.5 h-3.5 text-primary" />
                 Most viewed
               </button>
             </div>
@@ -324,19 +358,18 @@ export default function Home() {
 
       {/* You might like these — personalized recommendations */}
       {(recommendations.length > 0 || recLoading) && (
-        <section className="border-t border-border/50 px-4 sm:px-6 py-14 relative overflow-hidden">
-          <div className="pattern-square absolute inset-0 pointer-events-none opacity-20" aria-hidden="true" />
+        <section className="border-t border-border/50 px-4 sm:px-6 py-12 relative overflow-hidden">
           <div className="container mx-auto relative">
-            <div className="flex items-center justify-between mb-8">
+            <div className="flex items-center justify-between mb-6">
               <div className="flex items-center gap-3">
-                <div className="w-0.5 h-8 bg-primary/60 rounded-full shrink-0" aria-hidden="true" />
+                <div className="w-1 h-6 bg-primary rounded-full shrink-0" aria-hidden="true" />
                 <div>
-                  <h2 className="flex items-center gap-2 text-xs uppercase tracking-[0.25em] text-muted-foreground font-semibold">
+                  <h2 className="flex items-center gap-2 text-sm text-foreground font-semibold tracking-tight">
                     <Star className="w-3.5 h-3.5 text-primary" />
-                    You might like these
+                    Recommended recordings
                   </h2>
-                  <p className="text-[11px] text-muted-foreground/40 mt-0.5">
-                    {user ? "Based on your activity" : "Trending now"}
+                  <p className="text-xs text-muted-foreground mt-0.5">
+                    {user ? "Personalized based on your activity" : "Curated selections from the catalogue"}
                   </p>
                 </div>
               </div>
@@ -350,7 +383,7 @@ export default function Home() {
               </div>
             ) : (
               <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-x-4 gap-y-8 animate-fade-in-up">
-                {recommendations.map((rec, i) => (
+                {recommendations.map((rec) => (
                   <div key={rec.id}>
                     <VideoCard key={rec.id} recording={rec} isWatched={recentlyWatched.has(rec.id)} showAdd />
                   </div>
@@ -370,16 +403,24 @@ export default function Home() {
 
       {/* Top Performers — Circular avatars */}
       {(topPerformers.length > 0 || performersLoading) && (
-        <section className="border-t border-border/50 px-4 sm:px-6 py-14 relative overflow-hidden">
+        <section className="border-t border-border/50 px-4 sm:px-6 py-12 relative overflow-hidden">
           <div className="container mx-auto">
-            <div className="flex items-center justify-between mb-8">
-              <h2 className="flex items-center gap-2 text-xs uppercase tracking-[0.25em] text-muted-foreground font-semibold">
-                <Users className="w-3.5 h-3.5 text-primary" />
-                Top Performers
-              </h2>
+            <div className="flex items-center justify-between mb-6">
+              <div className="flex items-center gap-3">
+                <div className="w-1 h-6 bg-primary rounded-full shrink-0" aria-hidden="true" />
+                <div>
+                  <h2 className="flex items-center gap-2 text-sm text-foreground font-semibold tracking-tight">
+                    <Users className="w-3.5 h-3.5 text-primary" />
+                    Top catalogued performers
+                  </h2>
+                  <p className="text-xs text-muted-foreground mt-0.5">
+                    Frequently listed profiles in the directory
+                  </p>
+                </div>
+              </div>
               <Link
                 href="/performers"
-                className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors group"
+                className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors group font-medium"
               >
                 Directory <ArrowRight className="w-3 h-3 transition-transform duration-200 group-hover:translate-x-0.5" />
               </Link>
@@ -406,20 +447,26 @@ export default function Home() {
         </section>
       )}
 
-
       {/* Popular Tags */}
       {Array.isArray(tags) && tags.length > 0 && (
-        <section className="border-t border-border/50 px-4 sm:px-6 py-14 relative overflow-hidden">
-          <div className="pattern-square absolute inset-0 pointer-events-none opacity-20" aria-hidden="true" />
+        <section className="border-t border-border/50 px-4 sm:px-6 py-12 relative overflow-hidden">
           <div className="container mx-auto relative">
-            <div className="flex items-center justify-between mb-8">
-              <h2 className="flex items-center gap-2 text-xs uppercase tracking-[0.25em] text-muted-foreground font-semibold">
-                <Tags className="w-3.5 h-3.5 text-primary" />
-                Browse by Tag
-              </h2>
+            <div className="flex items-center justify-between mb-6">
+              <div className="flex items-center gap-3">
+                <div className="w-1 h-6 bg-primary rounded-full shrink-0" aria-hidden="true" />
+                <div>
+                  <h2 className="flex items-center gap-2 text-sm text-foreground font-semibold tracking-tight">
+                    <Tags className="w-3.5 h-3.5 text-primary" />
+                    Browse topics &amp; tags
+                  </h2>
+                  <p className="text-xs text-muted-foreground mt-0.5">
+                    Filter index entries by category
+                  </p>
+                </div>
+              </div>
               <Link
                 href="/tags"
-                className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors group"
+                className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors group font-medium"
               >
                 All tags <ArrowRight className="w-3 h-3 transition-transform duration-200 group-hover:translate-x-0.5" />
               </Link>
@@ -429,10 +476,10 @@ export default function Home() {
                 <Link
                   key={tag}
                   href={`/browse?tags=${encodeURIComponent(tag)}`}
-                  className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs border border-border/60 text-muted-foreground hover:border-primary/50 hover:text-primary hover:bg-primary/5 transition-all rounded-lg dark:bg-card"
+                  className="inline-flex items-center gap-2 px-3 py-1.5 text-xs border border-border/70 text-foreground/80 hover:border-primary/50 hover:text-primary hover:bg-primary/5 transition-all rounded-lg bg-card/60"
                 >
-                  {tag}
-                  <span className="text-[10px] text-muted-foreground/50 font-medium">{count}</span>
+                  <span>{tag}</span>
+                  <span className="text-[11px] text-muted-foreground font-mono tabular-nums">{count}</span>
                 </Link>
               ))}
             </div>

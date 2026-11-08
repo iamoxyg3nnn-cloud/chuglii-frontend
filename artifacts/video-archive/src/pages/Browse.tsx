@@ -440,15 +440,17 @@ export default function Browse() {
           <div className="flex flex-col gap-3 mb-6">
             <div className="flex flex-col sm:flex-row sm:items-center gap-3">
               <div>
-                <div className="flex items-center gap-2.5 mb-0.5">
+                <div className="flex items-center gap-2.5">
                   <div className="w-7 h-7 rounded-lg bg-primary/10 flex items-center justify-center">
                     <Clapperboard className="w-3.5 h-3.5 text-primary" />
                   </div>
                   <h1 className="text-xl font-bold tracking-tight">Browse recordings</h1>
-                <p className="text-xs text-muted-foreground mt-1 max-w-xl">Search public adult cam recording listings by title or performer, narrow results with tags and filters, and sort the catalogue to find relevant entries. 18+ only.</p>
                 </div>
+                <p className="text-xs text-muted-foreground mt-1.5 max-w-xl">
+                  Search public adult cam recording listings by title or performer, narrow results with tags and filters, and sort the catalogue to find relevant entries. 18+ only.
+                </p>
                 {data && data.total != null && (
-                  <p className="text-xs text-muted-foreground/70 ml-9.5">
+                  <p className="text-xs text-muted-foreground/75 mt-1 tabular-nums font-mono">
                     {(data.totalIsEstimate ?? false) ? "≈ " : ""}{data.total.toLocaleString()} recordings
                   </p>
                 )}
@@ -594,12 +596,12 @@ export default function Browse() {
                               if (e.key === "Enter") handleSavePreset();
                             }}
                             maxLength={40}
-                            className="flex-1 h-7 bg-card border border-border/40 focus:border-primary/50 rounded-[2px] px-2 text-xs outline-none"
+                            className="flex-1 h-7 bg-card border border-border/40 focus:border-primary/50 rounded-md px-2 text-xs outline-none"
                           />
                           <button
                             onClick={handleSavePreset}
                             disabled={!presetName.trim()}
-                            className="w-7 h-7 flex items-center justify-center border border-primary/30 text-primary rounded-[2px] disabled:opacity-40 hover:border-primary/60 transition-opacity"
+                            className="w-7 h-7 flex items-center justify-center border border-primary/30 text-primary rounded-md disabled:opacity-40 hover:border-primary/60 transition-opacity"
                             title="Save preset"
                           >
                             <Plus className="w-3 h-3" />

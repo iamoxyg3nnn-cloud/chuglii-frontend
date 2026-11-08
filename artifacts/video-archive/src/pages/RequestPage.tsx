@@ -1,4 +1,4 @@
-﻿import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useLocation, Link } from "wouter";
 import { useQuery } from "@tanstack/react-query";
 import { motion } from "framer-motion";
@@ -279,7 +279,7 @@ export default function RequestPage() {
             <div className="flex gap-3 justify-center">
               <button
                 onClick={() => setLocation("/")}
-                className="px-4 py-2 text-xs border border-border/60 text-muted-foreground hover:text-foreground rounded-sm transition-colors"
+                className="px-4 py-2 text-xs border border-border/60 text-muted-foreground hover:text-foreground rounded-lg transition-colors"
               >
                 Back to archive
               </button>
@@ -294,7 +294,7 @@ export default function RequestPage() {
                   setPriority("normal");
                   setSubmissionId(null);
                 }}
-                className="px-4 py-2 text-xs border border-primary/30 text-primary hover:border-primary/60 rounded-sm transition-colors"
+                className="px-4 py-2 text-xs border border-primary/30 text-primary hover:border-primary/60 rounded-lg transition-colors"
               >
                 Submit another
               </button>
@@ -314,7 +314,7 @@ export default function RequestPage() {
               <Sparkles className="w-3 h-3" />
               Request a performer
             </div>
-            <h1 className="text-2xl font-black tracking-tight text-foreground">
+            <h1 className="text-2xl font-bold tracking-tight text-foreground">
               Request Recording
             </h1>
             <p className="text-sm text-muted-foreground mt-1">
@@ -458,7 +458,7 @@ function Step2PerformerLookup({
             value={username}
             onChange={(e) => onUsernameChange(e.target.value)}
             placeholder="e.g. sexysusan"
-            className="w-full h-10 bg-secondary border border-border/60 focus:border-primary/50 rounded-sm px-3 text-sm outline-none transition-all placeholder:text-muted-foreground/40"
+            className="w-full h-10 bg-secondary border border-border/60 focus:border-primary/50 rounded-lg px-3 text-sm outline-none transition-all placeholder:text-muted-foreground/40"
           />
           {username && (
             <p className="text-[10px] text-muted-foreground/50 mt-1">
@@ -558,12 +558,12 @@ function Step3Confirm({
           onChange={(e) => onNotesChange(e.target.value)}
           placeholder="Any specific details about this request..."
           rows={3}
-          className="w-full bg-secondary border border-border/60 focus:border-primary/50 rounded-sm px-3 py-2 text-sm outline-none transition-all placeholder:text-muted-foreground/40 resize-none"
+          className="w-full bg-secondary border border-border/60 focus:border-primary/50 rounded-lg px-3 py-2 text-sm outline-none transition-all placeholder:text-muted-foreground/40 resize-none"
         />
       </div>
 
       <div className="space-y-2">
-        <p id="request-priority-label" className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
+        <p id="request-priority-label" className="text-xs font-medium text-muted-foreground">
           Priority
         </p>
         <div role="group" aria-labelledby="request-priority-label" className="flex gap-2">
@@ -571,7 +571,7 @@ function Step3Confirm({
             <button
               key={p}
               onClick={() => onPriorityChange(p)}
-              className={`flex-1 h-9 text-xs font-medium rounded-sm border transition-colors ${
+              className={`flex-1 h-9 text-xs font-medium rounded-lg border transition-colors ${
                 priority === p
                   ? "border-primary/50 bg-primary/8 text-primary"
                   : "border-border/60 text-muted-foreground hover:text-foreground hover:border-border"

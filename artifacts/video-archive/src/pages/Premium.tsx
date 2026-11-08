@@ -147,13 +147,11 @@ export default function Premium() {
         )}
 
         <div className="text-center mb-10">
-          <div className="mb-3 flex items-center justify-center gap-2">
+          <div className="mb-3 flex items-center justify-center gap-2 text-xs font-medium text-muted-foreground">
             <Crown className="w-5 h-5 text-primary" />
-            <span className="text-xs uppercase tracking-[0.3em] text-muted-foreground font-medium">
-              VAULT Premium
-            </span>
+            <span>VAULT Premium</span>
           </div>
-          <h1 className="text-3xl md:text-4xl font-black tracking-tight mb-3">
+          <h1 className="text-3xl md:text-4xl font-bold tracking-tight text-foreground mb-3">
             Watch ad-free, <span className="text-primary">forever clear</span>
           </h1>
           <p className="text-sm text-muted-foreground max-w-md mx-auto leading-relaxed">

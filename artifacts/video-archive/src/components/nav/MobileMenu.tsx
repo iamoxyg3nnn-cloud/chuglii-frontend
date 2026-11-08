@@ -61,7 +61,7 @@ export function MobileMenu({
                   onMouseEnter={() => prefetchRoute(href)}
                   onFocus={() => prefetchRoute(href)}
                 >
-                  <Icon className={`w-4 h-4 ${isActiveNavigationRoute(href, location) ? "text-primary" : "text-muted-foreground/40"}`} />
+                  <Icon className={`w-4 h-4 ${isActiveNavigationRoute(href, location) ? "text-primary" : "text-muted-foreground/60"}`} />
                   {label}
                 </span>
               </Link>
@@ -70,9 +70,9 @@ export function MobileMenu({
               onClick={() => { onClose?.(); onRequestOpen?.(); }}
               onMouseEnter={() => prefetchRoute("/request")}
               onFocus={() => prefetchRoute("/request")}
-              className="w-full flex items-center gap-2.5 px-3 py-2.5 text-sm rounded-lg transition-all duration-150 text-muted-foreground hover:text-foreground hover:bg-secondary/30 dark:hover:bg-white/5"
+              className="w-full flex items-center gap-2.5 px-3 py-2.5 text-sm rounded-lg transition-colors duration-150 text-muted-foreground hover:text-foreground hover:bg-secondary/30 dark:hover:bg-white/5"
             >
-              <Send className="w-4 h-4 text-muted-foreground/40" />
+              <Send className="w-4 h-4 text-muted-foreground/60" />
               Request
             </button>
           </div>
@@ -81,13 +81,13 @@ export function MobileMenu({
 
           {/* Library section */}
           <div className="px-3 py-2 space-y-0.5">
-            <p className="px-3 py-1 text-[10px] uppercase tracking-wider text-muted-foreground/40 font-semibold">
+            <p className="px-3 py-1 text-xs text-muted-foreground/70 font-medium">
               Library
             </p>
             {LIBRARY_LINKS.map(({ href, label, icon: Icon }) => (
               <Link key={href} href={href} aria-current={isActiveNavigationRoute(href, location) ? "page" : undefined}>
                 <span
-                  className={`block px-3 py-2 text-sm rounded-lg transition-all duration-150 inline-flex items-center gap-2.5 ${
+                  className={`block px-3 py-2 text-sm rounded-lg transition-colors duration-150 inline-flex items-center gap-2.5 ${
                     isActiveNavigationRoute(href, location)
                       ? "text-foreground font-medium bg-secondary/50 dark:bg-white/8"
                       : "text-muted-foreground hover:text-foreground hover:bg-secondary/30 dark:hover:bg-white/5"
@@ -96,7 +96,7 @@ export function MobileMenu({
                   onMouseEnter={() => prefetchRoute(href)}
                   onFocus={() => prefetchRoute(href)}
                 >
-                  <Icon className={`w-3.5 h-3.5 ${isActiveNavigationRoute(href, location) ? "text-primary" : "text-muted-foreground/40"}`} />
+                  <Icon className={`w-3.5 h-3.5 ${isActiveNavigationRoute(href, location) ? "text-primary" : "text-muted-foreground/60"}`} />
                   {label}
                 </span>
               </Link>
@@ -110,7 +110,7 @@ export function MobileMenu({
             {SETTINGS_LINKS.map(({ href, label, icon: Icon }) => (
               <Link key={href} href={href} aria-current={isActiveNavigationRoute(href, location) ? "page" : undefined}>
                 <span
-                  className={`block px-3 py-2 text-sm rounded-lg transition-all duration-150 inline-flex items-center gap-2.5 ${
+                  className={`block px-3 py-2 text-sm rounded-lg transition-colors duration-150 inline-flex items-center gap-2.5 ${
                     isActiveNavigationRoute(href, location)
                       ? "text-foreground font-medium bg-secondary/50 dark:bg-white/8"
                       : "text-muted-foreground hover:text-foreground hover:bg-secondary/30 dark:hover:bg-white/5"
@@ -119,7 +119,7 @@ export function MobileMenu({
                   onMouseEnter={() => prefetchRoute(href)}
                   onFocus={() => prefetchRoute(href)}
                 >
-                  <Icon className={`w-3.5 h-3.5 ${isActiveNavigationRoute(href, location) ? "text-primary" : "text-muted-foreground/40"}`} />
+                  <Icon className={`w-3.5 h-3.5 ${isActiveNavigationRoute(href, location) ? "text-primary" : "text-muted-foreground/60"}`} />
                   {label}
                 </span>
               </Link>

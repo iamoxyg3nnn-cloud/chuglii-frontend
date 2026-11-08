@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef, lazy, Suspense } from "react";
 import * as DialogPrimitive from "@radix-ui/react-dialog";
 import { Link, useLocation } from "wouter";
-import { Menu, X, Film, Sun, Moon, Crown, Check } from "lucide-react";
+import { Menu, X, Film, Sun, Moon, Crown, Check, Shuffle } from "lucide-react";
 import { UserMenu } from "@/components/UserMenu";
 import { usePremium } from "@/contexts/PremiumContext";
 import { useAds } from "@/contexts/AdsContext";
@@ -31,14 +31,14 @@ function prefetchFooter(href: string) {
 function Logo() {
   return (
     <Link href="/" className="shrink-0 flex items-center gap-2.5 group">
-      <div className="relative flex items-center justify-center w-8 h-8 rounded-lg border border-primary/20 group-hover:border-primary/40 transition-all duration-300">
+      <div className="relative flex items-center justify-center w-8 h-8 rounded-lg bg-primary/10 border border-primary/20 group-hover:border-primary/40 transition-colors duration-200">
         <Film className="w-4 h-4 text-primary" />
       </div>
-      <div className="flex items-baseline gap-0.5">
-        <span className="font-black text-xl tracking-tighter text-foreground group-hover:text-primary transition-colors duration-300">
+      <div className="flex items-baseline gap-1">
+        <span className="font-bold text-lg tracking-tight text-foreground group-hover:text-primary transition-colors duration-200">
           VAULT
         </span>
-        <span className="logo-dot w-1.5 h-1.5 rounded-full bg-primary inline-block" />
+        <span className="w-1.5 h-1.5 rounded-full bg-primary inline-block" />
       </div>
     </Link>
   );
@@ -50,22 +50,13 @@ function RandomButton() {
   return (
     <button
       onClick={() => setLocation("/random")}
-      className={`random-fab fixed right-6 sm:right-8 z-40 cursor-pointer hover:scale-110 active:scale-95 transition-all duration-200 pointer-events-auto ${
+      className={`fixed right-6 sm:right-8 z-40 h-11 w-11 rounded-xl bg-card/90 backdrop-blur-md border border-border/80 shadow-md hover:border-primary/50 text-muted-foreground hover:text-primary transition-colors flex items-center justify-center cursor-pointer pointer-events-auto ${
         showAds ? "bottom-24 sm:bottom-8" : "bottom-8"
       }`}
       aria-label="Random video"
+      title="Surprise me / Random recording"
     >
-      <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1" strokeLinecap="round" strokeLinejoin="round" className="w-7 h-7 opacity-60 hover:opacity-100 transition-opacity" style={{ color: 'hsl(var(--primary))' }}>
-        <path d="M10.82 16.12c1.69.6 3.91.79 5.18.85.28.01.53-.09.7-.27"/>
-        <path d="M11.14 20.57c.52.24 2.44 1.12 4.08 1.37.46.06.86-.25.9-.71.12-1.52-.3-3.43-.5-4.28"/>
-        <path d="M16.13 21.05c1.65.63 3.68.84 4.87.91a.9.9 0 0 0 .7-.26"/>
-        <path d="M17.99 5.52a20.83 20.83 0 0 1 3.15 4.5.8.8 0 0 1-.68 1.13c-1.17.1-2.5.02-3.9-.25"/>
-        <path d="M20.57 11.14c.24.52 1.12 2.44 1.37 4.08.04.3-.08.59-.31.75"/>
-        <path d="M4.93 4.93a10 10 0 0 0-.67 13.4c.35.43.96.4 1.17-.12.69-1.71 1.07-5.07 1.07-6.71 1.34.45 3.1.9 4.88.62a.85.85 0 0 0 .48-.24"/>
-        <path d="M5.52 17.99c1.05.95 2.91 2.42 4.5 3.15a.8.8 0 0 0 1.13-.68c.2-2.34-.33-5.3-1.57-8.28"/>
-        <path d="M8.35 2.68a10 10 0 0 1 9.98 1.58c.43.35.4.96-.12 1.17-1.5.6-4.3.98-6.07 1.05"/>
-        <path d="m2 2 20 20"/>
-      </svg>
+      <Shuffle className="w-4 h-4" />
     </button>
   );
 }
@@ -98,13 +89,13 @@ export function AgeGate() {
       <DialogPrimitive.Portal>
         <DialogPrimitive.Overlay className="fixed inset-0 z-[100] bg-black/98 backdrop-blur-sm data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0" />
         <DialogPrimitive.Content
-          className={`fixed left-1/2 top-1/2 z-[101] -translate-x-1/2 -translate-y-1/2 w-[calc(100%-2rem)] ${showTerms ? "max-w-lg" : "max-w-sm"} max-h-[calc(100dvh-2rem)] overflow-y-auto bg-background border border-border/50 shadow-lg px-8 py-12 ${showTerms ? "" : "text-center"}`}
+          className={`fixed left-1/2 top-1/2 z-[101] -translate-x-1/2 -translate-y-1/2 w-[calc(100%-2rem)] ${showTerms ? "max-w-lg" : "max-w-sm"} max-h-[calc(100dvh-2rem)] overflow-y-auto bg-card border border-border/70 shadow-2xl rounded-2xl px-8 py-10 ${showTerms ? "" : "text-center"}`}
           onEscapeKeyDown={(event) => event.preventDefault()}
           onPointerDownOutside={(event) => event.preventDefault()}
         >
           {showTerms ? (
             <>
-              <DialogPrimitive.Title className="text-xs uppercase tracking-[0.3em] text-muted-foreground mb-6 text-center">
+              <DialogPrimitive.Title className="text-xs uppercase tracking-[0.25em] text-muted-foreground mb-6 text-center font-medium">
                 Terms of Use
               </DialogPrimitive.Title>
               <DialogPrimitive.Description className="sr-only">
@@ -147,7 +138,7 @@ export function AgeGate() {
               <div className="mt-8 text-center">
                 <button
                   type="button"
-                  className="h-10 px-6 border border-border text-sm text-muted-foreground hover:text-foreground hover:border-foreground/30 transition-colors"
+                  className="h-10 px-6 rounded-lg border border-border text-sm text-muted-foreground hover:text-foreground hover:border-foreground/30 transition-colors"
                   onClick={() => setShowTerms(false)}
                 >
                   Back
@@ -157,28 +148,31 @@ export function AgeGate() {
           ) : (
             <>
               <div className="mb-8">
-                <DialogPrimitive.Title className="text-xs uppercase tracking-[0.3em] text-muted-foreground mb-6">
+                <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-primary/10 border border-primary/20 text-primary text-[11px] font-semibold mb-4">
+                  <span>Age verification required</span>
+                </div>
+                <DialogPrimitive.Title className="sr-only">
                   Age Verification Required
                 </DialogPrimitive.Title>
-                <div className="text-6xl font-black tracking-tighter text-foreground mb-2">18+</div>
-                <div className="w-8 h-px bg-primary mx-auto mb-6" />
+                <div className="text-5xl font-extrabold tracking-tight text-foreground mb-2">18+</div>
+                <div className="w-8 h-px bg-primary/60 mx-auto mb-4" />
                 <DialogPrimitive.Description className="text-sm text-muted-foreground leading-relaxed">
-                  This site contains adult material. By entering, you confirm you are 18 years of age or
+                  This archive contains adult material. By entering, you confirm you are 18 years of age or
                   older and agree to our{" "}
                   <button
                     type="button"
                     onClick={() => setShowTerms(true)}
-                    className="text-primary hover:underline inline cursor-pointer bg-transparent border-none p-0 text-sm"
+                    className="text-primary hover:underline inline cursor-pointer bg-transparent border-none p-0 text-sm font-medium"
                   >
                     Terms of Use
                   </button>
                   .
                 </DialogPrimitive.Description>
               </div>
-              <div className="space-y-3">
+              <div className="space-y-2.5">
                 <button
                   type="button"
-                  className="w-full min-h-12 px-3 border border-primary/30 text-primary text-sm font-semibold tracking-wide hover:border-primary/60 transition-colors"
+                  className="w-full h-11 px-4 rounded-xl bg-primary text-primary-foreground text-sm font-semibold tracking-wide hover:bg-primary/90 transition-colors"
                   onClick={() => {
                     markAgeGatePassed();
                     setIsOpen(false);
@@ -188,7 +182,7 @@ export function AgeGate() {
                 </button>
                 <button
                   type="button"
-                  className="w-full min-h-12 px-3 border border-border text-sm text-muted-foreground hover:text-foreground hover:border-foreground/30 transition-colors"
+                  className="w-full h-11 px-4 rounded-xl border border-border/80 text-sm text-muted-foreground hover:text-foreground hover:border-border transition-colors"
                   onClick={() => (window.location.href = "https://google.com")}
                 >
                   Exit
@@ -380,22 +374,12 @@ export function Layout({ children }: { children: React.ReactNode }) {
       <RandomButton />
       <PremiumUpsellPopup />
 
-      <footer className="py-10 border-t border-border/40 mt-16 bg-background dark:bg-background backdrop-blur-sm relative overflow-hidden">
-        {/* Diamond texture — fades in from bottom edge */}
-        <div
-          className="pattern-square absolute inset-0 pointer-events-none"
-          style={{
-            opacity: 0.22,
-            maskImage: "linear-gradient(to top, black 0%, transparent 70%)",
-            WebkitMaskImage: "linear-gradient(to top, black 0%, transparent 70%)",
-          }}
-          aria-hidden="true"
-        />
-        <div className="container mx-auto px-4 sm:px-6">
+      <footer className="border-t border-border/40 mt-20 bg-card/40 backdrop-blur-md">
+        <div className="container mx-auto px-4 sm:px-6 py-12 lg:py-16">
           {/* ── Site-wide footer ad (every page) ────────────────────────
               728×90 desktop / 468×60 tablet / 300×100 phones (rectangle). */}
           {footerAds && (
-            <div className="mb-8 flex justify-center">
+            <div className="mb-12 flex justify-center">
               <AdLeaderboard
                 lg="leaderboard-728x90"
                 md="banner-468x60"
@@ -403,42 +387,131 @@ export function Layout({ children }: { children: React.ReactNode }) {
               />
             </div>
           )}
-          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-6">
-            <div className="space-y-2">
-              <Link href="/" className="flex items-center gap-1.5 group w-fit">
-                <Film className="w-3.5 h-3.5 text-primary/40 group-hover:text-primary transition-colors" />
-                <span className="font-black text-sm tracking-tighter text-foreground/40 group-hover:text-foreground/70 transition-colors">
-                  VAULT<span className="text-primary/40">.</span>
-                </span>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-8 lg:gap-12 pb-12 border-b border-border/40">
+            {/* Brand column */}
+            <div className="lg:col-span-2 space-y-4">
+              <Link href="/" className="flex items-center gap-2 group w-fit">
+                <div className="flex items-center justify-center w-7 h-7 rounded-md bg-primary/10 border border-primary/20 group-hover:border-primary/40 transition-colors">
+                  <Film className="w-3.5 h-3.5 text-primary" />
+                </div>
+                <div className="flex items-baseline gap-1">
+                  <span className="font-bold text-base tracking-tight text-foreground group-hover:text-primary transition-colors">
+                    VAULT
+                  </span>
+                  <span className="w-1.5 h-1.5 rounded-full bg-primary inline-block" />
+                </div>
               </Link>
-              <p className="text-xs text-muted-foreground/40 max-w-xs leading-relaxed">
-                Public adult cam recording archive and performer directory. For adult audiences only (18+).
+              <p className="text-xs text-muted-foreground max-w-sm leading-relaxed">
+                A public recording index and performer archive. Explore listed streams, discover performer profiles, and curate your personal collection.
               </p>
+              <div className="flex items-center gap-2 text-[11px] text-muted-foreground/80">
+                <span className="inline-block w-2 h-2 rounded-full bg-emerald-500/80" />
+                <span>Archive index operational</span>
+                <span className="text-border/60">·</span>
+                <span className="font-semibold text-foreground/80">18+ Adults only</span>
+              </div>
             </div>
-            <nav
-              className="flex flex-wrap gap-x-5 gap-y-2 text-xs text-muted-foreground/50"
-              aria-label="Footer navigation"
-            >
-              <Link href="/premium" className="text-primary/60 hover:text-primary transition-colors" onMouseEnter={() => prefetchFooter("/premium")} onFocus={() => prefetchFooter("/premium")}>Premium</Link>
-              <Link href="/browse" className="hover:text-muted-foreground transition-colors" onMouseEnter={() => prefetchFooter("/browse")} onFocus={() => prefetchFooter("/browse")}>Browse</Link>
-              <Link href="/performers" className="hover:text-muted-foreground transition-colors" onMouseEnter={() => prefetchFooter("/performers")} onFocus={() => prefetchFooter("/performers")}>Performers</Link>
-              <Link href="/tags" className="hover:text-muted-foreground transition-colors" onMouseEnter={() => prefetchFooter("/tags")} onFocus={() => prefetchFooter("/tags")}>Tags</Link>
-              <Link href="/playlists" className="hover:text-muted-foreground transition-colors" onMouseEnter={() => prefetchFooter("/playlists")} onFocus={() => prefetchFooter("/playlists")}>Playlists</Link>
-              <Link href="/collections" className="hover:text-muted-foreground transition-colors" onMouseEnter={() => prefetchFooter("/collections")} onFocus={() => prefetchFooter("/collections")}>Collections</Link>
-              <Link href="/request" className="hover:text-muted-foreground transition-colors" onMouseEnter={() => prefetchFooter("/request")} onFocus={() => prefetchFooter("/request")}>Request</Link>
-              <Link href="/content-removal" className="hover:text-muted-foreground transition-colors">Content Removal</Link>
-              <Link href="/my-requests" className="hover:text-muted-foreground transition-colors" onMouseEnter={() => prefetchFooter("/my-requests")} onFocus={() => prefetchFooter("/my-requests")}>My Requests</Link>
-              <Link href="/bookmarks" className="hover:text-muted-foreground transition-colors" onMouseEnter={() => prefetchFooter("/bookmarks")} onFocus={() => prefetchFooter("/bookmarks")}>Bookmarks</Link>
-              <Link href="/watch-later" className="hover:text-muted-foreground transition-colors" onMouseEnter={() => prefetchFooter("/watch-later")} onFocus={() => prefetchFooter("/watch-later")}>Watch Later</Link>
-              <Link href="/history" className="hover:text-muted-foreground transition-colors" onMouseEnter={() => prefetchFooter("/history")} onFocus={() => prefetchFooter("/history")}>History</Link>
-              <Link href="/analytics" className="hover:text-muted-foreground transition-colors" onMouseEnter={() => prefetchFooter("/analytics")} onFocus={() => prefetchFooter("/analytics")}>Analytics</Link>
-              <span className="hidden sm:block w-px h-3 bg-border/40 self-center" />
-              <span className="cursor-default">Terms</span>
-              <span className="cursor-default">Privacy</span>
-            </nav>
+
+            {/* Discover */}
+            <div className="space-y-3">
+              <h3 className="text-xs font-semibold text-foreground tracking-wide">Discover</h3>
+              <ul className="space-y-2 text-xs text-muted-foreground">
+                <li>
+                  <Link href="/browse" className="hover:text-foreground transition-colors" onMouseEnter={() => prefetchFooter("/browse")} onFocus={() => prefetchFooter("/browse")}>
+                    Browse recordings
+                  </Link>
+                </li>
+                <li>
+                  <Link href="/performers" className="hover:text-foreground transition-colors" onMouseEnter={() => prefetchFooter("/performers")} onFocus={() => prefetchFooter("/performers")}>
+                    Performer directory
+                  </Link>
+                </li>
+                <li>
+                  <Link href="/tags" className="hover:text-foreground transition-colors" onMouseEnter={() => prefetchFooter("/tags")} onFocus={() => prefetchFooter("/tags")}>
+                    Topic tags
+                  </Link>
+                </li>
+                <li>
+                  <Link href="/playlists" className="hover:text-foreground transition-colors" onMouseEnter={() => prefetchFooter("/playlists")} onFocus={() => prefetchFooter("/playlists")}>
+                    Curated playlists
+                  </Link>
+                </li>
+                <li>
+                  <Link href="/collections" className="hover:text-foreground transition-colors" onMouseEnter={() => prefetchFooter("/collections")} onFocus={() => prefetchFooter("/collections")}>
+                    Public collections
+                  </Link>
+                </li>
+              </ul>
+            </div>
+
+            {/* Library */}
+            <div className="space-y-3">
+              <h3 className="text-xs font-semibold text-foreground tracking-wide">Library</h3>
+              <ul className="space-y-2 text-xs text-muted-foreground">
+                <li>
+                  <Link href="/bookmarks" className="hover:text-foreground transition-colors" onMouseEnter={() => prefetchFooter("/bookmarks")} onFocus={() => prefetchFooter("/bookmarks")}>
+                    Saved bookmarks
+                  </Link>
+                </li>
+                <li>
+                  <Link href="/watch-later" className="hover:text-foreground transition-colors" onMouseEnter={() => prefetchFooter("/watch-later")} onFocus={() => prefetchFooter("/watch-later")}>
+                    Watch later
+                  </Link>
+                </li>
+                <li>
+                  <Link href="/history" className="hover:text-foreground transition-colors" onMouseEnter={() => prefetchFooter("/history")} onFocus={() => prefetchFooter("/history")}>
+                    Watch history
+                  </Link>
+                </li>
+                <li>
+                  <Link href="/my-requests" className="hover:text-foreground transition-colors" onMouseEnter={() => prefetchFooter("/my-requests")} onFocus={() => prefetchFooter("/my-requests")}>
+                    My requests
+                  </Link>
+                </li>
+                <li>
+                  <Link href="/premium" className="text-primary hover:text-primary/90 transition-colors font-medium" onMouseEnter={() => prefetchFooter("/premium")} onFocus={() => prefetchFooter("/premium")}>
+                    Premium membership
+                  </Link>
+                </li>
+              </ul>
+            </div>
+
+            {/* Support & Legal */}
+            <div className="space-y-3">
+              <h3 className="text-xs font-semibold text-foreground tracking-wide">Support & Legal</h3>
+              <ul className="space-y-2 text-xs text-muted-foreground">
+                <li>
+                  <Link href="/request" className="hover:text-foreground transition-colors" onMouseEnter={() => prefetchFooter("/request")} onFocus={() => prefetchFooter("/request")}>
+                    Request recording
+                  </Link>
+                </li>
+                <li>
+                  <Link href="/content-removal" className="hover:text-foreground transition-colors">
+                    Content removal / DMCA
+                  </Link>
+                </li>
+                <li>
+                  <Link href="/analytics" className="hover:text-foreground transition-colors" onMouseEnter={() => prefetchFooter("/analytics")} onFocus={() => prefetchFooter("/analytics")}>
+                    Viewing analytics
+                  </Link>
+                </li>
+                <li className="pt-1 text-muted-foreground/60 text-[11px]">
+                  <span>Terms of Service</span>
+                  <span className="mx-2">·</span>
+                  <span>Privacy Policy</span>
+                </li>
+              </ul>
+            </div>
           </div>
-          <div className="mt-8 pt-5 border-t border-border/30 text-[11px] text-muted-foreground/30">
-            &copy; {new Date().getFullYear()} VAULT — Adult Recording Archive — Adults only (18+)
+
+          <div className="pt-6 flex flex-col sm:flex-row items-center justify-between gap-4 text-[11px] text-muted-foreground">
+            <div>
+              &copy; <span className="tabular-nums">{new Date().getFullYear()}</span> VAULT. Public Recording Archive &amp; Performer Directory.
+            </div>
+            <div className="text-muted-foreground/75 text-[11px]">
+              Adult content intended strictly for audiences 18 years or older.
+            </div>
           </div>
         </div>
       </footer>

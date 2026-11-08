@@ -120,7 +120,7 @@ export default function Notifications() {
         {isLoading ? (
           <div className="space-y-2">
             {[...Array(5)].map((_, i) => (
-              <div key={i} className="h-14 bg-secondary/30 border border-border/30 rounded-sm animate-pulse" />
+              <div key={i} className="h-14 bg-secondary/30 border border-border/30 rounded-lg animate-pulse" />
             ))}
           </div>
         ) : notifications.length === 0 ? (
@@ -138,7 +138,7 @@ export default function Notifications() {
               return (
                 <div
                   key={n.id}
-                  className={`flex items-start gap-3 px-4 py-3 border rounded-sm transition-all ${
+                  className={`flex items-start gap-3 px-4 py-3 border rounded-xl transition-all ${
                     !n.is_read
                       ? "border-primary/20 bg-primary/5"
                       : "border-border/40 hover:border-border/60"
@@ -171,7 +171,7 @@ export default function Notifications() {
                   <button
                     onClick={() => deleteOne.mutate(n.id)}
                     disabled={deleteOne.isPending}
-                    className="shrink-0 flex items-center justify-center w-7 h-7 text-muted-foreground/40 hover:text-destructive hover:bg-destructive/10 transition-colors rounded mt-0.5"
+                    className="shrink-0 flex items-center justify-center w-7 h-7 text-muted-foreground/40 hover:text-destructive hover:bg-destructive/10 transition-colors rounded-lg mt-0.5"
                     title="Delete"
                   >
                     <X className="w-3.5 h-3.5" />

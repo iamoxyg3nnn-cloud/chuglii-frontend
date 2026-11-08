@@ -75,11 +75,11 @@ export default function AdminCache() {
     <div className="p-6">
       <div className="flex items-center justify-between mb-6">
         <div>
-          <div className="flex items-center gap-2 text-xs uppercase tracking-[0.25em] text-muted-foreground font-semibold mb-2">
+          <div className="flex items-center gap-2 text-xs font-medium text-muted-foreground mb-2">
             <Shield className="w-3.5 h-3.5 text-primary" />
-            Admin
+            <span>Admin</span>
           </div>
-          <h1 className="text-2xl font-black tracking-tighter">Cache Management</h1>
+          <h1 className="text-2xl font-bold tracking-tight text-foreground">Cache Management</h1>
           <p className="text-sm text-muted-foreground mt-1">
             Monitor and manage Redis cache
           </p>

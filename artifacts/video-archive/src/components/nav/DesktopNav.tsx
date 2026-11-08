@@ -26,9 +26,9 @@ export const DesktopNav = memo(function DesktopNav({ location, onRequestOpen }: 
       <button
         onClick={onRequestOpen}
         type="button"
-        className="nav-underline px-3 py-1.5 rounded-lg inline-flex items-center gap-1.5 transition-all duration-200 text-muted-foreground/70 hover:text-foreground cursor-pointer"
+        className="nav-underline px-3 py-1.5 rounded-lg inline-flex items-center gap-1.5 transition-colors duration-150 text-muted-foreground hover:text-foreground cursor-pointer"
       >
-        <Send className="w-3.5 h-3.5 text-muted-foreground/40" />
+        <Send className="w-3.5 h-3.5 text-muted-foreground/70" />
         Request
       </button>
     </nav>
@@ -52,14 +52,14 @@ const NavLink = memo(function NavLink({ href, label, icon: Icon, isActive: activ
       <span
         onMouseEnter={prefetch}
         onFocus={prefetch}
-        className={`nav-underline px-3 py-1.5 rounded-lg inline-flex items-center gap-1.5 transition-all duration-200 cursor-pointer ${
+        className={`nav-underline px-3 py-1.5 rounded-lg inline-flex items-center gap-1.5 transition-colors duration-150 cursor-pointer ${
           active
             ? "text-foreground font-medium active"
-            : "text-muted-foreground/70 hover:text-foreground"
+            : "text-muted-foreground hover:text-foreground"
         }`}
       >
-        <Icon className={`w-3.5 h-3.5 transition-all duration-200 ${
-          active ? "text-primary" : "text-muted-foreground/40 group-hover:text-foreground/60"
+        <Icon className={`w-3.5 h-3.5 transition-colors duration-150 ${
+          active ? "text-primary" : "text-muted-foreground/60 group-hover:text-foreground/80"
         }`} />
         {label}
       </span>

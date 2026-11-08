@@ -110,7 +110,7 @@ export default function AdminPage() {
               : "Your account doesn't have admin privileges."}
           </p>
           <Link href={user ? "/" : "/login"}>
-            <span className="inline-flex items-center gap-1.5 h-9 px-4 text-xs font-semibold border border-primary/30 text-primary hover:border-primary/60 rounded-sm transition-colors">
+            <span className="inline-flex items-center gap-1.5 h-9 px-4 text-xs font-semibold border border-primary/30 text-primary hover:border-primary/60 rounded-lg transition-colors">
               {user ? "Go Home" : "Sign In"}
             </span>
           </Link>
@@ -144,11 +144,11 @@ export default function AdminPage() {
       <div className="container mx-auto px-4 sm:px-6 py-10 max-w-4xl">
         <div className="flex items-start justify-between mb-8 gap-4">
           <div>
-            <div className="flex items-center gap-2 text-xs uppercase tracking-[0.25em] text-muted-foreground font-semibold mb-3">
+            <div className="flex items-center gap-2 text-xs font-medium text-muted-foreground mb-2">
               <Shield className="w-3.5 h-3.5 text-primary" />
-              Admin
+              <span>Admin</span>
             </div>
-            <h1 className="text-2xl sm:text-3xl font-black tracking-tighter">
+            <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-foreground">
               Recording Requests
             </h1>
             <p className="text-sm text-muted-foreground mt-2">
@@ -159,7 +159,7 @@ export default function AdminPage() {
             <button
               onClick={loadRequests}
               disabled={pageLoading}
-              className="inline-flex items-center gap-1.5 h-9 px-4 text-xs font-medium border border-border/50 text-muted-foreground hover:text-foreground hover:border-border transition-all rounded-sm disabled:opacity-50"
+              className="inline-flex items-center gap-1.5 h-9 px-4 text-xs font-medium border border-border/50 text-muted-foreground hover:text-foreground hover:border-border transition-all rounded-lg disabled:opacity-50"
             >
               <RefreshCw className={`w-3.5 h-3.5 ${pageLoading ? "animate-spin" : ""}`} />
               Refresh
@@ -172,16 +172,16 @@ export default function AdminPage() {
             <button
               key={id}
               onClick={() => setStatusFilter(id)}
-              className={`p-3 border rounded-sm text-left transition-all ${
+              className={`p-3 border rounded-lg text-left transition-all ${
                 statusFilter === id
                   ? "border-primary/60"
                   : "border-border/40 hover:border-border/70"
               }`}
             >
-              <div className={`text-lg font-black ${statusFilter === id ? "text-primary" : "text-foreground"}`}>
+              <div className={`text-lg font-bold tabular-nums ${statusFilter === id ? "text-primary" : "text-foreground"}`}>
                 {counts[id]}
               </div>
-              <div className="text-[10px] text-muted-foreground uppercase tracking-wide">{label}</div>
+              <div className="text-[10px] text-muted-foreground font-medium">{label}</div>
             </button>
           ))}
         </div>
@@ -192,7 +192,7 @@ export default function AdminPage() {
             <button
               key={id}
               onClick={() => setStatusFilter(id)}
-              className={`px-3 py-1 text-xs rounded-sm transition-all border ${
+              className={`px-3 py-1 text-xs rounded-lg transition-all border ${
                 statusFilter === id
                   ? "border-primary/60 text-primary"
                   : "border-border/40 text-muted-foreground hover:text-foreground hover:border-border"
@@ -209,7 +209,7 @@ export default function AdminPage() {
         </div>
 
         {error && (
-          <div className="flex items-center gap-2 p-4 bg-destructive/10 border border-destructive/30 rounded-sm text-sm text-destructive mb-4">
+          <div className="flex items-center gap-2 p-4 bg-destructive/10 border border-destructive/30 rounded-lg text-sm text-destructive mb-4">
             <AlertTriangle className="w-4 h-4 shrink-0" />
             {error}
           </div>
@@ -218,11 +218,11 @@ export default function AdminPage() {
         {pageLoading && !requests.length ? (
           <div className="space-y-2">
             {Array.from({ length: 5 }).map((_, i) => (
-              <div key={i} className="h-16 bg-secondary/30 border border-border/30 rounded-sm animate-pulse" />
+              <div key={i} className="h-16 bg-secondary/30 border border-border/30 rounded-lg animate-pulse" />
             ))}
           </div>
         ) : filtered.length === 0 ? (
-          <div className="py-24 text-center border border-dashed border-border/40 rounded-sm">
+          <div className="py-24 text-center border border-dashed border-border/40 rounded-2xl">
             <Inbox className="w-10 h-10 text-muted-foreground/20 mx-auto mb-4" />
             <p className="text-sm text-muted-foreground">
               {statusFilter === "all" ? "No requests submitted yet." : `No ${statusFilter} requests.`}
@@ -239,10 +239,10 @@ export default function AdminPage() {
               return (
                 <div
                   key={req.id ?? req.created_at}
-                  className="border border-border/40 hover:border-border/70 rounded-sm transition-all"
+                  className="border border-border/40 hover:border-border/70 rounded-xl transition-all"
                 >
                   <div className="flex items-center gap-3 px-4 py-3">
-                    <span className={`shrink-0 text-[10px] font-semibold uppercase tracking-wide px-2 py-0.5 rounded-[2px] border ${statusStyle.className}`}>
+                    <span className={`shrink-0 text-[10px] font-semibold px-2 py-0.5 rounded-md border ${statusStyle.className}`}>
                       {statusStyle.label}
                     </span>
                     <div className="flex-1 min-w-0">

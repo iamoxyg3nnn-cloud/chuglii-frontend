@@ -69,11 +69,11 @@ export default function Playlists() {
         {/* Header */}
         <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4 mb-8">
           <div>
-            <div className="flex items-center gap-2 text-xs uppercase tracking-[0.25em] text-muted-foreground font-semibold mb-3">
+            <div className="flex items-center gap-2 text-xs font-medium text-muted-foreground mb-2">
               <ListVideo className="w-3.5 h-3.5 text-primary" />
-              Community Playlists
+              <span>Community Playlists</span>
             </div>
-            <h1 className="text-2xl sm:text-3xl font-black tracking-tighter">Playlists</h1>
+            <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-foreground">Playlists</h1>
             <p className="text-sm text-muted-foreground mt-2">
               Explore user-created playlists across the community. Create yours and share it with everyone!
             </p>
@@ -114,7 +114,7 @@ export default function Playlists() {
             onSubmit={handleCreate}
             className="mb-8 p-5 border border-primary/30 bg-primary/5 rounded-2xl space-y-3 animate-fade-in-up"
           >
-            <p className="text-xs font-semibold text-foreground uppercase tracking-wide">
+            <p className="text-xs font-semibold text-foreground">
               Create New Public Playlist
             </p>
             <div className="space-y-2">

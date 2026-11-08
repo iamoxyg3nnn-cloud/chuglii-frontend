@@ -173,8 +173,7 @@ export default function Profile() {
     <Layout>
       <div className="container mx-auto px-4 sm:px-6 py-10 max-w-4xl">
         {/* Profile Card Header */}
-        <div className="relative overflow-hidden rounded-2xl border border-border/40 bg-gradient-to-b from-card via-card to-background p-6 sm:p-8 mb-8 shadow-sm">
-          <div className="pattern-square absolute inset-0 pointer-events-none opacity-20" aria-hidden="true" />
+        <div className="relative overflow-hidden rounded-2xl border border-border/70 bg-card p-6 sm:p-8 mb-8 shadow-xs">
 
           <div className="relative flex flex-col sm:flex-row sm:items-center justify-between gap-6">
             <div className="flex items-center gap-4 sm:gap-5 min-w-0">

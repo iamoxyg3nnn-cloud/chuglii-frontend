@@ -380,11 +380,11 @@ export const VideoCard = memo(function VideoCard({ recording, showRemove, onRemo
   return (
     <Link
       href={`/video/${recording.id}`}
-      className="group block outline-none focus-visible:ring-1 focus-visible:ring-primary rounded"
+      className="group block outline-none focus-visible:ring-2 focus-visible:ring-primary/60 rounded-xl"
       {...linkHandlers}
     >
-      <div ref={viewportRef} className="flex flex-col gap-2">
-        <div className="relative aspect-video overflow-hidden bg-secondary rounded-sm will-change-transform">
+      <div ref={viewportRef} className="flex flex-col gap-2.5">
+        <div className="relative aspect-video overflow-hidden bg-secondary/80 rounded-xl border border-border/40 will-change-transform shadow-2xs group-hover:border-border/80 transition-colors">
 
           {usePreviewChain && preloadVideoUrl && !isSlowConnection && isRealVideo && (
             <video
@@ -530,9 +530,9 @@ export const VideoCard = memo(function VideoCard({ recording, showRemove, onRemo
 
           <div className="absolute top-2 right-2 z-30 flex items-center gap-1.5 pointer-events-none">
             {isWatched && (
-              <div className="flex items-center gap-1 bg-black/40 backdrop-blur-sm ring-1 ring-white/10 px-1.5 py-0.5 rounded-[2px]">
-                <CheckCircle className="w-2.5 h-2.5 text-green-400" />
-                <span className="text-[9px] font-semibold text-green-300/90 uppercase tracking-wider">Watched</span>
+              <div className="flex items-center gap-1 bg-black/60 backdrop-blur-md ring-1 ring-white/10 px-1.5 py-0.5 rounded-md">
+                <CheckCircle className="w-2.5 h-2.5 text-emerald-400" />
+                <span className="text-[10px] font-medium text-emerald-300">Watched</span>
               </div>
             )}
             {showAdd && (
@@ -552,7 +552,7 @@ export const VideoCard = memo(function VideoCard({ recording, showRemove, onRemo
                     timestamp: recording.timestamp,
                   });
                 }}
-                className="w-6 h-6 flex items-center justify-center bg-black/30 backdrop-blur-sm ring-1 ring-white/10 hover:bg-primary/70 hover:ring-primary/30 text-white rounded-[2px] opacity-0 group-hover:opacity-100 transition-all pointer-events-auto cursor-pointer"
+                className="w-7 h-7 flex items-center justify-center bg-black/50 backdrop-blur-md ring-1 ring-white/10 hover:bg-primary text-white rounded-md opacity-0 group-hover:opacity-100 transition-opacity pointer-events-auto cursor-pointer"
                 aria-label="Add to collection"
                 title="Add to collection"
               >
@@ -562,7 +562,7 @@ export const VideoCard = memo(function VideoCard({ recording, showRemove, onRemo
             {showRemove && onRemove && (
               <button
                 onClick={(e) => { e.preventDefault(); e.stopPropagation(); onRemove(); }}
-                className="w-6 h-6 flex items-center justify-center bg-black/30 backdrop-blur-sm ring-1 ring-white/10 hover:bg-red-600/70 hover:ring-red-600/30 text-white rounded-[2px] opacity-0 group-hover:opacity-100 transition-all text-[10px] font-bold pointer-events-auto cursor-pointer"
+                className="w-7 h-7 flex items-center justify-center bg-black/50 backdrop-blur-md ring-1 ring-white/10 hover:bg-destructive text-white rounded-md opacity-0 group-hover:opacity-100 transition-opacity text-xs font-bold pointer-events-auto cursor-pointer"
                 aria-label="Remove"
               >
                 ✕
@@ -572,12 +572,12 @@ export const VideoCard = memo(function VideoCard({ recording, showRemove, onRemo
 
           <div className="absolute top-2 left-2 flex items-center gap-1 pointer-events-none">
             {recording.resolution && (
-              <span className="text-[9px] font-bold uppercase tracking-wider text-white/90 bg-black/30 backdrop-blur-sm ring-1 ring-white/10 px-1.5 py-0.5 rounded-[2px]">
+              <span className="text-[10px] font-medium text-white/90 bg-black/60 backdrop-blur-md ring-1 ring-white/10 px-1.5 py-0.5 rounded-md">
                 {recording.resolution}
               </span>
             )}
             {recording.framerate != null && recording.framerate > 0 && (
-              <span className="text-[9px] font-bold text-white/70 bg-black/30 backdrop-blur-sm ring-1 ring-white/10 px-1.5 py-0.5 rounded-[2px]">
+              <span className="text-[10px] font-medium text-white/80 bg-black/60 backdrop-blur-md ring-1 ring-white/10 px-1.5 py-0.5 rounded-md">
                 {recording.framerate}fps
               </span>
             )}
@@ -592,17 +592,17 @@ export const VideoCard = memo(function VideoCard({ recording, showRemove, onRemo
             </div>
           )}
           {progress !== undefined && progress >= 100 && (
-            <div className="absolute bottom-0 left-0 right-0 h-1 bg-green-500/60 z-10" />
+            <div className="absolute bottom-0 left-0 right-0 h-1 bg-emerald-500/80 z-10" />
           )}
 
           <div className="absolute bottom-2 left-2 right-2 flex items-end justify-between pointer-events-none">
             {showDuration ? (
-              <span className="flex items-center gap-1 text-[9px] text-white/70 bg-black/30 backdrop-blur-sm ring-1 ring-white/10 px-1.5 py-0.5 rounded-[2px]">
+              <span className="flex items-center gap-1 text-[10px] font-medium text-white/80 bg-black/60 backdrop-blur-md ring-1 ring-white/10 px-1.5 py-0.5 rounded-md tabular-nums">
                 <Clock className="w-2.5 h-2.5" />
                 {formatDuration(recording.duration)}
               </span>
             ) : showFilesize ? (
-              <span className="flex items-center gap-1 text-[9px] text-white/70 bg-black/30 backdrop-blur-sm ring-1 ring-white/10 px-1.5 py-0.5 rounded-[2px]">
+              <span className="flex items-center gap-1 text-[10px] font-medium text-white/80 bg-black/60 backdrop-blur-md ring-1 ring-white/10 px-1.5 py-0.5 rounded-md tabular-nums">
                 <HardDrive className="w-2.5 h-2.5" />
                 {formatBytes(recording.filesize)}
               </span>
@@ -612,19 +612,19 @@ export const VideoCard = memo(function VideoCard({ recording, showRemove, onRemo
 
         <div className="px-0.5 space-y-1">
           <div className="flex items-center gap-1.5">
-            <span className="text-[13px] font-semibold text-primary/90 group-hover:text-primary transition-colors truncate">
+            <span className="text-[13px] font-medium text-foreground group-hover:text-primary transition-colors truncate">
               {recording.username}
             </span>
           </div>
 
-          <div className="flex items-center justify-between gap-2">
-            <span className="text-[11px] text-muted-foreground/50">
+          <div className="flex items-center justify-between gap-2 text-[11px] text-muted-foreground/75 tabular-nums">
+            <span>
               {formatRelativeTime(recording.timestamp)}
             </span>
             {showViewers && (
-              <span className="flex items-center gap-1 text-[10px] text-muted-foreground/40">
-                <Eye className="w-2.5 h-2.5" />
-                {formatViewers(recording.viewers)} views
+              <span className="flex items-center gap-1">
+                <Eye className="w-3 h-3 text-muted-foreground/50" />
+                {formatViewers(recording.viewers)}
               </span>
             )}
           </div>

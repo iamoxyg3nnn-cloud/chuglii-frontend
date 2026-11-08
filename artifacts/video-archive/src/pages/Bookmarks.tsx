@@ -64,11 +64,11 @@ export default function Bookmarks() {
       <div className="container mx-auto px-4 sm:px-6 py-8 max-w-7xl">
         <div className="flex items-center justify-between mb-8 pb-6 border-b border-border/40">
           <div>
-            <div className="flex items-center gap-2 text-xs uppercase tracking-[0.25em] text-muted-foreground font-semibold mb-3">
+            <div className="flex items-center gap-2 text-xs font-medium text-muted-foreground mb-2">
               <Bookmark className="w-3.5 h-3.5 text-primary" />
-              Saved
+              <span>Saved</span>
             </div>
-            <h1 className="text-2xl sm:text-3xl font-black tracking-tighter">Bookmarks</h1>
+            <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-foreground">Bookmarks</h1>
             <p className="text-sm text-muted-foreground mt-2">
               {bookmarks.length} saved recording{bookmarks.length !== 1 ? "s" : ""}
               <CloudSyncIndicator compact />

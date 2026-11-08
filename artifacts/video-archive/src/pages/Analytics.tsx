@@ -51,11 +51,11 @@ export default function Analytics() {
           <Link href="/history" className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors mb-4">
             <ArrowLeft className="w-3 h-3" /> Back to History
           </Link>
-          <div className="flex items-center gap-2 text-xs uppercase tracking-[0.25em] text-muted-foreground font-semibold mb-3">
+          <div className="flex items-center gap-2 text-xs font-medium text-muted-foreground mb-2">
             <BarChart3 className="w-3.5 h-3.5 text-primary" />
-            Analytics
+            <span>Analytics</span>
           </div>
-          <h1 className="text-2xl sm:text-3xl font-black tracking-tighter">Watch Analytics</h1>
+          <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-foreground">Watch Analytics</h1>
           <p className="text-sm text-muted-foreground mt-2">Your viewing habits at a glance</p>
         </div>
 

@@ -323,11 +323,11 @@ export default function AdminAds() {
       {/* Header */}
       <div className="flex items-center justify-between mb-6">
         <div>
-          <div className="flex items-center gap-2 text-xs uppercase tracking-[0.25em] text-muted-foreground font-semibold mb-2">
+          <div className="flex items-center gap-2 text-xs font-medium text-muted-foreground mb-2">
             <Megaphone className="w-3.5 h-3.5 text-primary" />
-            Admin
+            <span>Admin</span>
           </div>
-          <h1 className="text-2xl font-black tracking-tighter">Ad Management</h1>
+          <h1 className="text-2xl font-bold tracking-tight text-foreground">Ad Management</h1>
           <p className="text-sm text-muted-foreground mt-1">
             Add, edit, reorder and remove ads — and control exactly where they show. All changes go
             live on every open page in realtime.

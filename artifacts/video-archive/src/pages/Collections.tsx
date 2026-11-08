@@ -87,11 +87,11 @@ export default function Collections() {
       <div className="container mx-auto px-4 sm:px-6 py-10 max-w-4xl">
         <div className="flex items-start justify-between mb-8 gap-4">
           <div>
-            <div className="flex items-center gap-2 text-xs uppercase tracking-[0.25em] text-muted-foreground font-semibold mb-3">
+            <div className="flex items-center gap-2 text-xs font-medium text-muted-foreground mb-2">
               <ListVideo className="w-3.5 h-3.5 text-primary" />
-              Collections
+              <span>Collections</span>
             </div>
-            <h1 className="text-2xl sm:text-3xl font-black tracking-tighter">
+            <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-foreground">
               My Collections
             </h1>
             <p className="text-sm text-muted-foreground mt-2">
@@ -101,7 +101,7 @@ export default function Collections() {
           </div>
           <button
             onClick={() => setShowCreate((v) => !v)}
-            className="inline-flex items-center gap-1.5 h-9 px-4 text-xs font-semibold border border-primary/30 text-primary hover:border-primary/60 transition-colors shrink-0 rounded-sm"
+            className="inline-flex items-center gap-1.5 h-9 px-4 text-xs font-semibold border border-primary/30 text-primary hover:border-primary/60 transition-colors shrink-0 rounded-lg"
           >
             <Plus className="w-3.5 h-3.5" />
             New Collection
@@ -116,7 +116,7 @@ export default function Collections() {
             onSubmit={handleCreate}
             className="mb-6 p-5 border border-primary/30 bg-primary/5 rounded-xl space-y-3 animate-fade-in-up"
           >
-            <p className="text-xs font-semibold text-foreground uppercase tracking-wide">
+            <p className="text-xs font-semibold text-foreground">
               New Collection
             </p>
             <div className="space-y-2">

@@ -285,7 +285,7 @@ export default function PerformerProfile() {
                 </div>
               ) : profile ? (
                 <div>
-                  <h1 className="text-2xl sm:text-3xl font-black tracking-tight">{profile.username}</h1>
+                  <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-foreground">{profile.username}</h1>
                   <div className="flex items-center gap-3 mt-1.5 text-xs text-muted-foreground">
                     <span className="flex items-center gap-1.5">
                       <Film className="w-3 h-3 text-muted-foreground/50" />
@@ -373,7 +373,7 @@ export default function PerformerProfile() {
                 <button
                   onClick={() => handlePageChange(Math.max(1, safePage - 1))}
                   disabled={safePage <= 1}
-                  className="h-8 px-3 text-xs font-medium border border-border/50 text-muted-foreground hover:border-primary/40 hover:text-foreground rounded-sm transition-all disabled:opacity-40 disabled:cursor-not-allowed"
+                  className="h-8 px-3 text-xs font-medium border border-border/50 text-muted-foreground hover:border-border hover:text-foreground rounded-lg transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
                 >
                   ← Prev
                 </button>
@@ -383,7 +383,7 @@ export default function PerformerProfile() {
                 <button
                   onClick={() => handlePageChange(Math.min(totalPages, safePage + 1))}
                   disabled={safePage >= totalPages}
-                  className="h-8 px-3 text-xs font-medium border border-border/50 text-muted-foreground hover:border-primary/40 hover:text-foreground rounded-sm transition-all disabled:opacity-40 disabled:cursor-not-allowed"
+                  className="h-8 px-3 text-xs font-medium border border-border/50 text-muted-foreground hover:border-border hover:text-foreground rounded-lg transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
                 >
                   Next →
                 </button>

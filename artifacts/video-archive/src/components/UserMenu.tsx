@@ -24,19 +24,19 @@ export function UserMenu() {
 
   if (!user) {
     return (
-      <div className="flex items-center gap-1">
+      <div className="flex items-center gap-1.5">
         <Link href="/login">
-          <span className="hidden sm:inline-flex items-center h-7 px-3 text-xs font-medium text-muted-foreground hover:text-foreground border border-border/50 hover:border-border rounded-sm transition-all">
+          <span className="hidden sm:inline-flex items-center h-8 px-3 text-xs font-medium text-muted-foreground hover:text-foreground border border-border/50 hover:border-border rounded-lg transition-colors">
             Sign in
           </span>
         </Link>
         <Link href="/signup">
-          <span className="hidden sm:inline-flex items-center h-7 px-3 text-xs font-semibold border border-primary/30 text-primary hover:border-primary/60 rounded-sm transition-colors">
+          <span className="hidden sm:inline-flex items-center h-8 px-3 text-xs font-semibold border border-primary/30 text-primary hover:border-primary/60 rounded-lg transition-colors">
             Sign up
           </span>
         </Link>
         <Link href="/login">
-          <span className="sm:hidden flex items-center justify-center w-8 h-8 text-muted-foreground hover:text-foreground transition-colors rounded">
+          <span className="sm:hidden flex items-center justify-center w-8 h-8 text-muted-foreground hover:text-foreground transition-colors rounded-lg">
             <User className="w-4 h-4" />
           </span>
         </Link>
@@ -57,7 +57,7 @@ export function UserMenu() {
     <div ref={ref} className="relative">
       <button
         onClick={() => setOpen((v) => !v)}
-        className="flex items-center gap-1.5 h-8 px-2 text-xs text-muted-foreground hover:text-foreground transition-colors rounded"
+        className="flex items-center gap-1.5 h-8 px-2 text-xs text-muted-foreground hover:text-foreground transition-colors rounded-lg"
         aria-expanded={open}
         aria-haspopup="true"
       >
@@ -68,7 +68,7 @@ export function UserMenu() {
       </button>
 
       {open && (
-        <div className="absolute right-0 top-full mt-1.5 w-52 glass-dropdown rounded-sm z-50 max-h-[calc(100dvh-4.5rem)] overflow-y-auto overscroll-contain shadow-2xl">
+        <div className="absolute right-0 top-full mt-1.5 w-52 glass-dropdown rounded-xl z-50 max-h-[calc(100dvh-4.5rem)] overflow-y-auto overscroll-contain shadow-2xl">
           <Link href="/profile">
             <div
               onClick={() => setOpen(false)}

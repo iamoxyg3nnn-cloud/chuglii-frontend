@@ -65,7 +65,7 @@ function RequestCard({ request, onDelete, onViewRequest }: { request: UserReques
               <span className="text-sm font-semibold text-foreground truncate">
                 @{performerName}
               </span>
-              <span className={`text-[10px] font-semibold uppercase tracking-wider px-1.5 py-0.5 rounded-[2px] ${cfg.bg} ${cfg.color}`}>
+              <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-md ${cfg.bg} ${cfg.color}`}>
                 {cfg.label}
               </span>
             </div>
@@ -96,7 +96,7 @@ function RequestCard({ request, onDelete, onViewRequest }: { request: UserReques
       <button
         onClick={handleDelete}
         disabled={deleting}
-        className="absolute top-2 right-2 z-10 w-7 h-7 flex items-center justify-center rounded-sm opacity-0 group-hover:opacity-100 bg-background/80 hover:bg-destructive/10 text-muted-foreground/40 hover:text-destructive border border-border/30 hover:border-destructive/30 transition-all"
+        className="absolute top-2 right-2 z-10 w-7 h-7 flex items-center justify-center rounded-lg opacity-0 group-hover:opacity-100 bg-background/80 hover:bg-destructive/10 text-muted-foreground/40 hover:text-destructive border border-border/30 hover:border-destructive/30 transition-all"
         title="Delete request"
         aria-label="Delete request"
       >
@@ -209,7 +209,7 @@ export default function MyRequests() {
               <ArrowLeft className="w-3 h-3" />
               New request
             </Link>
-            <h1 className="text-xl font-black tracking-tight text-foreground">
+            <h1 className="text-xl font-bold tracking-tight text-foreground">
               My Requests
             </h1>
             <p className="text-xs text-muted-foreground/60 mt-0.5">
@@ -218,7 +218,7 @@ export default function MyRequests() {
           </div>
           <Link
             href="/request"
-            className="inline-flex items-center gap-1.5 h-9 px-3 text-xs font-medium border border-primary/30 text-primary hover:border-primary/60 rounded-sm transition-colors"
+            className="inline-flex items-center gap-1.5 h-9 px-3 text-xs font-medium border border-primary/30 text-primary hover:border-primary/60 rounded-lg transition-colors"
           >
             <Send className="w-3.5 h-3.5" />
             New Request
@@ -240,7 +240,7 @@ export default function MyRequests() {
             <p className="text-xs text-muted-foreground/50 mt-1">Please try again later.</p>
           </div>
         ) : requests.length === 0 ? (
-          <div className="py-20 text-center border border-border/30 rounded-lg bg-card/50">
+          <div className="py-20 text-center border border-border/30 rounded-xl bg-card/50">
             <div className="w-12 h-12 rounded-full bg-secondary/50 flex items-center justify-center mx-auto mb-4">
               <Send className="w-5 h-5 text-muted-foreground/30" />
             </div>
@@ -250,7 +250,7 @@ export default function MyRequests() {
             </p>
             <Link
               href="/request"
-              className="inline-flex items-center gap-1.5 h-9 px-4 text-xs font-medium border border-primary/30 text-primary hover:border-primary/60 rounded-sm transition-colors"
+              className="inline-flex items-center gap-1.5 h-9 px-4 text-xs font-medium border border-primary/30 text-primary hover:border-primary/60 rounded-lg transition-colors"
             >
               <Send className="w-3.5 h-3.5" />
               Submit Your First Request
@@ -268,7 +268,7 @@ export default function MyRequests() {
                   <button
                     key={key}
                     onClick={() => setStatusFilter(key)}
-                    className={`relative inline-flex items-center gap-1.5 h-8 px-2.5 text-xs font-medium rounded-sm border transition-all shrink-0 ${
+                    className={`relative inline-flex items-center gap-1.5 h-8 px-2.5 text-xs font-medium rounded-lg border transition-all shrink-0 ${
                       isActive
                         ? (key === "all"
                             ? "border-primary/50 text-primary bg-primary/5"
@@ -316,7 +316,7 @@ export default function MyRequests() {
                     <button
                       onClick={() => setPage((p) => Math.max(1, p - 1))}
                       disabled={safePage <= 1}
-                      className="inline-flex items-center justify-center w-8 h-8 rounded-sm border border-border/50 text-muted-foreground hover:text-foreground hover:border-border disabled:opacity-30 disabled:pointer-events-none transition-all"
+                      className="inline-flex items-center justify-center w-8 h-8 rounded-lg border border-border/50 text-muted-foreground hover:text-foreground hover:border-border disabled:opacity-30 disabled:pointer-events-none transition-all"
                       aria-label="Previous page"
                     >
                       <ChevronLeft className="w-4 h-4" />
@@ -342,7 +342,7 @@ export default function MyRequests() {
                         <button
                           key={p}
                           onClick={() => setPage(p)}
-                          className={`inline-flex items-center justify-center w-8 h-8 text-xs font-medium rounded-sm border transition-all ${
+                          className={`inline-flex items-center justify-center w-8 h-8 text-xs font-medium rounded-lg border transition-all ${
                             p === safePage
                               ? "border-primary/50 text-primary bg-primary/5"
                               : "border-border/50 text-muted-foreground hover:text-foreground hover:border-border"
@@ -356,7 +356,7 @@ export default function MyRequests() {
                     <button
                       onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
                       disabled={safePage >= totalPages}
-                      className="inline-flex items-center justify-center w-8 h-8 rounded-sm border border-border/50 text-muted-foreground hover:text-foreground hover:border-border disabled:opacity-30 disabled:pointer-events-none transition-all"
+                      className="inline-flex items-center justify-center w-8 h-8 rounded-lg border border-border/50 text-muted-foreground hover:text-foreground hover:border-border disabled:opacity-30 disabled:pointer-events-none transition-all"
                       aria-label="Next page"
                     >
                       <ChevronRight className="w-4 h-4" />

@@ -306,7 +306,7 @@ export function SearchDropdown({ open, onOpenChange }: SearchDropdownProps) {
             onFocus={() => setShowSuggestions(true)}
             onBlur={() => window.setTimeout(() => setShowSuggestions(false), 180)}
             onKeyDown={handleKeyDown}
-            className="h-9 w-36 rounded-full border border-border/50 bg-secondary pl-8 pr-3 text-sm outline-none transition-all placeholder:text-muted-foreground/40 focus:border-primary/40 min-[380px]:w-44 sm:w-64 dark:bg-white/[0.08]"
+            className="h-9 w-40 rounded-lg border border-border/70 bg-secondary/80 pl-8 pr-3 text-sm outline-none transition-colors placeholder:text-muted-foreground/50 focus:border-primary/50 focus:ring-1 focus:ring-primary/40 min-[380px]:w-48 sm:w-64 dark:bg-white/[0.06]"
           />
           {showSuggestions && (
             <div
@@ -314,7 +314,7 @@ export function SearchDropdown({ open, onOpenChange }: SearchDropdownProps) {
               id={listboxId}
               role="listbox"
               aria-label="Search suggestions"
-              className="glass-dropdown absolute right-0 top-full z-50 mt-1.5 max-h-[70vh] w-[calc(100vw-2rem)] min-w-[280px] overflow-y-auto overflow-x-hidden rounded-lg animate-in fade-in zoom-in-95 duration-150 sm:w-[min(420px,calc(100vw-2rem))]"
+              className="glass-dropdown absolute right-0 top-full z-50 mt-1.5 max-h-[70vh] w-[calc(100vw-2rem)] min-w-[280px] overflow-y-auto overflow-x-hidden rounded-xl animate-in fade-in zoom-in-95 duration-150 sm:w-[min(420px,calc(100vw-2rem))]"
             >
               {hasQuery ? (
                 <>
@@ -328,10 +328,10 @@ export function SearchDropdown({ open, onOpenChange }: SearchDropdownProps) {
                         const group = predictions.filter((item) => item.type === type);
                         if (!group.length) return null;
                         const Icon = type === "performer" ? User : type === "tag" ? Tag : Clapperboard;
-                        const label = type === "performer" ? "Performers" : type === "recording" ? "Recordings" : "Tags";
+                        const label = type === "performer" ? "Performers" : type === "recording" ? "Recordings" : "Topics";
                         return (
                           <section key={type}>
-                            <div className="flex items-center gap-1.5 bg-secondary px-3 py-1.5 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground/50 dark:bg-white/[0.06]">
+                            <div className="flex items-center gap-1.5 bg-secondary/60 px-3 py-1.5 text-[11px] font-medium text-muted-foreground/75 dark:bg-white/[0.04]">
                               <Icon className="h-3 w-3" /> {label}
                             </div>
                             {group.map((item) => {
@@ -389,7 +389,7 @@ export function SearchDropdown({ open, onOpenChange }: SearchDropdownProps) {
                 </>
               ) : filteredRecent.length ? (
                 <>
-                  <div className="flex items-center justify-between bg-secondary px-3 py-1.5 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground/50 dark:bg-white/[0.06]">
+                  <div className="flex items-center justify-between bg-secondary/60 px-3 py-1.5 text-[11px] font-medium text-muted-foreground/75 dark:bg-white/[0.04]">
                     <span className="flex items-center gap-1.5"><Clock className="h-3 w-3" /> Recent searches</span>
                     <button
                       type="button"

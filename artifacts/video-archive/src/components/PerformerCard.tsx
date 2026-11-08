@@ -85,7 +85,7 @@ function GroupCards({ performers }: { performers: Performer[] }) {
           onMouseEnter={() => prefetchRoute("/performers")}
           onFocus={() => prefetchRoute("/performers")}
         >
-          <figure className="flex items-center justify-center text-2xl font-extrabold leading-none text-zinc-400 p-4 bg-white relative rounded-full object-cover border border-solid border-zinc-300 
+          <figure className="flex items-center justify-center text-xl font-bold leading-none text-muted-foreground p-3 bg-card relative rounded-full object-cover border border-border/80 
             [&:where(:nth-child(4),_:nth-child(5))]:size-8 
             [&:where(:nth-child(4),_:nth-child(5))]:z-[3] 
             [&:where(:nth-child(2),_:nth-child(3))]:size-11 
@@ -94,10 +94,9 @@ function GroupCards({ performers }: { performers: Performer[] }) {
             [&:nth-child(1)]:z-[6] 
             [&:where(:not(:nth-child(4)))]:-ml-2 
             cursor-pointer
-            transition-all duration-300
+            transition-transform duration-200
             group-hover:z-10
-            group-hover:scale-110
-            group-hover:shadow-lg">
+            group-hover:scale-105">
             {p.username.charAt(0).toUpperCase()}
           </figure>
         </Link>
@@ -138,39 +137,36 @@ function CircleCard({ performer, fetchPriority }: { performer: Performer; fetchP
   const initial = performer.username.charAt(0).toUpperCase();
   const { imageUrl, onImageError } = usePerformerImageCandidates(performer);
   return (
-    <Link href={`/performers/${performer.username}`} className="group block outline-none w-full circle-bloom-hover focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-background rounded-sm"
+    <Link href={`/performers/${performer.username}`} className="group block outline-none w-full focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-background rounded-full"
       onMouseEnter={() => prefetchRoute("/performers")}
       onFocus={() => prefetchRoute("/performers")}
     >
       <div className="flex flex-col items-center gap-2.5">
         {/* Circle container — fixed size, centered via grid justify-items-center */}
         <div className="relative w-[72px] h-[72px] sm:w-[82px] sm:h-[82px] shrink-0">
-          {/* Bloom ring — shadow expands outward on hover */}
-          <div className="absolute inset-0 rounded-full circle-bloom-ring transition-shadow duration-300" />
-          {/* Main circle — scales up on hover */}
-          <div className="relative w-full h-full rounded-full overflow-hidden ring-[1.5px] ring-border/30 group-hover:ring-primary/60 shadow-sm group-hover:shadow-lg transition-all duration-300 ease-out group-hover:scale-110">
+          <div className="relative w-full h-full rounded-full overflow-hidden ring-1 ring-border/50 group-hover:ring-primary/60 shadow-xs transition-all duration-200 ease-out group-hover:scale-[1.04]">
             {imageUrl ? (
               <OptimizedImage
                 src={imageUrl}
                 alt={performer.username}
                 fetchPriority={fetchPriority}
                 width="avatar"
-                className="w-full h-full object-cover object-top group-hover:scale-110"
+                className="w-full h-full object-cover object-top transition-transform duration-300 group-hover:scale-105"
                 containerClassName="w-full h-full"
                 onError={onImageError}
               />
             ) : (
               <div className="w-full h-full bg-secondary flex items-center justify-center">
-                <span className="text-lg font-black text-muted-foreground/30">{initial}</span>
+                <span className="text-base font-bold text-muted-foreground/40">{initial}</span>
               </div>
             )}
           </div>
         </div>
         <div className="text-center min-w-0 w-[90px]">
-          <p className="text-xs font-semibold text-foreground truncate group-hover:text-primary transition-colors duration-300">
+          <p className="text-xs font-medium text-foreground truncate group-hover:text-primary transition-colors duration-150">
             {performer.username}
           </p>
-          <p className="text-[10px] text-muted-foreground/50 mt-0.5">
+          <p className="text-[10px] text-muted-foreground/60 tabular-nums mt-0.5">
             {performer.recording_count ?? 0}
           </p>
         </div>
@@ -199,15 +195,14 @@ const SquareCard = memo(function SquareCard({ performer, fetchPriority }: { perf
   const recCount = performer.recording_count ?? 0;
 
   return (
-    <Link href={`/performers/${performer.username}`} className="group block outline-none focus-visible:ring-2 focus-visible:ring-primary rounded-lg"
+    <Link href={`/performers/${performer.username}`} className="group block outline-none focus-visible:ring-2 focus-visible:ring-primary rounded-xl"
       onMouseEnter={() => prefetchRoute("/performers")}
       onFocus={() => prefetchRoute("/performers")}
     >
-      <div className="relative overflow-hidden rounded-lg bg-card will-change-transform
-        transition-all duration-400 ease-out
-        group-hover:-translate-y-[2px]
-        group-hover:shadow-[0_12px_32px_-8px_hsl(var(--primary)/0.15)]
-        group-hover:shadow-black/40"
+      <div className="relative overflow-hidden rounded-xl bg-card border border-border/40 hover:border-border/80 will-change-transform
+        transition-all duration-200 ease-out
+        group-hover:-translate-y-0.5
+        group-hover:shadow-md"
       >
         <div className="relative aspect-[3/4] overflow-hidden">
           {imageUrl ? (
@@ -229,11 +224,11 @@ const SquareCard = memo(function SquareCard({ performer, fetchPriority }: { perf
           <SpriteHover performer={performer} />
 
           <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/85 via-black/40 to-transparent pt-14 pb-3 px-3">
-            <p className="text-[13px] font-bold text-white leading-tight drop-shadow-[0_1px_4px_rgba(0,0,0,0.6)] truncate">
+            <p className="text-[13px] font-semibold text-white leading-tight truncate">
               {performer.username}
             </p>
-            <div className="flex items-center gap-1.5 mt-[3px]">
-              <span className="text-[10px] font-medium text-white/60 tabular-nums tracking-[0.01em]">
+            <div className="flex items-center gap-1.5 mt-1">
+              <span className="text-[10px] font-medium text-white/70 tabular-nums">
                 {recCount === 1 ? "1 recording" : `${formatCount(recCount)} recordings`}
               </span>
             </div>
@@ -241,9 +236,9 @@ const SquareCard = memo(function SquareCard({ performer, fetchPriority }: { perf
 
           {recCount > 0 && (
             <div className="absolute top-2 right-2">
-              <span className="inline-flex items-center justify-center min-w-[20px] h-[20px] px-[6px] rounded-full
-                bg-black/40 backdrop-blur-sm ring-1 ring-white/12
-                text-[9px] font-bold text-white/80 tabular-nums">
+              <span className="inline-flex items-center justify-center min-w-[20px] h-[20px] px-1.5 rounded-md
+                bg-black/60 backdrop-blur-md ring-1 ring-white/10
+                text-[10px] font-semibold text-white tabular-nums">
                 {formatCount(recCount)}
               </span>
             </div>

@@ -48,8 +48,8 @@ export default function ContentRemoval() {
    <div className="mb-8 flex items-start gap-3">
     <div className="rounded-xl border border-primary/20 bg-primary/10 p-3 text-primary"><ShieldCheck className="h-5 w-5"/></div>
     <div>
-     <p className="text-xs uppercase tracking-[0.25em] text-muted-foreground">Safety &amp; privacy</p>
-     <h1 className="mt-2 text-2xl font-black tracking-tight">Report content or request removal</h1>
+     <p className="text-xs font-medium text-muted-foreground">Safety &amp; privacy</p>
+     <h1 className="mt-2 text-2xl font-bold tracking-tight text-foreground">Report content or request removal</h1>
      <p className="mt-3 text-sm leading-6 text-muted-foreground">Report a listing that may violate privacy, consent, copyright, attribution or applicable law. Include enough detail for a reviewer to locate and assess the content.</p>
     </div>
    </div>

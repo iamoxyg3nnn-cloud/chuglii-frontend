@@ -56,7 +56,7 @@ const CommentForm = memo(function CommentForm({ placeholder = "Write a commentâ€
           value={author}
           onChange={(e) => setAuthor(e.target.value)}
           maxLength={100}
-          className="w-full h-8 bg-secondary border border-border/50 focus:border-primary/50 rounded-[2px] px-3 text-xs outline-none transition-all placeholder:text-muted-foreground/40"
+          className="w-full h-8 bg-secondary border border-border/50 focus:border-primary/50 rounded-lg px-3 text-xs outline-none transition-all placeholder:text-muted-foreground/40"
         />
       )}
       <div className="flex gap-2">
@@ -66,14 +66,14 @@ const CommentForm = memo(function CommentForm({ placeholder = "Write a commentâ€
           onChange={(e) => setContent(e.target.value)}
           maxLength={5000}
           rows={compact ? 2 : 3}
-          className="flex-1 bg-secondary border border-border/50 focus:border-primary/50 rounded-[2px] px-3 py-2 text-xs outline-none transition-all placeholder:text-muted-foreground/40 resize-none"
+          className="flex-1 bg-secondary border border-border/50 focus:border-primary/50 rounded-lg px-3 py-2 text-xs outline-none transition-all placeholder:text-muted-foreground/40 resize-none"
         />
       </div>
       <div className="flex items-center gap-2">
         <button
           type="submit"
           disabled={loading || !content.trim()}
-          className="inline-flex items-center gap-1.5 h-7 px-3 border border-primary/30 text-primary text-xs font-medium rounded-[2px] hover:border-primary/60 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+          className="inline-flex items-center gap-1.5 h-7 px-3 border border-primary/30 text-primary text-xs font-medium rounded-lg hover:border-primary/60 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
         >
           {loading ? <Loader2 className="w-3 h-3 animate-spin" /> : <Send className="w-3 h-3" />}
           {compact ? "Reply" : "Post"}
@@ -272,7 +272,7 @@ export function CommentSection({ recordingId }: CommentSectionProps) {
             <button
               key={o.value}
               onClick={() => setSort(o.value)}
-              className={`px-2.5 py-1 text-[10px] rounded-[2px] transition-colors ${
+              className={`px-2.5 py-1 text-[10px] rounded-lg transition-colors ${
                 sort === o.value
                   ? "text-primary border border-primary/30 font-medium"
                   : "text-muted-foreground/50 hover:text-foreground/60"
@@ -287,7 +287,7 @@ export function CommentSection({ recordingId }: CommentSectionProps) {
       {user ? (
         <CommentForm onSubmit={handlePost} />
       ) : (
-        <div className="flex items-center gap-2 p-4 border border-border/40 rounded-sm bg-secondary">
+        <div className="flex items-center gap-2 p-4 border border-border/40 rounded-xl bg-secondary">
           <LogIn className="w-4 h-4 text-muted-foreground/40" />
           <p className="text-xs text-muted-foreground/60">
             <Link href="/login" className="text-primary hover:underline font-medium">Sign in</Link> to leave a comment

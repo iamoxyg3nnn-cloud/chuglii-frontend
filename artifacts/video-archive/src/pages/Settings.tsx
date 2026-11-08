@@ -154,11 +154,11 @@ export default function Settings() {
       <div className="container mx-auto px-4 sm:px-6 py-10 max-w-2xl">
         <div className="mb-8 flex items-center justify-between gap-4 flex-wrap">
           <div>
-            <div className="flex items-center gap-2 text-xs uppercase tracking-[0.25em] text-muted-foreground font-semibold mb-3">
+            <div className="flex items-center gap-2 text-xs font-medium text-muted-foreground mb-2">
               <SettingsIcon className="w-3.5 h-3.5 text-primary" />
-              Settings
+              <span>Settings</span>
             </div>
-            <h1 className="text-2xl sm:text-3xl font-black tracking-tighter">Account Settings</h1>
+            <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-foreground">Account Settings</h1>
           </div>
           <Link href="/profile">
             <button

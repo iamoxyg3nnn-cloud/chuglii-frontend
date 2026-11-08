@@ -318,7 +318,7 @@ export default function CollectionDetail() {
                     if (e.key === "Escape") setEditing(false);
                   }}
                   maxLength={80}
-                  className="h-9 bg-background border border-primary/50 rounded-sm px-3 text-sm font-bold outline-none flex-1 max-w-xs"
+                  className="h-9 bg-background border border-primary/50 rounded-lg px-3 text-sm font-semibold outline-none flex-1 max-w-xs"
                 />
                 <button
                   onClick={handleRename}
@@ -339,7 +339,7 @@ export default function CollectionDetail() {
               </div>
             ) : (
               <div className="flex items-center gap-2 mb-1">
-                <h1 className="text-xl sm:text-2xl font-black tracking-tighter">{playlistName}</h1>
+                <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-foreground">{playlistName}</h1>
                 {isOwner && (
                   <button
                     onClick={() => { setEditing(true); setEditName(playlistName); }}
@@ -367,7 +367,7 @@ export default function CollectionDetail() {
                   }}
                   maxLength={200}
                   placeholder="Description (optional)"
-                  className="h-8 bg-background border border-primary/50 rounded-sm px-2.5 text-sm outline-none flex-1 max-w-sm"
+                  className="h-8 bg-background border border-primary/50 rounded-lg px-2.5 text-sm outline-none flex-1 max-w-sm"
                 />
                 <button
                   onClick={handleDescSave}

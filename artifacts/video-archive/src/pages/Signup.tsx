@@ -60,14 +60,14 @@ export default function Signup() {
       <div className="min-h-screen flex items-center justify-center px-4 relative overflow-hidden">
         <div className="w-full max-w-sm text-center">
           <CheckCircle2 className="w-12 h-12 text-primary mx-auto mb-6" />
-          <h1 className="text-2xl font-black tracking-tight mb-2">Check your email</h1>
+          <h1 className="text-2xl font-bold tracking-tight text-foreground mb-2">Check your email</h1>
           <p className="text-sm text-muted-foreground mb-6">
             We sent a verification link to <strong className="text-foreground">{email}</strong>.
             Click it to activate your account.
           </p>
           <Link
             href="/login"
-            className="inline-flex items-center gap-1.5 h-10 px-5 border border-primary/30 text-primary text-sm font-semibold hover:border-primary/60 transition-colors rounded-sm"
+            className="inline-flex items-center gap-1.5 h-10 px-5 border border-primary/30 text-primary text-sm font-semibold hover:border-primary/60 transition-colors rounded-lg"
           >
             Back to sign in
           </Link>
@@ -82,11 +82,11 @@ export default function Signup() {
         <div className="text-center mb-10">
           <Link href="/" className="inline-flex items-center gap-1.5 group mb-8">
             <Film className="w-5 h-5 text-primary" />
-            <span className="font-black text-xl tracking-tighter text-foreground group-hover:text-primary transition-colors">
+            <span className="font-bold text-xl tracking-tight text-foreground group-hover:text-primary transition-colors">
               VAULT<span className="text-primary">.</span>
             </span>
           </Link>
-          <h1 className="text-2xl font-black tracking-tight mt-4">Create account</h1>
+          <h1 className="text-2xl font-bold tracking-tight text-foreground mt-4">Create account</h1>
           <p className="text-sm text-muted-foreground mt-1">
             Save videos, build collections, sync across devices
           </p>
@@ -94,7 +94,7 @@ export default function Signup() {
 
         <form onSubmit={handleSubmit} className="space-y-4">
           {error && (
-            <div className="flex flex-col gap-2 p-3 bg-destructive/10 border border-destructive/30 rounded-sm text-xs text-destructive">
+            <div className="flex flex-col gap-2 p-3 bg-destructive/10 border border-destructive/30 rounded-lg text-xs text-destructive">
               <div className="flex items-start gap-2">
                 <AlertCircle className="w-3.5 h-3.5 shrink-0 mt-0.5" />
                 <span>{error}</span>
@@ -106,7 +106,7 @@ export default function Signup() {
           )}
 
           <div className="space-y-1">
-            <label htmlFor="signup-username" className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
+            <label htmlFor="signup-username" className="text-xs font-medium text-muted-foreground">
               Username
             </label>
             <input
@@ -119,12 +119,12 @@ export default function Signup() {
               placeholder="your_username"
               minLength={3}
               maxLength={30}
-              className="w-full h-10 bg-secondary border border-border/60 focus:border-primary/50 rounded-sm px-3 text-sm outline-none transition-all placeholder:text-muted-foreground/40"
+              className="w-full h-10 bg-secondary border border-border/60 focus:border-primary/50 focus:ring-2 focus:ring-primary/10 rounded-lg px-3 text-sm outline-none transition-all placeholder:text-muted-foreground/40"
             />
           </div>
 
           <div className="space-y-1">
-            <label htmlFor="signup-email" className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
+            <label htmlFor="signup-email" className="text-xs font-medium text-muted-foreground">
               Email
             </label>
             <input
@@ -134,12 +134,12 @@ export default function Signup() {
               onChange={(e) => setEmail(e.target.value)}
               required
               placeholder="you@example.com"
-              className="w-full h-10 bg-secondary border border-border/60 focus:border-primary/50 rounded-sm px-3 text-sm outline-none transition-all placeholder:text-muted-foreground/40"
+              className="w-full h-10 bg-secondary border border-border/60 focus:border-primary/50 focus:ring-2 focus:ring-primary/10 rounded-lg px-3 text-sm outline-none transition-all placeholder:text-muted-foreground/40"
             />
           </div>
 
           <div className="space-y-1">
-            <label htmlFor="signup-password" className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
+            <label htmlFor="signup-password" className="text-xs font-medium text-muted-foreground">
               Password
             </label>
             <div className="relative">
@@ -150,7 +150,7 @@ export default function Signup() {
                 onChange={(e) => setPassword(e.target.value)}
                 required
                 placeholder="At least 6 characters"
-                className="w-full h-10 bg-secondary border border-border/60 focus:border-primary/50 rounded-sm px-3 pr-10 text-sm outline-none transition-all placeholder:text-muted-foreground/40"
+                className="w-full h-10 bg-secondary border border-border/60 focus:border-primary/50 focus:ring-2 focus:ring-primary/10 rounded-lg px-3 pr-10 text-sm outline-none transition-all placeholder:text-muted-foreground/40"
               />
               <button
                 type="button"
@@ -167,7 +167,7 @@ export default function Signup() {
           <button
             type="submit"
             disabled={loading}
-            className="w-full h-10 border border-primary/30 text-primary text-sm font-semibold hover:border-primary/60 transition-colors rounded-sm disabled:opacity-60"
+            className="w-full h-10 bg-primary text-primary-foreground text-sm font-semibold hover:bg-primary/90 transition-colors rounded-lg shadow-xs disabled:opacity-60 cursor-pointer"
           >
             {loading ? "Creating account…" : "Create account"}
           </button>

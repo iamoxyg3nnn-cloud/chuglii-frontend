@@ -899,16 +899,16 @@ export default function VideoDetail() {
             {/* Server selector */}
             {!isLoading && servers.length > 1 && (
               <div className="flex items-center gap-2">
-                <Server className="w-3.5 h-3.5 text-muted-foreground/40 shrink-0" />
+                <Server className="w-3.5 h-3.5 text-muted-foreground/60 shrink-0" />
                 <div className="flex gap-1.5 flex-wrap">
                   {servers.map((s, i) => (
                     <button
                       key={i}
                       onClick={() => { setActiveServer(i); sessionStorage.setItem("vserver", String(i)); setVideoStarted(false); sessionStorage.removeItem("vplayed"); }}
-                      className={`px-3 py-1 text-[11px] font-medium rounded-[2px] border transition-all ${
+                      className={`px-3 py-1 text-xs font-medium rounded-lg border transition-colors ${
                         activeServer === i
-                          ? "border-primary/60 text-primary"
-                          : "border-border/50 text-muted-foreground hover:border-primary/40 hover:text-foreground"
+                          ? "bg-primary/10 border-primary/50 text-primary"
+                          : "border-border/60 text-muted-foreground hover:border-border hover:text-foreground"
                       }`}
                     >
                       {s.label}
@@ -918,13 +918,13 @@ export default function VideoDetail() {
               </div>
             )}
 
-            {/* Player â€” click-to-play */}
+            {/* Player — click-to-play */}
             {isLoading ? (
-              <Skeleton className="w-full aspect-video" />
+              <Skeleton className="w-full aspect-video rounded-2xl" />
             ) : video ? (
               <div
                 ref={playerRef}
-                className="relative group aspect-video w-full bg-black overflow-hidden rounded-sm"
+                className="relative group aspect-video w-full bg-black overflow-hidden rounded-2xl border border-border/70 shadow-sm"
               >
                   {currentServer?.type === "iframe" && !videoStarted ? (
                     /* Pre-roll first (armed by this click), else poster / click-to-play */
@@ -963,7 +963,7 @@ export default function VideoDetail() {
                       <span className="text-white/80 text-xs font-medium">Click to play</span>
                     </div>
                     {video.resolution && (
-                      <div className="absolute top-3 right-3 text-[10px] font-bold text-white/80 bg-black/30 backdrop-blur-sm ring-1 ring-white/10 px-2 py-0.5 rounded-[2px]">
+                      <div className="absolute top-3 right-3 text-[10px] font-bold text-white/90 bg-black/60 backdrop-blur-md ring-1 ring-white/10 px-2 py-0.5 rounded-md">
                         {video.resolution}
                       </div>
                     )}
@@ -1090,37 +1090,37 @@ export default function VideoDetail() {
                 <div className="flex flex-wrap items-center gap-2">
                   <button
                     onClick={() => handleReaction("like")}
-                    className={`inline-flex items-center gap-1.5 h-8 px-3 text-xs font-medium rounded-[2px] border transition-all ${
+                    className={`inline-flex items-center gap-1.5 h-8 px-3 text-xs font-medium rounded-lg border transition-colors ${
                       reactions?.user_reaction === "like"
-                        ? "border-primary/60 text-primary"
-                        : "border-border/50 text-muted-foreground hover:border-primary/30 hover:text-foreground"
+                        ? "border-primary/50 text-primary bg-primary/10"
+                        : "border-border/60 text-muted-foreground hover:border-border hover:text-foreground"
                     }`}
                   >
                     <ThumbsUp className="w-3.5 h-3.5" />
-                    {reactions?.likes != null && reactions.likes > 0 && <span>{reactions.likes.toLocaleString()}</span>}
+                    {reactions?.likes != null && reactions.likes > 0 && <span className="tabular-nums font-mono">{reactions.likes.toLocaleString()}</span>}
                     Like
                   </button>
 
                   <button
                     onClick={() => handleReaction("dislike")}
-                    className={`inline-flex items-center gap-1.5 h-8 px-3 text-xs font-medium rounded-[2px] border transition-all ${
+                    className={`inline-flex items-center gap-1.5 h-8 px-3 text-xs font-medium rounded-lg border transition-colors ${
                       reactions?.user_reaction === "dislike"
-                        ? "border-destructive/40 text-destructive"
-                        : "border-border/50 text-muted-foreground hover:border-border hover:text-foreground"
+                        ? "border-destructive/50 text-destructive bg-destructive/10"
+                        : "border-border/60 text-muted-foreground hover:border-border hover:text-foreground"
                     }`}
                   >
                     <ThumbsDown className="w-3.5 h-3.5" />
-                    {reactions?.dislikes != null && reactions.dislikes > 0 && <span>{reactions.dislikes.toLocaleString()}</span>}
+                    {reactions?.dislikes != null && reactions.dislikes > 0 && <span className="tabular-nums font-mono">{reactions.dislikes.toLocaleString()}</span>}
                     Dislike
                   </button>
 
                   {user && (
                   <button
                     onClick={handleBookmark}
-                    className={`inline-flex items-center gap-1.5 h-8 px-3 text-xs font-medium rounded-[2px] border transition-all ${
+                    className={`inline-flex items-center gap-1.5 h-8 px-3 text-xs font-medium rounded-lg border transition-colors ${
                       bookmarked
-                        ? "border-amber-500/40 text-amber-500"
-                        : "border-border/50 text-muted-foreground hover:border-border hover:text-foreground"
+                        ? "border-amber-500/50 text-amber-500 bg-amber-500/10"
+                        : "border-border/60 text-muted-foreground hover:border-border hover:text-foreground"
                     }`}
                   >
                     <Bookmark className={`w-3.5 h-3.5 ${bookmarked ? "fill-amber-500" : ""}`} />
@@ -1131,10 +1131,10 @@ export default function VideoDetail() {
                   {user && (
                   <button
                     onClick={handleWatchLater}
-                    className={`inline-flex items-center gap-1.5 h-8 px-3 text-xs font-medium rounded-[2px] border transition-all ${
+                    className={`inline-flex items-center gap-1.5 h-8 px-3 text-xs font-medium rounded-lg border transition-colors ${
                       watchLater
-                        ? "border-blue-500/40 text-blue-400"
-                        : "border-border/50 text-muted-foreground hover:border-border hover:text-foreground"
+                        ? "border-blue-500/50 text-blue-400 bg-blue-500/10"
+                        : "border-border/60 text-muted-foreground hover:border-border hover:text-foreground"
                     }`}
                   >
                     <ListVideo className="w-3.5 h-3.5" />
@@ -1144,10 +1144,10 @@ export default function VideoDetail() {
 
                   <button
                     onClick={handleShare}
-                    className="inline-flex items-center gap-1.5 h-8 px-3 text-xs font-medium rounded-[2px] border border-border/50 text-muted-foreground hover:border-border hover:text-foreground transition-all"
+                    className="inline-flex items-center gap-1.5 h-8 px-3 text-xs font-medium rounded-lg border border-border/60 text-muted-foreground hover:border-border hover:text-foreground transition-colors"
                   >
                     {copied ? (
-                      <><Check className="w-3.5 h-3.5 text-green-500" /> Copied!</>
+                      <><Check className="w-3.5 h-3.5 text-emerald-400" /> Copied</>
                     ) : (
                       <><Share2 className="w-3.5 h-3.5" /> Share</>
                     )}
@@ -1156,10 +1156,10 @@ export default function VideoDetail() {
                   {currentServer?.src && currentServer.type === "iframe" && (
                     <button
                       onClick={handleCopyEmbed}
-                      className="inline-flex items-center gap-1.5 h-8 px-3 text-xs font-medium rounded-[2px] border border-border/50 text-muted-foreground hover:border-border hover:text-foreground transition-all"
+                      className="inline-flex items-center gap-1.5 h-8 px-3 text-xs font-medium rounded-lg border border-border/60 text-muted-foreground hover:border-border hover:text-foreground transition-colors"
                     >
                       {embedCopied ? (
-                        <><Check className="w-3.5 h-3.5 text-green-500" /> Copied!</>
+                        <><Check className="w-3.5 h-3.5 text-emerald-400" /> Copied</>
                       ) : (
                         <><Code2 className="w-3.5 h-3.5" /> Embed</>
                       )}
@@ -1171,7 +1171,7 @@ export default function VideoDetail() {
                       href={safeEmbedSource}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="inline-flex items-center gap-1.5 h-8 px-3 text-xs font-medium rounded-[2px] border border-border/50 text-muted-foreground hover:border-border hover:text-foreground transition-all"
+                      className="inline-flex items-center gap-1.5 h-8 px-3 text-xs font-medium rounded-lg border border-border/60 text-muted-foreground hover:border-border hover:text-foreground transition-colors"
                     >
                       <Download className="w-3.5 h-3.5" />
                       Source
@@ -1183,14 +1183,14 @@ export default function VideoDetail() {
                   <div ref={collectionRef} className="relative">
                     <button
                       onClick={() => setCollectionOpen((v) => !v)}
-                      className="inline-flex items-center gap-1.5 h-8 px-3 text-xs font-medium rounded-[2px] border border-border/50 text-muted-foreground hover:border-border hover:text-foreground transition-all"
+                      className="inline-flex items-center gap-1.5 h-8 px-3 text-xs font-medium rounded-lg border border-border/60 text-muted-foreground hover:border-border hover:text-foreground transition-colors"
                     >
                       <FolderPlus className="w-3.5 h-3.5" />
                       Collection
                       <ChevronDown className={`w-3 h-3 transition-transform ${collectionOpen ? "rotate-180" : ""}`} />
                     </button>
                     {collectionOpen && (
-                      <div className="absolute right-0 sm:left-0 sm:right-auto top-full mt-1 z-50 w-56 glass-dropdown rounded overflow-hidden">
+                      <div className="absolute right-0 sm:left-0 sm:right-auto top-full mt-1 z-50 w-56 glass-dropdown rounded-xl overflow-hidden shadow-lg border border-border/70">
                         <div className="p-2 border-b border-border/40">
                           <div className="flex gap-1">
                             <input
@@ -1202,12 +1202,12 @@ export default function VideoDetail() {
                               onChange={(e) => setNewColName(e.target.value)}
                               onKeyDown={(e) => { if (e.key === "Enter") handleCreateAndAdd(); }}
                               maxLength={60}
-                              className="flex-1 h-7 bg-card border border-border/40 focus:border-primary/50 rounded-[2px] px-2 text-xs outline-none"
+                              className="flex-1 h-7 bg-card border border-border/40 focus:border-primary/50 rounded-md px-2 text-xs outline-none"
                             />
                             <button
                               onClick={handleCreateAndAdd}
                               disabled={!newColName.trim()}
-                              className="w-7 h-7 flex items-center justify-center border border-primary/30 text-primary rounded-[2px] disabled:opacity-40 hover:border-primary/60 transition-opacity"
+                              className="w-7 h-7 flex items-center justify-center border border-primary/30 text-primary rounded-md disabled:opacity-40 hover:border-primary/60 transition-opacity"
                               title="Create and add"
                             >
                               <Plus className="w-3 h-3" />
@@ -1248,7 +1248,7 @@ export default function VideoDetail() {
                   {user && (
                   <Link
                     href="/history"
-                    className="inline-flex items-center gap-1.5 h-8 px-3 text-xs font-medium rounded-[2px] border border-border/50 text-muted-foreground hover:border-border hover:text-foreground transition-all"
+                    className="inline-flex items-center gap-1.5 h-8 px-3 text-xs font-medium rounded-lg border border-border/50 text-muted-foreground hover:border-border hover:text-foreground transition-all"
                   >
                     <Clock className="w-3.5 h-3.5" />
                     History
@@ -1261,7 +1261,7 @@ export default function VideoDetail() {
                   <div className="flex flex-wrap gap-1.5">
                     {video.tags.map((tag) => (
                       <Link key={tag} href={`/browse?tags=${encodeURIComponent(tag)}`}>
-                        <span className="inline-block px-2.5 py-1 text-[11px] border border-border/50 text-muted-foreground hover:border-primary/50 hover:text-primary hover:bg-primary/5 transition-all cursor-pointer rounded-[2px]">
+                        <span className="inline-block px-2.5 py-1 text-[11px] border border-border/50 text-muted-foreground hover:border-primary/50 hover:text-primary hover:bg-primary/5 transition-all cursor-pointer rounded-lg">
                           {tag}
                         </span>
                       </Link>
@@ -1324,7 +1324,7 @@ export default function VideoDetail() {
             <AdBanner file="half-page-300x600" breakpoint="lg" />
 
             <div className="flex items-center justify-between">
-              <p className="text-[10px] uppercase tracking-[0.25em] text-muted-foreground font-semibold">
+              <p className="text-xs font-semibold text-foreground">
                 More from {video?.username ?? "this performer"}
               </p>
             </div>
@@ -1333,7 +1333,7 @@ export default function VideoDetail() {
               <div className="space-y-4">
                 {Array.from({ length: 6 }).map((_, i) => (
                   <div key={i} className="flex gap-3">
-                    <Skeleton className="w-28 aspect-video shrink-0" />
+                    <Skeleton className="w-28 aspect-video shrink-0 rounded-lg" />
                     <div className="flex-1 space-y-1.5 pt-0.5">
                       <Skeleton className="h-3 w-full" />
                       <Skeleton className="h-3 w-2/3" />
@@ -1346,8 +1346,8 @@ export default function VideoDetail() {
                 {related
                   .filter((r) => r.id !== id && r.username === video?.username)
                   .map((rec, i) => (
-                    <Link key={rec.id} href={`/video/${rec.id}`} className="group flex gap-3 rounded-sm outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-background">
-                      <div className="w-28 aspect-video shrink-0 overflow-hidden bg-secondary rounded-[2px] relative">
+                    <Link key={rec.id} href={`/video/${rec.id}`} className="group flex gap-3 rounded-lg outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-background">
+                      <div className="w-28 aspect-video shrink-0 overflow-hidden bg-secondary rounded-lg border border-border/40 relative">
                         {proxyUrl(rec.thumbnail_url) ? (
                           <OptimizedImage
                             src={proxyUrl(rec.thumbnail_url)!}
@@ -1368,7 +1368,7 @@ export default function VideoDetail() {
                           </div>
                         )}
                         {recentlyWatched.has(rec.id) && (
-                          <div className="absolute top-1 right-1 z-10 flex items-center gap-0.5 bg-black/40 backdrop-blur-sm ring-1 ring-white/10 px-1 py-0.5 rounded-[2px] pointer-events-none">
+                          <div className="absolute top-1 right-1 z-10 flex items-center gap-0.5 bg-black/60 backdrop-blur-md ring-1 ring-white/10 px-1 py-0.5 rounded-md pointer-events-none">
                             <CheckCircle className="w-2 h-2 text-green-400" />
                             <span className="text-[7px] font-semibold text-green-300/90 uppercase tracking-wider">Watched</span>
                           </div>
@@ -1410,10 +1410,10 @@ export default function VideoDetail() {
         {!isLoading ? (
           <div ref={recSectionRef} className="mt-10 space-y-5">
             <div className="flex flex-col gap-1">
-              <p className="text-[10px] uppercase tracking-[0.25em] text-muted-foreground font-semibold">
+              <h2 className="text-sm font-semibold text-foreground">
                 Recommendations
-              </p>
-              <p className="text-[9px] text-muted-foreground/40">
+              </h2>
+              <p className="text-[11px] text-muted-foreground/60">
                 {user ? "Based on your watch history" : "More like this"}
               </p>
             </div>
@@ -1422,7 +1422,7 @@ export default function VideoDetail() {
               <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-3">
                 {Array.from({ length: 12 }).map((_, i) => (
                   <div key={i} className="space-y-2">
-                    <Skeleton className="w-full aspect-video" />
+                    <Skeleton className="w-full aspect-video rounded-lg" />
                     <Skeleton className="h-3 w-3/4" />
                     <Skeleton className="h-2 w-1/2" />
                   </div>
@@ -1441,12 +1441,12 @@ export default function VideoDetail() {
                 </div>
 
                 {recData.totalPages > 1 && (
-                  <div className="flex items-center justify-center gap-1 pt-3 flex-wrap">
+                  <div className="flex items-center justify-center gap-1.5 pt-3 flex-wrap">
                     <button
                       onClick={() => setRecPage((p) => Math.max(1, p - 1))}
                       disabled={recData.page <= 1 || recFetching}
                       aria-label="Previous page"
-                      className="inline-flex items-center justify-center w-7 h-7 text-xs rounded-[2px] border border-border/50 text-muted-foreground hover:border-primary/40 hover:text-foreground transition-all disabled:opacity-40 disabled:cursor-not-allowed"
+                      className="inline-flex items-center justify-center w-8 h-8 text-xs rounded-lg border border-border/50 text-muted-foreground hover:border-border hover:text-foreground transition-all disabled:opacity-40 disabled:cursor-not-allowed"
                     >
                       <ChevronDown className="w-3.5 h-3.5 rotate-90" />
                     </button>
@@ -1460,7 +1460,7 @@ export default function VideoDetail() {
                         if (p === recData.page - 2 || p === recData.page + 2) {
                           return (
                             <span key={p} className="px-1 text-[10px] text-muted-foreground/40">
-                              â€¦
+                              …
                             </span>
                           );
                         }
@@ -1471,10 +1471,10 @@ export default function VideoDetail() {
                           key={p}
                           onClick={() => setRecPage(p)}
                           disabled={recFetching}
-                          className={`inline-flex items-center justify-center min-w-7 h-7 px-1.5 text-xs rounded-[2px] border transition-all disabled:cursor-not-allowed ${
+                          className={`inline-flex items-center justify-center min-w-8 h-8 px-2 text-xs rounded-lg border transition-all disabled:cursor-not-allowed ${
                             isCurrent
-                              ? "border-primary/60 text-primary bg-primary/5"
-                              : "border-border/50 text-muted-foreground hover:border-primary/40 hover:text-foreground"
+                              ? "border-primary/60 text-primary bg-primary/5 font-semibold"
+                              : "border-border/50 text-muted-foreground hover:border-border hover:text-foreground"
                           }`}
                         >
                           {p}
@@ -1486,7 +1486,7 @@ export default function VideoDetail() {
                       onClick={() => setRecPage((p) => Math.min(recData.totalPages, p + 1))}
                       disabled={recData.page >= recData.totalPages || recFetching}
                       aria-label="Next page"
-                      className="inline-flex items-center justify-center w-7 h-7 text-xs rounded-[2px] border border-border/50 text-muted-foreground hover:border-primary/40 hover:text-foreground transition-all disabled:opacity-40 disabled:cursor-not-allowed"
+                      className="inline-flex items-center justify-center w-8 h-8 text-xs rounded-lg border border-border/50 text-muted-foreground hover:border-border hover:text-foreground transition-all disabled:opacity-40 disabled:cursor-not-allowed"
                     >
                       <ChevronDown className="w-3.5 h-3.5 -rotate-90" />
                     </button>

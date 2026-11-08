@@ -79,7 +79,7 @@ export function NotificationBell() {
     <div ref={ref} className="relative">
       <button
         onClick={() => setOpen((v) => !v)}
-        className="relative flex items-center justify-center w-8 h-8 text-muted-foreground hover:text-foreground transition-colors rounded"
+        className="relative flex items-center justify-center w-8 h-8 text-muted-foreground hover:text-foreground transition-colors rounded-lg"
         aria-label={`Notifications${unread > 0 ? ` (${unread} unread)` : ""}`}
       >
         <Bell className="w-4 h-4" />
@@ -91,7 +91,7 @@ export function NotificationBell() {
       </button>
 
       {open && (
-        <div className="absolute right-0 top-full mt-1.5 w-72 glass-dropdown rounded-sm z-50 max-h-[calc(100dvh-4.5rem)] overflow-y-auto overscroll-contain shadow-2xl">
+        <div className="absolute right-0 top-full mt-1.5 w-72 glass-dropdown rounded-xl z-50 max-h-[calc(100dvh-4.5rem)] overflow-y-auto overscroll-contain shadow-2xl">
           <div className="flex items-center justify-between px-3 py-2.5 border-b border-border/40">
             <span className="text-xs font-semibold">Notifications</span>
             {unread > 0 && (

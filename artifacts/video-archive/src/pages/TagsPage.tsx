@@ -30,11 +30,11 @@ export default function TagsPage() {
     <Layout>
       <div className="container mx-auto px-4 sm:px-6 py-10 max-w-4xl">
         <div className="mb-10">
-          <div className="flex items-center gap-2 text-xs uppercase tracking-[0.25em] text-muted-foreground font-semibold mb-3">
+          <div className="flex items-center gap-2 text-xs font-medium text-muted-foreground mb-2">
             <Tags className="w-3.5 h-3.5 text-primary" />
-            Tags
+            <span>Tags</span>
           </div>
-          <h1 className="text-2xl sm:text-3xl font-black tracking-tighter">Browse recordings by tag</h1>
+          <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-foreground">Browse recordings by tag</h1>
           <p className="text-sm text-muted-foreground mt-2 max-w-2xl">Use topic tags to explore the public recording catalogue. Select a tag to open matching listings, then refine your results with the browse filters. Adults 18+ only.</p>
           {tags && (
             <p className="text-sm text-muted-foreground mt-2">

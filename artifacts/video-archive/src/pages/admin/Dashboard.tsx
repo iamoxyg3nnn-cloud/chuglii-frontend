@@ -101,11 +101,11 @@ export default function AdminDashboard() {
   return (
     <div className="p-6">
       <div className="mb-8">
-        <div className="flex items-center gap-2 text-xs uppercase tracking-[0.25em] text-muted-foreground font-semibold mb-2">
+        <div className="flex items-center gap-2 text-xs font-medium text-muted-foreground mb-2">
           <Shield className="w-3.5 h-3.5 text-primary" />
-          Dashboard
+          <span>Dashboard</span>
         </div>
-        <h1 className="text-2xl sm:text-3xl font-black tracking-tighter">
+        <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-foreground">
           Overview
         </h1>
         <p className="text-sm text-muted-foreground mt-1">
@@ -119,10 +119,10 @@ export default function AdminDashboard() {
             <CardContent className="p-5">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-xs text-muted-foreground uppercase tracking-wider font-medium">
+                  <p className="text-xs text-muted-foreground font-medium">
                     {label}
                   </p>
-                  <p className="text-3xl font-black tracking-tighter mt-1">
+                  <p className="text-3xl font-bold tabular-nums tracking-tight mt-1">
                     {key === "requests_total" ? stats?.requests?.total ?? 0
                       : stats?.[key] ?? 0}
                   </p>

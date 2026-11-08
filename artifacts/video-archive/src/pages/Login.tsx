@@ -63,11 +63,11 @@ export default function Login() {
         <div className="text-center mb-10">
           <Link href="/" className="inline-flex items-center gap-1.5 group mb-8">
             <Film className="w-5 h-5 text-primary" />
-            <span className="font-black text-xl tracking-tighter text-foreground group-hover:text-primary transition-colors">
+            <span className="font-bold text-xl tracking-tight text-foreground group-hover:text-primary transition-colors">
               VAULT<span className="text-primary">.</span>
             </span>
           </Link>
-          <h1 className="text-2xl font-black tracking-tight mt-4">Sign in</h1>
+          <h1 className="text-2xl font-bold tracking-tight text-foreground mt-4">Sign in</h1>
           <p className="text-sm text-muted-foreground mt-1">
             Access your saved videos, collections and history
           </p>
@@ -75,7 +75,7 @@ export default function Login() {
 
         <form onSubmit={handleSubmit} className="space-y-4">
           {error && (
-            <div className="flex flex-col gap-2 p-3 bg-destructive/10 border border-destructive/30 rounded-sm text-xs text-destructive">
+            <div className="flex flex-col gap-2 p-3 bg-destructive/10 border border-destructive/30 rounded-lg text-xs text-destructive">
               <div className="flex items-start gap-2">
                 <AlertCircle className="w-3.5 h-3.5 shrink-0 mt-0.5" />
                 <span>{error}</span>
@@ -87,7 +87,7 @@ export default function Login() {
           )}
 
           <div className="space-y-1">
-            <label htmlFor="login-identity" className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
+            <label htmlFor="login-identity" className="text-xs font-medium text-muted-foreground">
               Email or Username
             </label>
             <input
@@ -99,12 +99,12 @@ export default function Login() {
               autoFocus
               autoComplete="username"
               placeholder="you@example.com or username"
-              className="w-full h-10 bg-secondary border border-border/60 focus:border-primary/50 rounded-sm px-3 text-sm outline-none transition-all placeholder:text-muted-foreground/40"
+              className="w-full h-10 bg-secondary border border-border/60 focus:border-primary/50 focus:ring-2 focus:ring-primary/10 rounded-lg px-3 text-sm outline-none transition-all placeholder:text-muted-foreground/40"
             />
           </div>
 
           <div className="space-y-1">
-            <label htmlFor="login-password" className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
+            <label htmlFor="login-password" className="text-xs font-medium text-muted-foreground">
               Password
             </label>
             <div className="relative">
@@ -115,7 +115,7 @@ export default function Login() {
                 onChange={(e) => setPassword(e.target.value)}
                 required
                 placeholder="••••••••"
-                className="w-full h-10 bg-secondary border border-border/60 focus:border-primary/50 rounded-sm px-3 pr-10 text-sm outline-none transition-all placeholder:text-muted-foreground/40"
+                className="w-full h-10 bg-secondary border border-border/60 focus:border-primary/50 focus:ring-2 focus:ring-primary/10 rounded-lg px-3 pr-10 text-sm outline-none transition-all placeholder:text-muted-foreground/40"
               />
               <button
                 type="button"
@@ -140,7 +140,7 @@ export default function Login() {
           <button
             type="submit"
             disabled={loading}
-            className="w-full h-10 border border-primary/30 text-primary text-sm font-semibold hover:border-primary/60 transition-colors rounded-sm disabled:opacity-60"
+            className="w-full h-10 bg-primary text-primary-foreground text-sm font-semibold hover:bg-primary/90 transition-colors rounded-lg shadow-xs disabled:opacity-60 cursor-pointer"
           >
             {loading ? "Signing in…" : "Sign in"}
           </button>
