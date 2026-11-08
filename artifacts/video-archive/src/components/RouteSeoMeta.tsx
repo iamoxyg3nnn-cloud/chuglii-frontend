@@ -27,29 +27,29 @@ function upsertCanonical(href: string) {
 function describeRoute(path: string): { title: string; description: string; index: boolean } {
   if (path === "/") {
     return {
-      title: "Adult Recording Archive & Directory",
-      description: "Explore the VAULT adult recording archive. Browse searchable collections, performer directories and tags. Adults only (18+).",
+      title: "Adult Cam Recording Archive & Performer Directory",
+      description: "Explore cam recordings and performer profiles on VAULT. Create an account to save your favorite recordings in your own private archive. Adults only (18+).",
       index: true,
     };
   }
   if (path === "/browse" || path.startsWith("/browse/")) {
     return {
-      title: "Browse the Recording Archive",
-      description: "Browse and search the VAULT recording catalogue by title, performer and tags. Adults only (18+).",
+      title: "Browse Cam Recordings",
+      description: "Search the public VAULT cam recording catalogue by title, performer and tags. Adults only (18+).",
       index: true,
     };
   }
   if (path === "/performers") {
     return {
       title: "Performer Directory",
-      description: "Explore the VAULT performer directory and discover public archive profiles. Adults only (18+).",
+      description: "Discover performer profiles and related recordings in the VAULT directory. Adults only (18+).",
       index: true,
     };
   }
   if (path === "/tags") {
     return {
       title: "Browse Archive Tags",
-      description: "Explore topics and categories in the VAULT recording archive. Adults only (18+).",
+      description: "Find public cam recordings by topic and tag in the VAULT directory. Adults only (18+).",
       index: true,
     };
   }
