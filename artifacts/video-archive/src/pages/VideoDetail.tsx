@@ -1,4 +1,4 @@
-﻿import { useRef, useState, useCallback, useEffect, useMemo } from "react";
+import { useRef, useState, useCallback, useEffect, useMemo } from "react";
 import { useParams, Link, useLocation } from "wouter";
 import { useQuery, useQueryClient, keepPreviousData } from "@tanstack/react-query";
 import {
@@ -89,6 +89,10 @@ function detectHostLabel(url: string): string {
     if (hostname.includes("mixdrop")) return "Mixdrop";
     if (hostname.includes("dood")) return "DoodStream";
     if (hostname.includes("lulu")) return "LuluStream";
+    if (hostname.includes("upload18")) return "Upload18";
+    if (hostname.includes("dropload") || hostname.includes("dr0pstream")) return "Dropload";
+    if (hostname.includes("videro")) return "Videro";
+    if (hostname.includes("filehost")) return "FileHost";
     if (hostname.includes("filemoon")) return "Filemoon";
     if (hostname.includes("upstream")) return "Upstream";
     if (hostname.includes("vidoza")) return "Vidoza";
