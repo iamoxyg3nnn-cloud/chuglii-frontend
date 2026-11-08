@@ -26,21 +26,21 @@ import { usePreloadRecordings } from "@/hooks/use-preload-recordings";
 import { useContinuousPrefetch } from "@/hooks/use-continuous-prefetch";
 import { isConnectionConstrained } from "@/lib/connection";
 import {
-  Search,
+  MagnifyingGlass,
   X,
-  ChevronDown,
+  CaretDown,
   SlidersHorizontal,
-  Tag,
-  Filter,
-  Bookmark,
+  Funnel,
+  BookmarkSimple,
   Check,
   Plus,
-  Trash2,
-  Clapperboard,
-  Clock3,
-  AlertCircle,
-  RefreshCw,
-} from "lucide-react";
+  Trash,
+  FilmStrip,
+  Clock,
+  WarningCircle,
+  Tag,
+  ArrowClockwise,
+} from "@phosphor-icons/react";
 import { AppPagination } from "@/components/ui/app-pagination";
 import {
   getFilterPresets,
@@ -442,7 +442,7 @@ export default function Browse() {
               <div>
                 <div className="flex items-center gap-2.5">
                   <div className="w-7 h-7 rounded-lg bg-primary/10 flex items-center justify-center">
-                    <Clapperboard className="w-3.5 h-3.5 text-primary" />
+                    <FilmStrip size={15} weight="duotone" className="text-primary" />
                   </div>
                   <h1 className="text-xl font-bold tracking-tight">Browse recordings</h1>
                 </div>
@@ -459,7 +459,7 @@ export default function Browse() {
               <div className="sm:ml-auto flex flex-wrap items-center gap-2">
                 {/* Search */}
                 <form onSubmit={handleSearch} className="relative">
-                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground/60 pointer-events-none" />
+                  <MagnifyingGlass size={14} weight="regular" className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground/60 pointer-events-none" />
                   <input
                     ref={searchInputRef}
                     type="search"
@@ -486,13 +486,13 @@ export default function Browse() {
                   <span className="absolute right-2 top-1/2 -translate-y-1/2 flex items-center gap-1">
                     {search ? (
                       <button type="button" onClick={clearSearch} className="w-6 h-6 inline-flex items-center justify-center rounded text-muted-foreground hover:text-foreground hover:bg-background/70" aria-label="Clear search">
-                        <X className="w-3.5 h-3.5" />
+                        <X size={13} weight="bold" />
                       </button>
                     ) : (
                       <kbd className="hidden sm:inline-flex h-5 items-center rounded border border-border/70 px-1.5 text-[9px] text-muted-foreground/60">/</kbd>
                     )}
                     <button type="submit" className="w-6 h-6 inline-flex items-center justify-center rounded text-primary hover:bg-primary/10" aria-label="Submit search">
-                      <Search className="w-3.5 h-3.5" />
+                      <MagnifyingGlass size={13} weight="bold" />
                     </button>
                   </span>
                   {showRecentSearches && search.trim().length >= 2 && (
@@ -537,7 +537,7 @@ export default function Browse() {
                           onClick={() => applyRecentSearch(term)}
                           className="flex w-full items-center gap-2 rounded-md px-2 py-2 text-left text-xs text-muted-foreground hover:bg-secondary hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/60"
                         >
-                          <Clock3 className="h-3 w-3 shrink-0 opacity-60" />
+                          <Clock size={12} weight="regular" className="shrink-0 opacity-60" />
                           <span className="min-w-0 flex-1 truncate">{term}</span>
                           <span className="text-[9px] text-muted-foreground/40">Search</span>
                         </button>
@@ -560,7 +560,7 @@ export default function Browse() {
                       </option>
                     ))}
                   </select>
-                  <ChevronDown className="absolute right-2 top-1/2 -translate-y-1/2 w-3 h-3 text-muted-foreground pointer-events-none" />
+                  <CaretDown size={11} weight="bold" className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground pointer-events-none" />
                 </div>
 
                 {/* Filter presets — save / load */}
@@ -577,7 +577,7 @@ export default function Browse() {
                     }`}
                     aria-label="Filter presets"
                   >
-                    <Bookmark className="w-3 h-3" />
+                    <BookmarkSimple size={13} weight="regular" />
                     Presets
                   </button>
 
@@ -604,7 +604,7 @@ export default function Browse() {
                             className="w-7 h-7 flex items-center justify-center border border-primary/30 text-primary rounded-md disabled:opacity-40 hover:border-primary/60 transition-opacity"
                             title="Save preset"
                           >
-                            <Plus className="w-3 h-3" />
+                            <Plus size={13} weight="bold" />
                           </button>
                         </div>
                       </div>
@@ -629,9 +629,9 @@ export default function Browse() {
                                 className="flex-1 flex items-center gap-2 min-w-0 text-left"
                               >
                                 {savedPresetId === preset.id ? (
-                                  <Check className="w-3 h-3 text-green-500 shrink-0" />
+                                  <Check size={12} weight="bold" className="text-green-500 shrink-0" />
                                 ) : (
-                                  <Bookmark className="w-3 h-3 text-muted-foreground/40 shrink-0" />
+                                  <BookmarkSimple size={13} weight="regular" className="text-muted-foreground/40 shrink-0" />
                                 )}
                                 <span className="truncate">{preset.name}</span>
                                 {(preset.tags.length > 0 || preset.gender) && (
@@ -650,7 +650,7 @@ export default function Browse() {
                                 className="w-5 h-5 flex items-center justify-center text-muted-foreground/30 hover:text-destructive opacity-0 group-hover:opacity-100 transition-all shrink-0"
                                 title="Delete preset"
                               >
-                                <Trash2 className="w-3 h-3" />
+                                <Trash size={12} weight="regular" />
                               </button>
                             </div>
                           ))}
@@ -673,7 +673,7 @@ export default function Browse() {
                   }`}
                   aria-label="Toggle filters"
                 >
-                  <SlidersHorizontal className="w-3 h-3" />
+                  <SlidersHorizontal size={13} weight="bold" />
                   Filters
                   {activeFilterCount > 0 && (
                     <span className="ml-0.5 min-w-[16px] h-4 rounded-full border border-primary/40 text-primary text-[9px] font-bold flex items-center justify-center px-1">
@@ -687,7 +687,7 @@ export default function Browse() {
                     onClick={clearAll}
                     className="h-8 flex items-center gap-1.5 px-3 text-xs text-muted-foreground hover:text-foreground border border-border/60 hover:border-border rounded transition-colors"
                   >
-                    <X className="w-3 h-3" /> Clear all
+                    <X size={12} weight="bold" /> Clear all
                   </button>
                 )}
                 <p className="text-[10px] text-muted-foreground/40 sm:ml-1">Press <kbd className="rounded border border-border/60 px-1 py-0.5">/</kbd> to search</p>
@@ -736,7 +736,7 @@ export default function Browse() {
                 <div>
                   <div className="flex items-center justify-between mb-2.5">
                     <p className="text-[10px] uppercase tracking-widest text-muted-foreground font-semibold flex items-center gap-1.5">
-                      <Tag className="w-3 h-3" />
+                      <Tag size={12} weight="duotone" />
                       Tags
                       {selectedTags.length > 0 && (
                         <span className="ml-1.5 text-primary font-bold normal-case tracking-normal text-[11px]">
@@ -764,7 +764,7 @@ export default function Browse() {
                           className="inline-flex items-center gap-1.5 h-7 px-2.5 text-[11px] font-medium border border-primary/60 text-primary rounded-lg hover:border-primary/80 transition-all duration-150"
                         >
                           {tag}
-                          <X className="w-2.5 h-2.5" />
+                          <X size={10} weight="bold" />
                         </button>
                       ))}
                     </div>
@@ -772,7 +772,7 @@ export default function Browse() {
 
                   {/* Tag search input */}
                   <div className="relative mb-2.5">
-                    <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3 h-3 text-muted-foreground/50" />
+                    <MagnifyingGlass size={12} weight="regular" className="absolute left-2.5 top-1/2 -translate-y-1/2 text-muted-foreground/50" />
                     <input
                       type="text"
                       aria-label="Search tags"
@@ -816,7 +816,7 @@ export default function Browse() {
                 {resolution && (
                   <span className="inline-flex items-center gap-1 h-7 px-2.5 text-[11px] font-medium text-primary border border-primary/30 rounded-lg">
                     {resolution}
-                    <button onClick={() => selectResolution("")} className="hover:text-primary/80 transition-colors" aria-label="Remove resolution filter"><X className="w-2.5 h-2.5" /></button>
+                    <button onClick={() => selectResolution("")} className="hover:text-primary/80 transition-colors" aria-label="Remove resolution filter"><X size={10} weight="bold" /></button>
                   </span>
                 )}
                 {gender && (
@@ -827,7 +827,7 @@ export default function Browse() {
                       className="hover:text-primary/80 transition-colors"
                       aria-label="Remove gender filter"
                     >
-                      <X className="w-2.5 h-2.5" />
+                      <X size={10} weight="bold" />
                     </button>
                   </span>
                 )}
@@ -842,7 +842,7 @@ export default function Browse() {
                       className="hover:text-primary/80 transition-colors"
                       aria-label={`Remove ${tag} tag filter`}
                     >
-                      <X className="w-2.5 h-2.5" />
+                      <X size={10} weight="bold" />
                     </button>
                   </span>
                 ))}
@@ -872,7 +872,7 @@ export default function Browse() {
           ) : isError ? (
             <div className="py-24 sm:py-32 text-center border border-border/30 rounded-2xl bg-secondary/10">
               <div className="w-14 h-14 rounded-full bg-destructive/10 flex items-center justify-center mx-auto mb-4">
-                <AlertCircle className="w-6 h-6 text-destructive/60" />
+                <WarningCircle size={28} weight="duotone" className="text-destructive/70" />
               </div>
               <p className="text-sm text-foreground mb-1">Couldn&apos;t load recordings.</p>
               <p className="text-xs text-muted-foreground/50 mb-5 max-w-xs mx-auto">
@@ -883,7 +883,7 @@ export default function Browse() {
                 onClick={() => void retryRecordings()}
                 className="inline-flex items-center gap-1.5 h-9 px-4 text-xs font-semibold text-primary border border-primary/30 hover:border-primary/60 rounded-lg transition-colors"
               >
-                <RefreshCw className="w-3.5 h-3.5" />
+                <ArrowClockwise size={14} weight="bold" />
                 Try again
               </button>
             </div>
@@ -928,7 +928,7 @@ export default function Browse() {
           ) : (
             <div className="py-24 sm:py-32 text-center border border-border/30 rounded-2xl bg-secondary/10">
               <div className="w-14 h-14 rounded-full bg-secondary/50 flex items-center justify-center mx-auto mb-4">
-                <Filter className="w-6 h-6 text-muted-foreground/20" />
+                <Funnel size={28} weight="duotone" className="text-muted-foreground/30" />
               </div>
               <p className="text-sm text-muted-foreground mb-1">
                 No recordings match your filters.
@@ -940,7 +940,7 @@ export default function Browse() {
                 onClick={clearAll}
                 className="inline-flex items-center gap-1.5 h-8 px-4 text-xs font-medium text-primary hover:text-primary/80 border border-primary/20 hover:border-primary/40 rounded-lg transition-colors"
               >
-                <X className="w-3 h-3" />
+                <X size={12} weight="bold" />
                 Clear all filters
               </button>
             </div>

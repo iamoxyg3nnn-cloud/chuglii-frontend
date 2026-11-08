@@ -18,7 +18,20 @@ import { setQueue, shuffleQueueItems, toQueueItem, type QueueItem } from "@/lib/
 import { byPositionThenNewest, moveItem } from "@/lib/list-order";
 import { trackActivity } from "@/lib/rum";
 import { cn } from "@/lib/utils";
-import { ArrowLeft, ArrowUp, ArrowDown, Film, Pencil, Check, X, Trash2, ListVideo, Play, Shuffle, User } from "lucide-react";
+import {
+  ArrowLeft,
+  ArrowUp,
+  ArrowDown,
+  FilmStrip,
+  PencilSimple,
+  Check,
+  X,
+  Trash,
+  Playlist,
+  Play,
+  Shuffle,
+  User,
+} from "@phosphor-icons/react";
 import { formatRelativeTime } from "@/lib/formatters";
 import { proxyUrl } from "@/lib/proxy-url";
 
@@ -261,10 +274,10 @@ export default function CollectionDetail() {
     return (
       <Layout>
         <div className="container mx-auto px-4 sm:px-6 py-24 text-center">
-          <ListVideo className="w-10 h-10 text-muted-foreground/20 mx-auto mb-4" />
+          <Playlist size={40} weight="duotone" className="text-muted-foreground/20 mx-auto mb-4" />
           <p className="text-sm text-muted-foreground mb-4">Playlist not found</p>
           <Link href="/playlists" className="inline-flex items-center gap-1.5 text-xs text-primary hover:underline">
-            <ArrowLeft className="w-3 h-3" /> Back to Playlists
+            <ArrowLeft size={13} weight="bold" /> Back to Playlists
           </Link>
         </div>
       </Layout>
@@ -278,7 +291,7 @@ export default function CollectionDetail() {
           href="/playlists"
           className="inline-flex items-center gap-1.5 text-[11px] text-muted-foreground hover:text-foreground transition-colors mb-6 group"
         >
-          <ArrowLeft className="w-3 h-3 group-hover:-translate-x-0.5 transition-transform" />
+          <ArrowLeft size={12} weight="bold" className="group-hover:-translate-x-0.5 transition-transform" />
           Back to Playlists
         </Link>
 
@@ -293,13 +306,13 @@ export default function CollectionDetail() {
                 containerClassName="w-16 h-16"
                 fallback={
                   <div className="w-16 h-16 flex items-center justify-center bg-secondary">
-                    <Film className="w-6 h-6 text-muted-foreground/20" />
+                    <FilmStrip size={24} weight="duotone" className="text-muted-foreground/30" />
                   </div>
                 }
               />
             ) : (
               <div className="w-16 h-16 flex items-center justify-center bg-secondary">
-                <Film className="w-6 h-6 text-muted-foreground/20" />
+                <FilmStrip size={24} weight="duotone" className="text-muted-foreground/30" />
               </div>
             )}
           </div>
@@ -326,7 +339,7 @@ export default function CollectionDetail() {
                   aria-label="Save playlist name"
                   title="Save playlist name"
                 >
-                  <Check className="w-4 h-4" />
+                  <Check size={14} weight="bold" />
                 </button>
                 <button
                   onClick={() => setEditing(false)}
@@ -334,7 +347,7 @@ export default function CollectionDetail() {
                   aria-label="Cancel renaming"
                   title="Cancel"
                 >
-                  <X className="w-4 h-4" />
+                  <X size={14} weight="bold" />
                 </button>
               </div>
             ) : (
@@ -347,7 +360,7 @@ export default function CollectionDetail() {
                     aria-label="Rename playlist"
                     title="Rename playlist"
                   >
-                    <Pencil className="w-3.5 h-3.5" />
+                    <PencilSimple size={14} weight="regular" />
                   </button>
                 )}
               </div>
@@ -375,7 +388,7 @@ export default function CollectionDetail() {
                   aria-label="Save description"
                   title="Save description"
                 >
-                  <Check className="w-4 h-4" />
+                  <Check size={14} weight="bold" />
                 </button>
                 <button
                   onClick={() => setEditingDesc(false)}
@@ -383,7 +396,7 @@ export default function CollectionDetail() {
                   aria-label="Cancel editing description"
                   title="Cancel"
                 >
-                  <X className="w-3.5 h-3.5" />
+                  <X size={14} weight="bold" />
                 </button>
               </div>
             ) : (
@@ -399,7 +412,7 @@ export default function CollectionDetail() {
                   <p className="text-xs text-muted-foreground/40 italic">Add a description…</p>
                 ) : null}
                 {isOwner && (
-                  <Pencil className="w-3 h-3 shrink-0 text-muted-foreground/0 group-hover/desc:text-muted-foreground transition-colors" />
+                  <PencilSimple size={12} weight="regular" className="shrink-0 text-muted-foreground/0 group-hover/desc:text-muted-foreground transition-colors" />
                 )}
               </button>
             )}
@@ -413,7 +426,7 @@ export default function CollectionDetail() {
                     className="w-4 h-4 rounded-full object-cover shrink-0"
                   />
                 ) : (
-                  <User className="w-3.5 h-3.5 text-muted-foreground" />
+                  <User size={14} weight="regular" className="text-muted-foreground" />
                 )}
                 <span>Created by <strong className="text-foreground">{authorName}</strong></span>
               </div>
@@ -437,14 +450,14 @@ export default function CollectionDetail() {
                   className="flex items-center gap-1.5 h-9 px-2.5 text-xs font-medium border border-border/50 text-muted-foreground hover:border-primary/40 hover:text-primary transition-all rounded-lg cursor-pointer"
                   title="Shuffle play"
                 >
-                  <Shuffle className="w-3.5 h-3.5" />
+                  <Shuffle size={14} weight="regular" />
                   <span className="hidden sm:inline">Shuffle</span>
                 </button>
                 <button
                   onClick={handlePlayAll}
                   className="flex items-center gap-1.5 h-9 px-3.5 text-xs font-semibold border border-primary/30 text-primary hover:border-primary/60 transition-all rounded-lg cursor-pointer"
                 >
-                  <Play className="w-3.5 h-3.5 fill-current" />
+                  <Play size={14} weight="fill" />
                   Play all
                 </button>
               </>
@@ -463,7 +476,7 @@ export default function CollectionDetail() {
                 className="flex items-center gap-1.5 h-9 px-3 text-xs font-medium text-muted-foreground/50 hover:text-destructive border border-border/40 hover:border-destructive/40 rounded-lg transition-all cursor-pointer"
                 title="Delete playlist"
               >
-                <Trash2 className="w-3.5 h-3.5" />
+                <Trash size={14} weight="regular" />
                 <span className="hidden sm:inline">Delete</span>
               </button>
             )}
@@ -481,7 +494,7 @@ export default function CollectionDetail() {
           </div>
         ) : items.length === 0 ? (
           <div className="py-20 text-center border border-dashed border-border/40 rounded-2xl">
-            <Film className="w-8 h-8 text-muted-foreground/20 mx-auto mb-3" />
+            <FilmStrip size={32} weight="duotone" className="text-muted-foreground/20 mx-auto mb-3" />
             <p className="text-sm text-muted-foreground">No videos in this playlist yet.</p>
             {isOwner && (
               <p className="text-xs text-muted-foreground/60 mt-1">
@@ -518,7 +531,7 @@ export default function CollectionDetail() {
                           aria-label="Remove from playlist"
                           title="Remove from playlist"
                         >
-                          <Trash2 className="w-3 h-3" />
+                          <Trash size={12} weight="regular" />
                         </button>
                       )}
                     </div>
@@ -532,7 +545,7 @@ export default function CollectionDetail() {
                           title="Move up"
                           className="w-7 h-7 flex items-center justify-center rounded-lg bg-black/65 backdrop-blur-sm ring-1 ring-white/15 text-white hover:bg-black/85 disabled:opacity-30 disabled:cursor-not-allowed transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
                         >
-                          <ArrowUp className="w-3.5 h-3.5" />
+                          <ArrowUp size={13} weight="bold" />
                         </button>
                         <button
                           type="button"
@@ -542,7 +555,7 @@ export default function CollectionDetail() {
                           title="Move down"
                           className="w-7 h-7 flex items-center justify-center rounded-lg bg-black/65 backdrop-blur-sm ring-1 ring-white/15 text-white hover:bg-black/85 disabled:opacity-30 disabled:cursor-not-allowed transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
                         >
-                          <ArrowDown className="w-3.5 h-3.5" />
+                          <ArrowDown size={13} weight="bold" />
                         </button>
                         <span className="sr-only">You can also drag this recording to reorder it.</span>
                       </div>

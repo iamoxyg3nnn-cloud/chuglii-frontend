@@ -10,7 +10,7 @@ import { userApi, type UserNotification } from "@/lib/user-api";
 import { useRealtimeNotifications } from "@/hooks/use-realtime-notifications";
 import { getNotificationAction } from "@/lib/notification-actions";
 import { formatRelativeTime } from "@/lib/formatters";
-import { Bell, BellOff, CheckCheck, X, Trash2, ExternalLink } from "lucide-react";
+import { Bell, BellSlash, Checks, X, Trash, ArrowSquareOut } from "@phosphor-icons/react";
 
 const NOTIF_PAGE_SIZE = 50;
 
@@ -95,7 +95,7 @@ export default function Notifications() {
         <div className="flex items-center justify-between mb-8 pb-6 border-b border-border/40">
           <div>
             <h1 className="flex items-center gap-2 text-xl font-bold tracking-tight">
-              <Bell className="w-5 h-5 text-primary" />
+              <Bell size={18} weight="duotone" className="text-primary" />
               Notifications
             </h1>
             <p className="text-xs text-muted-foreground mt-1">
@@ -108,7 +108,7 @@ export default function Notifications() {
               disabled={markAll.isPending}
               className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-primary transition-colors"
             >
-              <CheckCheck className="w-3.5 h-3.5" />
+              <Checks size={14} />
               Mark all read
             </button>
           )}
@@ -125,7 +125,7 @@ export default function Notifications() {
           </div>
         ) : notifications.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-32 text-center">
-            <BellOff className="w-10 h-10 text-muted-foreground/20 mb-4" />
+            <BellSlash size={36} weight="duotone" className="text-muted-foreground/20 mb-4" />
             <p className="text-sm font-medium text-muted-foreground/50 mb-1">No notifications</p>
             <p className="text-xs text-muted-foreground/30">
               You'll see notifications about new content here.
@@ -163,7 +163,7 @@ export default function Notifications() {
                           }}
                         >
                           {action.label}
-                          <ExternalLink className="w-3 h-3" />
+                          <ArrowSquareOut size={12} />
                         </a>
                       )}
                     </div>
@@ -174,7 +174,7 @@ export default function Notifications() {
                     className="shrink-0 flex items-center justify-center w-7 h-7 text-muted-foreground/40 hover:text-destructive hover:bg-destructive/10 transition-colors rounded-lg mt-0.5"
                     title="Delete"
                   >
-                    <X className="w-3.5 h-3.5" />
+                    <X size={14} />
                   </button>
                 </div>
               );
@@ -198,7 +198,7 @@ export default function Notifications() {
                   onClick={() => clearAll.mutate()}
                   className="flex items-center gap-1.5 text-xs text-muted-foreground/50 hover:text-destructive transition-colors"
                 >
-                  <Trash2 className="w-3.5 h-3.5" />
+                  <Trash size={14} />
                   Clear all
                 </button>
               </div>

@@ -5,7 +5,7 @@ import { usePerformerLookup, useCreateRequest, type PerformerLookupResult } from
 import { useAuth } from "@/contexts/AuthContext";
 import { toast } from "@/hooks/use-toast";
 import { Dialog, DialogContent, DialogTitle, DialogDescription } from "@/components/ui/dialog";
-import { Film, Sparkles, CheckCircle, Check } from "lucide-react";
+import { FilmStrip, Sparkle, CheckCircle, Check } from "@phosphor-icons/react";
 
 import { Link } from "wouter";
 import { Button } from "@/components/ui/button";
@@ -147,7 +147,7 @@ function RequestDialogInner({ open, onOpenChange }: RequestDialogProps) {
         {submitted ? (
           <div className="text-center py-3">
             <div className="animate-fade-in-scale">
-              <CheckCircle className="w-10 h-10 text-green-500 mx-auto mb-3" />
+              <CheckCircle size={40} weight="fill" className="text-green-500 mx-auto mb-3" />
             </div>
             <h2 className="text-base font-bold text-foreground mb-1">Request Submitted!</h2>
             <p className="text-xs text-muted-foreground mb-3">
@@ -179,7 +179,7 @@ function RequestDialogInner({ open, onOpenChange }: RequestDialogProps) {
           <>
             <div className="text-center mb-2">
               <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-primary/8 border border-primary/20 text-[10px] text-primary mb-2">
-                <Sparkles className="w-2.5 h-2.5" />
+                <Sparkle size={11} weight="duotone" />
                 Request a performer
               </div>
               <h2 className="text-base font-black tracking-tight text-foreground">
@@ -240,8 +240,8 @@ function RequestDialogInner({ open, onOpenChange }: RequestDialogProps) {
 
 function Step1PlatformSelect({ onSelect }: { onSelect: (p: Platform) => void }) {
   const platforms = [
-    { id: "chaturbate" as const, name: "Chaturbate", desc: "Most popular cam site", color: "emerald", icon: Film },
-    { id: "stripchat" as const, name: "Stripchat", desc: "Newer, fast-growing platform", color: "violet", icon: Sparkles },
+    { id: "chaturbate" as const, name: "Chaturbate", desc: "Most popular cam site", color: "emerald", icon: FilmStrip },
+    { id: "stripchat" as const, name: "Stripchat", desc: "Newer, fast-growing platform", color: "violet", icon: Sparkle },
   ];
 
   return (
@@ -344,7 +344,7 @@ function Step2UsernameInput({
       {!value && (
         <div className="flex flex-col items-center justify-center py-4 text-center">
           <div className="w-8 h-8 rounded-full bg-secondary flex items-center justify-center mb-1.5">
-            <Film className="w-3 h-3 text-muted-foreground/40" />
+            <FilmStrip size={15} weight="duotone" className="text-muted-foreground/40" />
           </div>
           <p className="text-[11px] text-muted-foreground">
             Type a username then click Continue to check
@@ -428,7 +428,7 @@ function Step3Confirmation({
                     : "border-border/60 bg-secondary"
                 }`}
               >
-                {confirmed && <Check className="w-3 h-3" />}
+                {confirmed && <Check size={11} weight="bold" />}
               </button>
               <span className="text-[11px] text-foreground leading-tight">
                 I confirm this is the performer I want recorded
@@ -476,7 +476,7 @@ function Step3Confirmation({
               : "border-border/60 bg-secondary"
           }`}
         >
-          {confirmed && <Check className="w-3 h-3" />}
+          {confirmed && <Check size={11} weight="bold" />}
         </button>
         <span className="text-[11px] text-foreground leading-tight">
           I confirm this is the performer I want recorded

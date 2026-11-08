@@ -6,9 +6,9 @@ import { useAuth } from "@/contexts/AuthContext";
 import { userApi } from "@/lib/user-api";
 import { Link } from "wouter";
 import {
-  BarChart3, Clock, Film, CheckCircle, TrendingUp,
-  ArrowLeft, Loader2, Users
-} from "lucide-react";
+  ChartBar, Clock, FilmStrip, CheckCircle, TrendUp,
+  ArrowLeft, CircleNotch, UsersThree,
+} from "@phosphor-icons/react";
 
 function formatMs(ms: number): string {
   if (ms < 60000) return `${Math.round(ms / 1000)}s`;
@@ -49,10 +49,10 @@ export default function Analytics() {
         {/* Header */}
         <div className="mb-8 pb-6 border-b border-border/40">
           <Link href="/history" className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors mb-4">
-            <ArrowLeft className="w-3 h-3" /> Back to History
+            <ArrowLeft size={12} /> Back to History
           </Link>
           <div className="flex items-center gap-2 text-xs font-medium text-muted-foreground mb-2">
-            <BarChart3 className="w-3.5 h-3.5 text-primary" />
+            <ChartBar size={15} weight="duotone" className="text-primary" />
             <span>Analytics</span>
           </div>
           <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-foreground">Watch Analytics</h1>
@@ -64,7 +64,7 @@ export default function Analytics() {
 
         {isLoading ? (
           <div className="flex items-center justify-center py-24">
-            <Loader2 className="w-6 h-6 text-primary/60 animate-spin" />
+            <CircleNotch size={24} className="text-primary/60 animate-spin" />
           </div>
         ) : !stats ? (
           <div className="py-24 text-center">
@@ -75,26 +75,26 @@ export default function Analytics() {
             {/* Stat cards */}
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
               <StatCard
-                icon={<Clock className="w-4 h-4" />}
+                icon={<Clock size={16} weight="duotone" />}
                 label="Total Watch Time"
                 value={formatMs(stats.totalWatchMs)}
                 color="text-blue-400"
               />
               <StatCard
-                icon={<Film className="w-4 h-4" />}
+                icon={<FilmStrip size={16} weight="duotone" />}
                 label="Videos Watched"
                 value={String(stats.totalVideos)}
                 color="text-violet-400"
               />
               <StatCard
-                icon={<CheckCircle className="w-4 h-4" />}
+                icon={<CheckCircle size={16} weight="duotone" />}
                 label="Completed"
                 value={`${stats.completedVideos}`}
                 sub={stats.totalVideos > 0 ? `${Math.round((stats.completedVideos / stats.totalVideos) * 100)}%` : undefined}
                 color="text-green-400"
               />
               <StatCard
-                icon={<TrendingUp className="w-4 h-4" />}
+                icon={<TrendUp size={16} weight="bold" />}
                 label="Avg Progress"
                 value={`${stats.avgProgress}%`}
                 color="text-amber-400"
@@ -105,7 +105,7 @@ export default function Analytics() {
             {stats.topPerformers.length > 0 && (
               <section className="rounded-xl border border-border/30 bg-card p-5">
                 <h2 className="text-sm font-bold mb-4 flex items-center gap-2">
-                  <Users className="w-3.5 h-3.5 text-primary" />
+                  <UsersThree size={16} weight="duotone" className="text-primary" />
                   Most Watched Performers
                 </h2>
                 <div className="space-y-2">

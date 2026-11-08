@@ -9,7 +9,7 @@ import { useNotificationSound } from "@/hooks/use-notification-sound";
 import { toast } from "@/hooks/use-toast";
 import { getSoundEnabled, getVibrationEnabled } from "@/lib/sound-prefs";
 import { getNotificationAction } from "@/lib/notification-actions";
-import { Bell, X, CheckCheck, ExternalLink } from "lucide-react";
+import { Bell, X, Checks, ArrowSquareOut } from "@phosphor-icons/react";
 import { formatRelativeTime } from "@/lib/formatters";
 
 export function NotificationBell() {
@@ -79,10 +79,10 @@ export function NotificationBell() {
     <div ref={ref} className="relative">
       <button
         onClick={() => setOpen((v) => !v)}
-        className="relative flex items-center justify-center w-8 h-8 text-muted-foreground hover:text-foreground transition-colors rounded-lg"
+        className="relative flex items-center justify-center w-8 h-8 text-muted-foreground hover:text-foreground transition-colors rounded-lg cursor-pointer"
         aria-label={`Notifications${unread > 0 ? ` (${unread} unread)` : ""}`}
       >
-        <Bell className="w-4 h-4" />
+        <Bell size={17} weight="regular" />
         {unread > 0 && (
           <span className="absolute top-1 right-1 w-3.5 h-3.5 border border-primary/40 text-primary text-[9px] font-bold rounded-full flex items-center justify-center leading-none">
             {unread > 9 ? "9+" : unread}
@@ -97,9 +97,9 @@ export function NotificationBell() {
             {unread > 0 && (
               <button
                 onClick={() => markAllRead.mutate()}
-                className="flex items-center gap-1 text-[11px] text-muted-foreground hover:text-primary transition-colors"
+                className="flex items-center gap-1 text-[11px] text-muted-foreground hover:text-primary transition-colors cursor-pointer"
               >
-                <CheckCheck className="w-3 h-3" />
+                <Checks size={13} weight="bold" />
                 Mark all read
               </button>
             )}
@@ -139,17 +139,17 @@ export function NotificationBell() {
                             className="inline-flex items-center gap-0.5 text-[10px] text-primary hover:text-primary/80 hover:underline transition-colors"
                           >
                             {action.label}
-                            <ExternalLink className="w-2.5 h-2.5" />
+                            <ArrowSquareOut size={11} weight="bold" />
                           </Link>
                         )}
                       </div>
                     </div>
                     <button
                       onClick={() => deleteOne.mutate(n.id)}
-                      className="shrink-0 text-muted-foreground/30 hover:text-muted-foreground transition-colors mt-0.5"
+                      className="shrink-0 text-muted-foreground/30 hover:text-muted-foreground transition-colors mt-0.5 cursor-pointer"
                       aria-label="Delete notification"
                     >
-                      <X className="w-3 h-3" />
+                      <X size={12} weight="bold" />
                     </button>
                   </div>
                 );

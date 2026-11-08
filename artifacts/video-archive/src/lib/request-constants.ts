@@ -1,5 +1,5 @@
 import type { ComponentType } from "react";
-import { Clock, CheckCircle2, XCircle, CheckCircle } from "lucide-react";
+import { Clock, CheckCircle, XCircle, Checks } from "@phosphor-icons/react";
 
 export type StatusKey = "pending" | "approved" | "rejected" | "done";
 
@@ -7,7 +7,7 @@ export interface StatusConfig {
   label: string;
   color: string;
   bg: string;
-  icon: ComponentType<{ className?: string }>;
+  icon: ComponentType<{ className?: string; size?: number | string }>;
 }
 
 export const STATUS_CONFIG: Record<StatusKey, StatusConfig> = {
@@ -21,7 +21,7 @@ export const STATUS_CONFIG: Record<StatusKey, StatusConfig> = {
     label: "Approved",
     color: "text-blue-500",
     bg: "bg-blue-500/10",
-    icon: CheckCircle2,
+    icon: CheckCircle,
   },
   rejected: {
     label: "Rejected",
@@ -33,7 +33,7 @@ export const STATUS_CONFIG: Record<StatusKey, StatusConfig> = {
     label: "Completed",
     color: "text-green-500",
     bg: "bg-green-500/10",
-    icon: CheckCircle,
+    icon: Checks,
   },
 };
 

@@ -2,17 +2,17 @@ import { useState, useEffect, useRef, useCallback, useMemo, useId } from "react"
 import type { FormEvent, KeyboardEvent, ReactNode } from "react";
 import { useLocation } from "wouter";
 import {
-  Search,
+  MagnifyingGlass,
   X,
   User,
   Tag,
-  Clapperboard,
-  TrendingUp,
-  Trash2,
+  FilmStrip,
+  TrendUp,
+  Trash,
   Clock,
   ArrowRight,
-  LoaderCircle,
-} from "lucide-react";
+  CircleNotch,
+} from "@phosphor-icons/react";
 import { useSearchSuggestions, useListTags, useListPerformers, type SearchSuggestion } from "@/lib/api";
 import { readRecentSearches, rememberRecentSearch, clearRecentSearches } from "@/lib/recent-searches";
 import { proxyImageUrl } from "@/lib/proxy-url";
@@ -131,14 +131,14 @@ export function SearchDropdown({ open, onOpenChange }: SearchDropdownProps) {
       items.push({
         label: `#${tag.tag}`,
         href: `/browse?tags=${encodeURIComponent(tag.tag)}`,
-        icon: <Tag className="h-3 w-3" />,
+        icon: <Tag size={13} weight="regular" />,
       });
     }
     for (const performer of (trendingPerformers?.performers ?? []).slice(0, 3)) {
       items.push({
         label: performer.username,
         href: `/performers/${encodeURIComponent(performer.username)}`,
-        icon: <User className="h-3 w-3" />,
+        icon: <User size={13} weight="regular" />,
       });
     }
     return items.slice(0, 7);
@@ -270,12 +270,12 @@ export function SearchDropdown({ open, onOpenChange }: SearchDropdownProps) {
       <button
         type="button"
         onClick={() => onOpenChange(true)}
-        className="nav-btn group"
+        className="nav-btn group cursor-pointer"
         aria-label="Open search"
         title="Search ( / )"
         aria-keyshortcuts="/"
       >
-        <Search className="relative z-10 h-4 w-4" />
+        <MagnifyingGlass size={16} weight="regular" className="relative z-10" />
       </button>
     );
   }
@@ -284,7 +284,7 @@ export function SearchDropdown({ open, onOpenChange }: SearchDropdownProps) {
     <div className="relative flex items-center">
       <form onSubmit={handleSubmit} className="flex items-center gap-1.5">
         <div className="relative">
-          <Search className="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground/50" />
+          <MagnifyingGlass size={14} weight="regular" className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-muted-foreground/50" />
           <input
             ref={searchInputRef}
             type="search"
@@ -320,19 +320,19 @@ export function SearchDropdown({ open, onOpenChange }: SearchDropdownProps) {
                 <>
                   {suggestionsPending && predictions.length === 0 ? (
                     <div className="flex items-center gap-2 px-4 py-3 text-xs text-muted-foreground/60">
-                      <LoaderCircle className="h-3.5 w-3.5 animate-spin" /> Finding matches…
+                      <CircleNotch size={14} weight="bold" className="animate-spin" /> Finding matches…
                     </div>
                   ) : predictions.length ? (
                     <div>
                       {(["performer", "recording", "tag"] as const).map((type) => {
                         const group = predictions.filter((item) => item.type === type);
                         if (!group.length) return null;
-                        const Icon = type === "performer" ? User : type === "tag" ? Tag : Clapperboard;
+                        const Icon = type === "performer" ? User : type === "tag" ? Tag : FilmStrip;
                         const label = type === "performer" ? "Performers" : type === "recording" ? "Recordings" : "Topics";
                         return (
                           <section key={type}>
                             <div className="flex items-center gap-1.5 bg-secondary/60 px-3 py-1.5 text-[11px] font-medium text-muted-foreground/75 dark:bg-white/[0.04]">
-                              <Icon className="h-3 w-3" /> {label}
+                              <Icon size={12} weight="regular" /> {label}
                             </div>
                             {group.map((item) => {
                               const index = predictions.indexOf(item);
@@ -354,7 +354,7 @@ export function SearchDropdown({ open, onOpenChange }: SearchDropdownProps) {
                                     </span>
                                   ) : (
                                     <span className={`flex h-8 w-8 shrink-0 items-center justify-center rounded ${type === "performer" ? "rounded-full bg-primary/10 text-primary/60" : type === "tag" ? "rounded-full bg-amber-500/10 text-amber-500/60" : "bg-primary/10 text-primary/60"}`}>
-                                      <Icon className="h-3.5 w-3.5" />
+                                      <Icon size={14} weight="regular" />
                                     </span>
                                   )}
                                   <span className="min-w-0 flex-1">
@@ -390,7 +390,7 @@ export function SearchDropdown({ open, onOpenChange }: SearchDropdownProps) {
               ) : filteredRecent.length ? (
                 <>
                   <div className="flex items-center justify-between bg-secondary/60 px-3 py-1.5 text-[11px] font-medium text-muted-foreground/75 dark:bg-white/[0.04]">
-                    <span className="flex items-center gap-1.5"><Clock className="h-3 w-3" /> Recent searches</span>
+                    <span className="flex items-center gap-1.5"><Clock size={12} weight="regular" /> Recent searches</span>
                     <button
                       type="button"
                       id={`${listboxId}-option-${filteredRecent.length}`}
@@ -399,9 +399,9 @@ export function SearchDropdown({ open, onOpenChange }: SearchDropdownProps) {
                       data-index={filteredRecent.length}
                       onMouseDown={(event) => { event.preventDefault(); handleClearRecent(); }}
                       onMouseEnter={() => setSelectedIndex(filteredRecent.length)}
-                      className="inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-[9px] hover:text-foreground"
+                      className="inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-[9px] hover:text-foreground cursor-pointer"
                     >
-                      <Trash2 className="h-2.5 w-2.5" /> Clear
+                      <Trash size={11} weight="regular" /> Clear
                     </button>
                   </div>
                   {filteredRecent.map((term, index) => (
@@ -414,9 +414,9 @@ export function SearchDropdown({ open, onOpenChange }: SearchDropdownProps) {
                       data-index={index}
                       onMouseDown={() => submitSearch(term)}
                       onMouseEnter={() => setSelectedIndex(index)}
-                      className={`flex w-full items-center gap-2 px-3 py-2.5 text-left text-xs transition-colors ${selectedIndex === index ? "bg-secondary text-foreground dark:bg-white/[0.08]" : "text-muted-foreground hover:bg-secondary/30 hover:text-foreground"}`}
+                      className={`flex w-full items-center gap-2 px-3 py-2.5 text-left text-xs transition-colors cursor-pointer ${selectedIndex === index ? "bg-secondary text-foreground dark:bg-white/[0.08]" : "text-muted-foreground hover:bg-secondary/30 hover:text-foreground"}`}
                     >
-                      <Clock className="h-3 w-3 shrink-0 text-muted-foreground/40" />
+                      <Clock size={12} weight="regular" className="shrink-0 text-muted-foreground/40" />
                       <span className="flex-1 truncate">{term}</span>
                       <span className="text-[9px] text-muted-foreground/30">↵</span>
                     </button>
@@ -425,7 +425,7 @@ export function SearchDropdown({ open, onOpenChange }: SearchDropdownProps) {
               ) : (
                 <>
                   <div className="flex items-center gap-1.5 bg-secondary px-3 py-1.5 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground/50 dark:bg-white/[0.06]">
-                    <TrendingUp className="h-3 w-3" /> Trending now
+                    <TrendUp size={12} weight="bold" /> Trending now
                   </div>
                   {trendingItems.length ? trendingItems.map((item, index) => (
                     <button
@@ -437,11 +437,11 @@ export function SearchDropdown({ open, onOpenChange }: SearchDropdownProps) {
                       data-index={index}
                       onMouseDown={() => navigateTo(item.href)}
                       onMouseEnter={() => setSelectedIndex(index)}
-                      className={`flex w-full items-center gap-2 px-3 py-2.5 text-left text-xs transition-colors ${selectedIndex === index ? "bg-secondary text-foreground dark:bg-white/[0.08]" : "text-muted-foreground hover:bg-secondary/30 hover:text-foreground"}`}
+                      className={`flex w-full items-center gap-2 px-3 py-2.5 text-left text-xs transition-colors cursor-pointer ${selectedIndex === index ? "bg-secondary text-foreground dark:bg-white/[0.08]" : "text-muted-foreground hover:bg-secondary/30 hover:text-foreground"}`}
                     >
                       <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-primary/5">{item.icon}</span>
                       <span className="flex-1 truncate">{item.label}</span>
-                      <ArrowRight className="h-3 w-3 text-muted-foreground/30" />
+                      <ArrowRight size={12} weight="bold" className="text-muted-foreground/30" />
                     </button>
                   )) : <p className="px-3 py-3 text-xs text-muted-foreground/50">Start typing to search the archive.</p>}
                 </>
@@ -452,10 +452,10 @@ export function SearchDropdown({ open, onOpenChange }: SearchDropdownProps) {
         <button
           type="button"
           onClick={closeSearch}
-          className="flex h-7 w-7 items-center justify-center rounded-full text-muted-foreground transition-all hover:bg-secondary/50 hover:text-foreground dark:hover:bg-white/5"
+          className="flex h-7 w-7 items-center justify-center rounded-full text-muted-foreground transition-all hover:bg-secondary/50 hover:text-foreground dark:hover:bg-white/5 cursor-pointer"
           aria-label="Close search"
         >
-          <X className="h-3.5 w-3.5" />
+          <X size={14} weight="bold" />
         </button>
       </form>
     </div>

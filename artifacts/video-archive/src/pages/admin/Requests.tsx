@@ -2,9 +2,9 @@ import { useState, useEffect, useCallback } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import { resolveApiPath } from "@/lib/api-base";
 import {
-  Shield, RefreshCw, CheckCircle2, XCircle, Clock,
-  Trash2, Filter, ChevronDown, ChevronUp, User, Link2, FileText,
-} from "lucide-react";
+  Shield, ArrowsClockwise, CheckCircle, XCircle, Clock,
+  Trash, Funnel, CaretDown, CaretUp, User, LinkSimple, FileText,
+} from "@phosphor-icons/react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -123,7 +123,7 @@ export default function AdminRequests() {
       <div className="flex items-center justify-between mb-6">
         <div>
           <div className="flex items-center gap-2 text-xs font-medium text-muted-foreground mb-2">
-            <Shield className="w-3.5 h-3.5 text-primary" />
+            <Shield size={15} weight="duotone" className="text-primary" />
             <span>Admin</span>
           </div>
           <h1 className="text-2xl font-bold tracking-tight text-foreground">Requests</h1>
@@ -132,7 +132,7 @@ export default function AdminRequests() {
           </p>
         </div>
         <Button variant="outline" size="sm" onClick={loadRequests} disabled={loading}>
-          <RefreshCw className={`w-3.5 h-3.5 ${loading ? "animate-spin" : ""}`} />
+          <ArrowsClockwise size={14} className={loading ? "animate-spin" : ""} />
           Refresh
         </Button>
       </div>
@@ -197,7 +197,7 @@ export default function AdminRequests() {
                       </TableCell>
                       <TableCell className="font-medium">
                         <div className="flex items-center gap-2">
-                          <User className="w-3.5 h-3.5 text-muted-foreground/50" />
+                          <User size={14} className="text-muted-foreground/50" />
                           {req.performer_username ?? (
                             <span className="text-muted-foreground italic">Direct link</span>
                           )}
@@ -228,7 +228,7 @@ export default function AdminRequests() {
                                 className="h-8 w-8 text-muted-foreground hover:text-green-400"
                                 title="Approve"
                               >
-                                <CheckCircle2 className="w-4 h-4" />
+                                <CheckCircle size={16} weight="duotone" />
                               </Button>
                               <Button
                                 variant="ghost" size="icon"
@@ -237,7 +237,7 @@ export default function AdminRequests() {
                                 className="h-8 w-8 text-muted-foreground hover:text-red-400"
                                 title="Reject"
                               >
-                                <XCircle className="w-4 h-4" />
+                                <XCircle size={16} weight="duotone" />
                               </Button>
                             </>
                           )}
@@ -257,14 +257,14 @@ export default function AdminRequests() {
                             className="h-8 w-8 text-muted-foreground hover:text-destructive"
                             title="Delete"
                           >
-                            <Trash2 className="w-3.5 h-3.5" />
+                            <Trash size={14} />
                           </Button>
                           <Button
                             variant="ghost" size="icon"
                             onClick={() => setExpandedId(expandedId === req.id ? null : req.id)}
                             className="h-8 w-8 text-muted-foreground"
                           >
-                            {expandedId === req.id ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+                            {expandedId === req.id ? <CaretUp size={16} /> : <CaretDown size={16} />}
                           </Button>
                         </div>
                       </TableCell>
@@ -275,7 +275,7 @@ export default function AdminRequests() {
                           <div className="px-4 py-3 space-y-2 text-sm">
                             {req.stream_link && (
                               <div className="flex items-start gap-2">
-                                <Link2 className="w-3.5 h-3.5 text-muted-foreground/50 mt-0.5 shrink-0" />
+                                <LinkSimple size={14} className="text-muted-foreground/50 mt-0.5 shrink-0" />
                                 <a href={req.stream_link} target="_blank" rel="noopener noreferrer" className="text-primary hover:underline break-all">
                                   {req.stream_link}
                                 </a>
@@ -283,12 +283,12 @@ export default function AdminRequests() {
                             )}
                             {req.notes && (
                               <div className="flex items-start gap-2">
-                                <FileText className="w-3.5 h-3.5 text-muted-foreground/50 mt-0.5 shrink-0" />
+                                <FileText size={14} className="text-muted-foreground/50 mt-0.5 shrink-0" />
                                 <p className="text-muted-foreground">{req.notes}</p>
                               </div>
                             )}
                             <div className="flex items-start gap-2">
-                              <Shield className="w-3.5 h-3.5 text-muted-foreground/50 mt-0.5 shrink-0" />
+                              <Shield size={14} weight="duotone" className="text-muted-foreground/50 mt-0.5 shrink-0" />
                               <span className="text-muted-foreground">
                                 User ID: <code className="text-xs bg-muted/50 px-1 py-0.5 rounded">{req.user_id}</code>
                               </span>

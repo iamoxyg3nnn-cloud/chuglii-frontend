@@ -1,13 +1,13 @@
 import { Link } from "wouter";
 import { Layout } from "@/components/Layout";
 import { AdBanner } from "@/components/ads/AdBanner";
-import { Film } from "lucide-react";
+import { FilmStrip } from "@phosphor-icons/react";
 
 export default function NotFound() {
   return (
     <Layout>
       <div className="flex-1 flex flex-col items-center justify-center px-4 py-32 text-center relative overflow-hidden">
-        <Film className="w-10 h-10 text-muted-foreground/20 mb-6" />
+        <FilmStrip size={36} weight="duotone" className="text-muted-foreground/20 mb-6" />
         <div className="text-[clamp(4rem,12vw,8rem)] font-black tracking-tighter text-foreground/[0.04] leading-none select-none mb-4">
           404
         </div>

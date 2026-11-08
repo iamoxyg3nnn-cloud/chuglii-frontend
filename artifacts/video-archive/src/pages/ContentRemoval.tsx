@@ -1,6 +1,6 @@
 import { useState, type FormEvent } from "react";
 import { Link } from "wouter";
-import { AlertCircle, CheckCircle2, ShieldCheck } from "lucide-react";
+import { WarningCircle, CheckCircle, ShieldCheck } from "@phosphor-icons/react";
 import { Layout } from "@/components/Layout";
 
 const REASONS=[
@@ -46,7 +46,7 @@ export default function ContentRemoval() {
  return <Layout>
   <section className="container mx-auto max-w-3xl px-4 sm:px-6 py-12">
    <div className="mb-8 flex items-start gap-3">
-    <div className="rounded-xl border border-primary/20 bg-primary/10 p-3 text-primary"><ShieldCheck className="h-5 w-5"/></div>
+    <div className="rounded-xl border border-primary/20 bg-primary/10 p-3 text-primary"><ShieldCheck size={20} weight="duotone" /></div>
     <div>
      <p className="text-xs font-medium text-muted-foreground">Safety &amp; privacy</p>
      <h1 className="mt-2 text-2xl font-bold tracking-tight text-foreground">Report content or request removal</h1>
@@ -54,7 +54,7 @@ export default function ContentRemoval() {
     </div>
    </div>
    {requestId? <div className="rounded-xl border border-emerald-500/20 bg-emerald-500/5 p-6">
-    <CheckCircle2 className="h-6 w-6 text-emerald-500"/>
+    <CheckCircle size={24} weight="duotone" className="text-emerald-500"/>
     <h2 className="mt-3 text-lg font-semibold">Report received</h2>
     <p className="mt-2 text-sm text-muted-foreground">Your report was recorded. Reference: <span className="font-mono">{requestId}</span>. This is an acknowledgement, not a finding or a guarantee of removal.</p>
     <button className="mt-5 h-10 rounded-lg border border-border px-4 text-sm" onClick={()=>setRequestId("")}>Submit another report</button>
@@ -81,7 +81,7 @@ export default function ContentRemoval() {
      <label htmlFor="company-website">Leave this field empty</label>
      <input id="company-website" tabIndex={-1} autoComplete="off" value={honeypot} onChange={e=>setHoneypot(e.target.value)}/>
     </div>
-    {error&&<p role="alert" className="flex items-start gap-2 text-sm text-destructive"><AlertCircle className="mt-0.5 h-4 w-4 shrink-0"/>{error}</p>}
+    {error&&<p role="alert" className="flex items-start gap-2 text-sm text-destructive"><WarningCircle size={16} weight="duotone" className="mt-0.5 shrink-0"/>{error}</p>}
     <button disabled={busy} type="submit" className="h-11 w-full rounded-lg bg-primary px-5 text-sm font-semibold text-primary-foreground disabled:opacity-60">{busy?"Submitting…":"Submit report"}</button>
     <p className="text-xs leading-5 text-muted-foreground">Please provide accurate information. False or abusive reports may delay review. An acknowledgement does not guarantee removal.</p>
    </form>}

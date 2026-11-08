@@ -9,7 +9,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { useAuth } from "@/contexts/AuthContext";
 import { userApi, type PublicPlaylist } from "@/lib/user-api";
 import { trackActivity } from "@/lib/rum";
-import { ListVideo, Plus, Clapperboard, FolderHeart } from "lucide-react";
+import { Playlist, Plus, FilmStrip, FolderSimplePlus } from "@phosphor-icons/react";
 import { toast } from "@/hooks/use-toast";
 
 function PlaylistSkeleton() {
@@ -76,7 +76,7 @@ export default function Playlists() {
         <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4 mb-8">
           <div>
             <div className="flex items-center gap-2 text-xs font-medium text-muted-foreground mb-2">
-              <ListVideo className="w-3.5 h-3.5 text-primary" />
+              <Playlist size={15} weight="duotone" className="text-primary" />
               <span>Community Playlists</span>
             </div>
             <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-foreground">Playlists</h1>
@@ -91,7 +91,7 @@ export default function Playlists() {
                 href="/collections"
                 className="inline-flex items-center gap-1.5 h-9 px-3.5 text-xs font-medium border border-border/60 text-muted-foreground hover:text-foreground transition-colors rounded-lg"
               >
-                <FolderHeart className="w-3.5 h-3.5" />
+                <FolderSimplePlus size={14} weight="regular" />
                 My Playlists
               </Link>
             )}
@@ -105,7 +105,7 @@ export default function Playlists() {
               }}
               className="inline-flex items-center gap-1.5 h-9 px-4 text-xs font-semibold border border-primary/30 text-primary hover:border-primary/60 transition-colors rounded-lg cursor-pointer"
             >
-              <Plus className="w-3.5 h-3.5" />
+              <Plus size={13} weight="bold" />
               Create Playlist
             </button>
           </div>
@@ -176,7 +176,7 @@ export default function Playlists() {
         ) : playlists.length === 0 ? (
           <div className="py-24 text-center border border-border/30 rounded-2xl bg-secondary/10 animate-fade-in-up">
             <div className="w-14 h-14 rounded-full bg-secondary/50 flex items-center justify-center mx-auto mb-4">
-              <Clapperboard className="w-6 h-6 text-muted-foreground/40" />
+              <FilmStrip size={28} weight="duotone" className="text-muted-foreground/30" />
             </div>
             <h3 className="text-base font-bold mb-1">No playlists created yet</h3>
             <p className="text-xs text-muted-foreground mb-6 max-w-sm mx-auto">
@@ -189,7 +189,7 @@ export default function Playlists() {
               }}
               className="inline-flex items-center gap-1.5 h-9 px-4 text-xs font-semibold border border-primary/30 text-primary hover:border-primary/60 transition-colors rounded-lg cursor-pointer"
             >
-              <Plus className="w-3.5 h-3.5" />
+              <Plus size={13} weight="bold" />
               Create Playlist
             </button>
           </div>

@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { ChevronRight, VolumeX } from "lucide-react";
+import { CaretRight, SpeakerSimpleX } from "@phosphor-icons/react";
 import {
   PREROLL_SKIP_AFTER_MS,
   PREROLL_START_TIMEOUT_MS,
@@ -146,7 +146,7 @@ export function PrerollPlayer({ creative, onDone, withGesture = false }: Preroll
             onClick={finish}
             className="flex items-center gap-1 rounded-sm bg-white/90 px-3 py-1.5 text-xs font-bold uppercase tracking-wider text-black transition-colors hover:bg-white"
           >
-            Skip <ChevronRight className="w-3.5 h-3.5" />
+            Skip <CaretRight size={14} weight="bold" />
           </button>
         ) : (
           <span className="rounded-sm bg-black/60 px-2 py-1.5 text-[11px] font-medium tabular-nums text-white/80 ring-1 ring-white/10">
@@ -161,7 +161,7 @@ export function PrerollPlayer({ creative, onDone, withGesture = false }: Preroll
           onClick={toggleMute}
           className="absolute bottom-3 left-3 z-10 flex items-center gap-1.5 rounded-sm bg-black/60 px-2 py-1.5 text-[11px] font-medium text-white/85 ring-1 ring-white/10 transition-colors hover:bg-black/80"
         >
-          <VolumeX className="w-3.5 h-3.5" /> Unmute
+          <SpeakerSimpleX size={14} weight="bold" /> Unmute
         </button>
       )}
     </div>

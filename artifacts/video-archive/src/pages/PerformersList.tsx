@@ -2,7 +2,13 @@ import { useState, useRef, useEffect } from "react";
 import { useListPerformers } from "@/lib/api";
 import { Layout } from "@/components/Layout";
 import { PerformerCard } from "@/components/PerformerCard";
-import { Search, X, ChevronDown, Users, RefreshCw } from "lucide-react";
+import {
+  MagnifyingGlass,
+  X,
+  CaretDown,
+  UsersThree,
+  ArrowClockwise,
+} from "@phosphor-icons/react";
 import { AppPagination } from "@/components/ui/app-pagination";
 import { AdBanner } from "@/components/ads/AdBanner";
 import { AdLeaderboard } from "@/components/ads/AdLeaderboard";
@@ -53,7 +59,7 @@ export default function PerformersList() {
           <div className="flex items-center justify-between mb-8">
             <div className="flex items-center gap-3">
               <div className="w-9 h-9 rounded-xl bg-primary/10 flex items-center justify-center ring-1 ring-primary/5">
-                <Users className="w-[18px] h-[18px] text-primary" />
+                <UsersThree size={18} weight="duotone" className="text-primary" />
               </div>
               <div>
                 <h1 className="text-xl font-bold tracking-tight">Performer directory</h1>
@@ -73,7 +79,7 @@ export default function PerformersList() {
           {/* ── Filter toolbar ──────────────────────────── */}
           <div className="flex flex-wrap items-center gap-2 mb-8">
             <div className="relative grow sm:grow-0 sm:w-56">
-              <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground/40 pointer-events-none" />
+              <MagnifyingGlass size={14} weight="regular" className="absolute left-2.5 top-1/2 -translate-y-1/2 text-muted-foreground/40 pointer-events-none" />
               <input
                 type="text"
                 placeholder="Search performers…"
@@ -94,7 +100,7 @@ export default function PerformersList() {
                   className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground/40 hover:text-foreground transition-colors"
                   aria-label="Clear search"
                 >
-                  <X className="w-3 h-3" />
+                  <X size={12} weight="bold" />
                 </button>
               )}
             </div>
@@ -116,7 +122,7 @@ export default function PerformersList() {
                   </option>
                 ))}
               </select>
-              <ChevronDown className="absolute right-2.5 top-1/2 -translate-y-1/2 w-3 h-3 text-muted-foreground/40 pointer-events-none" />
+              <CaretDown size={11} weight="bold" className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground/40 pointer-events-none" />
             </div>
 
             <div className="relative">
@@ -132,7 +138,7 @@ export default function PerformersList() {
                 <option value="count">Most recorded</option>
                 <option value="name">A – Z</option>
               </select>
-              <ChevronDown className="absolute right-2.5 top-1/2 -translate-y-1/2 w-3 h-3 text-muted-foreground/40 pointer-events-none" />
+              <CaretDown size={11} weight="bold" className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground/40 pointer-events-none" />
             </div>
 
             {hasFilters && (
@@ -145,7 +151,7 @@ export default function PerformersList() {
                 }}
                 className="h-9 flex items-center gap-1.5 px-3.5 text-xs text-muted-foreground hover:text-foreground border border-border/50 hover:border-border/80 rounded-lg transition-colors"
               >
-                <X className="w-3 h-3" />
+                <X size={12} weight="bold" />
                 Clear
               </button>
             )}
@@ -170,7 +176,7 @@ export default function PerformersList() {
             ) : isError && !data ? (
               <div className="py-20 sm:py-28 text-center border border-border/20 rounded-2xl bg-secondary/8" role="alert">
                 <div className="w-14 h-14 rounded-full bg-secondary/50 flex items-center justify-center mx-auto mb-4">
-                  <Users className="w-6 h-6 text-muted-foreground/40" />
+                  <UsersThree size={28} weight="duotone" className="text-muted-foreground/40" />
                 </div>
                 <p className="text-sm font-medium text-foreground mb-1">Performers couldn’t be loaded.</p>
                 <p className="text-xs text-muted-foreground mb-5 max-w-sm mx-auto">
@@ -182,7 +188,7 @@ export default function PerformersList() {
                   disabled={isFetching}
                   className="inline-flex items-center gap-2 h-9 px-4 text-xs font-medium text-primary border border-primary/20 hover:border-primary/40 rounded-lg transition-colors disabled:opacity-50"
                 >
-                  <RefreshCw className={`w-3 h-3 ${isFetching ? "animate-spin" : ""}`} />
+                  <ArrowClockwise size={13} weight="bold" className={isFetching ? "animate-spin" : ""} />
                   Try again
                 </button>
               </div>
@@ -244,7 +250,7 @@ export default function PerformersList() {
             ) : (
               <div className="py-24 sm:py-32 text-center border border-border/20 rounded-2xl bg-secondary/8">
                 <div className="w-14 h-14 rounded-full bg-secondary/50 flex items-center justify-center mx-auto mb-4">
-                  <Users className="w-6 h-6 text-muted-foreground/20" />
+                  <UsersThree size={28} weight="duotone" className="text-muted-foreground/30" />
                 </div>
                 <p className="text-sm text-muted-foreground mb-1">
                   No performers match your search.
@@ -261,7 +267,7 @@ export default function PerformersList() {
                   }}
                   className="inline-flex items-center gap-1.5 h-8 px-4 text-xs font-medium text-primary hover:text-primary/80 border border-primary/20 hover:border-primary/40 rounded-lg transition-colors"
                 >
-                  <X className="w-3 h-3" />
+                  <X size={12} weight="bold" />
                   Clear all filters
                 </button>
               </div>

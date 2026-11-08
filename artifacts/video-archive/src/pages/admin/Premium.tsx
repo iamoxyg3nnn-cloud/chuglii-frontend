@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import { resolveApiPath } from "@/lib/api-base";
-import { Crown, RefreshCw, Server, BadgeCheck, AlertTriangle } from "lucide-react";
+import { Crown, ArrowsClockwise, HardDrives, SealCheck, Warning } from "@phosphor-icons/react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -120,7 +120,7 @@ export default function AdminPremium() {
     <div className="p-6 space-y-6">
       <div>
         <h1 className="text-lg font-bold tracking-tight flex items-center gap-2">
-          <Crown className="w-4 h-4 text-primary" /> Premium &amp; Ads
+          <Crown size={16} weight="fill" className="text-primary" /> Premium &amp; Ads
         </h1>
         <p className="text-xs text-muted-foreground mt-1">
           Manage ad-free subscribers, the ad earn target, and the ads kill-switch.
@@ -129,7 +129,7 @@ export default function AdminPremium() {
 
       {error && (
         <div className="rounded-lg border border-destructive/30 bg-destructive/10 p-4 text-sm text-destructive flex items-center gap-2">
-          <AlertTriangle className="w-4 h-4 shrink-0" /> {error}
+          <Warning size={16} weight="duotone" className="shrink-0" /> {error}
         </div>
       )}
 
@@ -138,7 +138,7 @@ export default function AdminPremium() {
         <Card>
           <CardHeader>
             <CardTitle className="text-sm flex items-center gap-2">
-              <Server className="w-3.5 h-3.5 text-primary" /> Runtime settings
+              <HardDrives size={15} weight="duotone" className="text-primary" /> Runtime settings
             </CardTitle>
             <CardDescription>Applied instantly — no redeploy.</CardDescription>
           </CardHeader>
@@ -238,7 +238,7 @@ export default function AdminPremium() {
         <Card>
           <CardHeader>
             <CardTitle className="text-sm flex items-center gap-2">
-              <BadgeCheck className="w-3.5 h-3.5 text-primary" /> Manual grant
+              <SealCheck size={15} weight="duotone" className="text-primary" /> Manual grant
             </CardTitle>
             <CardDescription>Fallback when payments aren't wired up.</CardDescription>
           </CardHeader>
@@ -281,7 +281,7 @@ export default function AdminPremium() {
         <CardHeader className="flex-row items-center justify-between space-y-0">
           <CardTitle className="text-sm">Granted premium</CardTitle>
           <Button variant="ghost" size="sm" onClick={() => load()} disabled={loading}>
-            <RefreshCw className={`w-3.5 h-3.5 mr-1 ${loading ? "animate-spin" : ""}`} /> Refresh
+            <ArrowsClockwise size={14} className={loading ? "animate-spin mr-1" : "mr-1"} /> Refresh
           </Button>
         </CardHeader>
         <CardContent>

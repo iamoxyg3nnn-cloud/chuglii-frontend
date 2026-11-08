@@ -1,5 +1,5 @@
 import { Link } from "wouter";
-import { ListVideo, Film, User, Play } from "lucide-react";
+import { Playlist, FilmStrip, User, Play } from "@phosphor-icons/react";
 import { OptimizedImage } from "@/components/ui/optimized-image";
 import { proxyUrl } from "@/lib/proxy-url";
 
@@ -65,7 +65,7 @@ export function StackedPlaylistCard({ playlist }: StackedPlaylistCardProps) {
             <img src={backThumb} alt="" className="w-full h-full object-cover blur-[0.5px]" />
           ) : (
             <div className="w-full h-full bg-secondary/80 flex items-center justify-center">
-              <Film className="w-6 h-6 text-muted-foreground/30" />
+              <FilmStrip size={20} weight="duotone" className="text-muted-foreground/30" />
             </div>
           )}
         </div>
@@ -76,7 +76,7 @@ export function StackedPlaylistCard({ playlist }: StackedPlaylistCardProps) {
             <img src={midThumb} alt="" className="w-full h-full object-cover" />
           ) : (
             <div className="w-full h-full bg-secondary flex items-center justify-center">
-              <Film className="w-6 h-6 text-muted-foreground/40" />
+              <FilmStrip size={22} weight="duotone" className="text-muted-foreground/40" />
             </div>
           )}
         </div>
@@ -91,20 +91,20 @@ export function StackedPlaylistCard({ playlist }: StackedPlaylistCardProps) {
             />
           ) : (
             <div className="w-full h-full flex items-center justify-center bg-secondary/90">
-              <Film className="w-8 h-8 text-muted-foreground/30" />
+              <FilmStrip size={28} weight="duotone" className="text-muted-foreground/30" />
             </div>
           )}
 
           {/* Hover Play Overlay */}
           <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex items-center justify-center">
             <div className="w-12 h-12 rounded-full bg-primary/90 text-primary-foreground flex items-center justify-center shadow-lg transform scale-90 group-hover:scale-100 transition-transform duration-300">
-              <Play className="w-6 h-6 fill-current ml-0.5" />
+              <Play size={24} weight="fill" className="ml-0.5" />
             </div>
           </div>
 
           {/* Item Count Badge Overlay */}
           <div className="absolute bottom-2.5 right-2.5 z-10 flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-black/75 backdrop-blur-md border border-white/10 text-white text-[11px] font-semibold shadow-md">
-            <ListVideo className="w-3.5 h-3.5 text-primary" />
+            <Playlist size={14} weight="duotone" className="text-primary" />
             <span>{playlist.item_count} {playlist.item_count === 1 ? "video" : "videos"}</span>
           </div>
         </div>
@@ -131,7 +131,7 @@ export function StackedPlaylistCard({ playlist }: StackedPlaylistCardProps) {
             />
           ) : (
             <div className="w-5 h-5 rounded-full bg-secondary border border-border/40 flex items-center justify-center shrink-0">
-              <User className="w-3 h-3 text-muted-foreground" />
+              <User size={12} weight="regular" className="text-muted-foreground" />
             </div>
           )}
           <span className="text-[11px] font-medium text-muted-foreground truncate">

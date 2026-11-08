@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { Link, useLocation } from "wouter";
 import { useAuth } from "@/contexts/AuthContext";
-import { Film, Eye, EyeOff, AlertCircle } from "lucide-react";
+import { FilmStrip, Eye, EyeSlash, WarningCircle } from "@phosphor-icons/react";
 
 const EMAIL_ERROR_HINTS: [RegExp, string][] = [
   [/email address not confirmed/i, "Your email hasn't been confirmed yet. Check your inbox for the verification link."],
@@ -62,7 +62,7 @@ export default function Login() {
       <div className="w-full max-w-sm">
         <div className="text-center mb-10">
           <Link href="/" className="inline-flex items-center gap-1.5 group mb-8">
-            <Film className="w-5 h-5 text-primary" />
+            <FilmStrip size={20} weight="duotone" className="text-primary" />
             <span className="font-bold text-xl tracking-tight text-foreground group-hover:text-primary transition-colors">
               VAULT<span className="text-primary">.</span>
             </span>
@@ -77,7 +77,7 @@ export default function Login() {
           {error && (
             <div className="flex flex-col gap-2 p-3 bg-destructive/10 border border-destructive/30 rounded-lg text-xs text-destructive">
               <div className="flex items-start gap-2">
-                <AlertCircle className="w-3.5 h-3.5 shrink-0 mt-0.5" />
+                <WarningCircle size={15} weight="duotone" className="shrink-0 mt-0.5" />
                 <span>{error}</span>
               </div>
               {emailErrorHint(error) && (
@@ -124,7 +124,7 @@ export default function Login() {
                 aria-controls="login-password"
                 className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground/50 hover:text-muted-foreground"
               >
-                {showPw ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                {showPw ? <EyeSlash size={16} /> : <Eye size={16} />}
               </button>
             </div>
             <div className="text-right">

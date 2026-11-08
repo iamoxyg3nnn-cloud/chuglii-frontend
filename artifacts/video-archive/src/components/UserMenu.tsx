@@ -2,9 +2,21 @@ import { useState, useRef, useEffect } from "react";
 import { Link, useLocation } from "wouter";
 import { useAuth } from "@/contexts/AuthContext";
 import {
-  User, Settings, LogOut, Bookmark, Clock, ListVideo, Heart,
-  Bell, Shield, ChevronDown, Send, Crown,
-} from "lucide-react";
+  UserCircle,
+  Gear,
+  SignOut,
+  BookmarkSimple,
+  Clock,
+  ClockCounterClockwise,
+  Playlist,
+  FolderSimplePlus,
+  Heart,
+  Bell,
+  ShieldCheck,
+  CaretDown,
+  PaperPlaneTilt,
+  Crown,
+} from "@phosphor-icons/react";
 
 export function UserMenu() {
   const { user, signOut, role } = useAuth();
@@ -37,7 +49,7 @@ export function UserMenu() {
         </Link>
         <Link href="/login">
           <span className="sm:hidden flex items-center justify-center w-8 h-8 text-muted-foreground hover:text-foreground transition-colors rounded-lg">
-            <User className="w-4 h-4" />
+            <UserCircle size={18} weight="regular" />
           </span>
         </Link>
       </div>
@@ -57,14 +69,14 @@ export function UserMenu() {
     <div ref={ref} className="relative">
       <button
         onClick={() => setOpen((v) => !v)}
-        className="flex items-center gap-1.5 h-8 px-2 text-xs text-muted-foreground hover:text-foreground transition-colors rounded-lg"
+        className="flex items-center gap-1.5 h-8 px-2 text-xs text-muted-foreground hover:text-foreground transition-colors rounded-lg cursor-pointer"
         aria-expanded={open}
         aria-haspopup="true"
       >
         <div className="w-6 h-6 rounded-full border border-primary/40 flex items-center justify-center text-[10px] font-bold text-primary">
           {initials}
         </div>
-        <ChevronDown className={`w-3 h-3 transition-transform ${open ? "rotate-180" : ""}`} />
+        <CaretDown size={12} weight="bold" className={`transition-transform ${open ? "rotate-180" : ""}`} />
       </button>
 
       {open && (
@@ -85,7 +97,7 @@ export function UserMenu() {
               <div className="text-[11px] text-muted-foreground truncate">{user.email}</div>
               {role && role !== "user" && (
                 <span className="inline-flex items-center gap-1 mt-1 text-[10px] font-semibold uppercase tracking-wide text-primary">
-                  <Shield className="w-2.5 h-2.5" />
+                  <ShieldCheck size={12} weight="bold" />
                   {role}
                 </span>
               )}
@@ -94,13 +106,13 @@ export function UserMenu() {
 
           <div className="py-1">
             {[
-              { href: "/profile", label: "Profile & Activity", Icon: User },
+              { href: "/profile", label: "Profile & Activity", Icon: UserCircle },
               { href: "/premium", label: "Go Premium", Icon: Crown },
-              { href: "/bookmarks", label: "Bookmarks", Icon: Bookmark },
-              { href: "/history", label: "History", Icon: Clock },
-              { href: "/watch-later", label: "Watch Later", Icon: ListVideo },
-              { href: "/collections", label: "Collections", Icon: ListVideo },
-              { href: "/my-requests", label: "My Requests", Icon: Send },
+              { href: "/bookmarks", label: "Bookmarks", Icon: BookmarkSimple },
+              { href: "/history", label: "History", Icon: ClockCounterClockwise },
+              { href: "/watch-later", label: "Watch Later", Icon: Clock },
+              { href: "/collections", label: "Collections", Icon: FolderSimplePlus },
+              { href: "/my-requests", label: "My Requests", Icon: PaperPlaneTilt },
               { href: "/following", label: "Following", Icon: Heart },
               { href: "/notifications", label: "Notifications", Icon: Bell },
             ].map(({ href, label, Icon }) => (
@@ -109,7 +121,7 @@ export function UserMenu() {
                   onClick={() => setOpen(false)}
                   className="flex items-center gap-2.5 px-3 py-2 text-xs text-muted-foreground hover:text-foreground hover:bg-secondary/50 transition-colors cursor-pointer"
                 >
-                  <Icon className="w-3.5 h-3.5 shrink-0" />
+                  <Icon size={15} weight="regular" className="shrink-0" />
                   {label}
                 </span>
               </Link>
@@ -123,7 +135,7 @@ export function UserMenu() {
                   onClick={() => setOpen(false)}
                   className="flex items-center gap-2.5 px-3 py-2 text-xs text-primary hover:bg-primary/10 transition-colors cursor-pointer"
                 >
-                  <Shield className="w-3.5 h-3.5 shrink-0" />
+                  <ShieldCheck size={15} weight="regular" className="shrink-0" />
                   Admin panel
                 </span>
               </Link>
@@ -136,15 +148,15 @@ export function UserMenu() {
                 onClick={() => setOpen(false)}
                 className="flex items-center gap-2.5 px-3 py-2 text-xs text-muted-foreground hover:text-foreground hover:bg-secondary/50 transition-colors cursor-pointer"
               >
-                <Settings className="w-3.5 h-3.5 shrink-0" />
+                <Gear size={15} weight="regular" className="shrink-0" />
                 Settings
               </span>
             </Link>
             <button
               onClick={handleSignOut}
-              className="w-full flex items-center gap-2.5 px-3 py-2 text-xs text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors"
+              className="w-full flex items-center gap-2.5 px-3 py-2 text-xs text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors cursor-pointer"
             >
-              <LogOut className="w-3.5 h-3.5 shrink-0" />
+              <SignOut size={15} weight="regular" className="shrink-0" />
               Sign out
             </button>
           </div>

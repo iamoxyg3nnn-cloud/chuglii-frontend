@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { Link } from "wouter";
-import { Sparkles, ShieldCheck } from "lucide-react";
+import { Sparkle, ShieldCheck } from "@phosphor-icons/react";
 import { Dialog } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { usePremium } from "@/contexts/PremiumContext";
@@ -40,7 +40,7 @@ export function PremiumUpsellPopup() {
       <Dialog.Content>
         <Dialog.Header>
           <div className="flex items-center gap-2 mb-1">
-            <Sparkles className="w-4 h-4 text-primary" />
+            <Sparkle size={16} weight="duotone" className="text-primary" />
             <Dialog.Title className="text-base">Go ad-free with VAULT Premium</Dialog.Title>
           </div>
           <Dialog.Description>
@@ -50,11 +50,11 @@ export function PremiumUpsellPopup() {
 
         <div className="space-y-3 mt-4 text-sm">
           <div className="flex items-center gap-2 text-muted-foreground">
-            <ShieldCheck className="w-4 h-4 text-primary shrink-0" />
+            <ShieldCheck size={16} weight="duotone" className="text-primary shrink-0" />
             No ads everywhere — for 30 days
           </div>
           <div className="flex items-center gap-2 text-muted-foreground">
-            <Sparkles className="w-4 h-4 text-primary shrink-0" />
+            <Sparkle size={16} weight="duotone" className="text-primary shrink-0" />
             Just {`$${price.toFixed(2)}`}
           </div>
         </div>

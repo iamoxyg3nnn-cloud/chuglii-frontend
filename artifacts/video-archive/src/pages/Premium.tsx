@@ -5,15 +5,14 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import {
   ShieldCheck,
-  CheckCircle2,
-  Loader2,
+  CheckCircle,
+  CircleNotch,
   Crown,
-  AlertTriangle,
-  Sparkles,
+  Warning,
+  Sparkle,
   Gift,
-  ExternalLink,
   Timer,
-} from "lucide-react";
+} from "@phosphor-icons/react";
 import { useAuth } from "@/contexts/AuthContext";
 import { usePremium } from "@/contexts/PremiumContext";
 import { premiumApi } from "@/lib/premium-client";
@@ -141,14 +140,14 @@ export default function Premium() {
       <div className="container mx-auto max-w-2xl px-4 sm:px-6 py-14">
         {paid && (
           <div className="mb-6 flex items-center gap-2 rounded-lg border border-green-500/30 bg-green-500/10 p-4 text-sm text-green-400">
-            <CheckCircle2 className="w-4 h-4 shrink-0" />
+            <CheckCircle size={16} weight="duotone" className="shrink-0" />
             Payment received — premium is active. Enjoy ad-free viewing!
           </div>
         )}
 
         <div className="text-center mb-10">
           <div className="mb-3 flex items-center justify-center gap-2 text-xs font-medium text-muted-foreground">
-            <Crown className="w-5 h-5 text-primary" />
+            <Crown size={20} weight="fill" className="text-primary" />
             <span>VAULT Premium</span>
           </div>
           <h1 className="text-3xl md:text-4xl font-bold tracking-tight text-foreground mb-3">
@@ -178,7 +177,7 @@ export default function Premium() {
           </div>
         ) : isPremium ? (
           <div className="rounded-xl border border-primary/30 bg-primary/5 p-8 text-center space-y-3">
-            <CheckCircle2 className="w-8 h-8 text-primary mx-auto" />
+            <CheckCircle size={32} weight="duotone" className="text-primary mx-auto" />
             <p className="text-sm font-semibold">You're covered.</p>
             <p className="text-xs text-muted-foreground">
               {status?.premium_until
@@ -199,19 +198,19 @@ export default function Premium() {
               </div>
               <ul className="space-y-2 text-sm text-muted-foreground mb-5">
                 <li className="flex items-center gap-2">
-                  <ShieldCheck className="w-4 h-4 text-primary shrink-0" /> No ads on any page
+                  <ShieldCheck size={16} weight="duotone" className="text-primary shrink-0" /> No ads on any page
                 </li>
                 <li className="flex items-center gap-2">
-                  <ShieldCheck className="w-4 h-4 text-primary shrink-0" /> Stacks — extend before it lapses
+                  <ShieldCheck size={16} weight="duotone" className="text-primary shrink-0" /> Stacks — extend before it lapses
                 </li>
                 <li className="flex items-center gap-2">
-                  <ShieldCheck className="w-4 h-4 text-primary shrink-0" /> Syncs across devices
+                  <ShieldCheck size={16} weight="duotone" className="text-primary shrink-0" /> Syncs across devices
                 </li>
               </ul>
               <Button onClick={handleCheckout} disabled={checkingOut} className="w-full">
                 {checkingOut ? (
                   <>
-                    <Loader2 className="w-4 h-4 animate-spin" /> Preparing checkout…
+                    <CircleNotch size={16} className="animate-spin" /> Preparing checkout…
                   </>
                 ) : (
                   <>Buy premium — ${price.toFixed(2)}</>
@@ -219,7 +218,7 @@ export default function Premium() {
               </Button>
               {checkoutError && (
                 <p className="mt-3 text-xs text-destructive flex items-center gap-1.5">
-                  <AlertTriangle className="w-3.5 h-3.5 shrink-0" />
+                  <Warning size={14} weight="duotone" className="shrink-0" />
                   {checkoutError}
                 </p>
               )}
@@ -231,7 +230,7 @@ export default function Premium() {
               <div className="flex items-center justify-between mb-4">
                 <div>
                   <div className="flex items-center gap-1.5">
-                    <Sparkles className="w-4 h-4 text-primary" />
+                    <Sparkle size={16} weight="duotone" className="text-primary" />
                     <h2 className="text-sm font-bold tracking-tight">Earn premium free</h2>
                   </div>
                   <p className="text-xs text-muted-foreground mt-0.5">
@@ -267,15 +266,15 @@ export default function Premium() {
               >
                 {claiming ? (
                   <>
-                    <Loader2 className="w-4 h-4 animate-spin" /> Verifying ad view…
+                    <CircleNotch size={16} className="animate-spin" /> Verifying ad view…
                   </>
                 ) : cooldownSeconds > 0 ? (
                   <>
-                    <Timer className="w-4 h-4" /> Next ad in {cooldownSeconds}s
+                    <Timer size={16} /> Next ad in {cooldownSeconds}s
                   </>
                 ) : (
                   <>
-                    <Gift className="w-4 h-4 text-primary" /> Watch Sponsored Ad (+1 Progress)
+                    <Gift size={16} weight="duotone" className="text-primary" /> Watch Sponsored Ad (+1 Progress)
                   </>
                 )}
               </Button>
@@ -287,9 +286,9 @@ export default function Premium() {
                   }`}
                 >
                   {claimMsg.ok ? (
-                    <CheckCircle2 className="w-3.5 h-3.5 shrink-0" />
+                    <CheckCircle size={14} weight="duotone" className="shrink-0" />
                   ) : (
-                    <AlertTriangle className="w-3.5 h-3.5 shrink-0" />
+                    <Warning size={14} weight="duotone" className="shrink-0" />
                   )}
                   {claimMsg.text}
                 </p>

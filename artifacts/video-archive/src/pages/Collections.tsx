@@ -11,8 +11,15 @@ import { userApi, type CloudCollection } from "@/lib/user-api";
 import { trackActivity } from "@/lib/rum";
 import { CloudSyncIndicator } from "@/components/CloudSyncIndicator";
 import {
-  FolderOpen, Plus, Trash2, Film, ListVideo, ChevronRight, AlertCircle, RefreshCw,
-} from "lucide-react";
+  FolderSimplePlus,
+  Plus,
+  Trash,
+  FilmStrip,
+  Playlist,
+  CaretRight,
+  WarningCircle,
+  ArrowClockwise,
+} from "@phosphor-icons/react";
 import { formatRelativeTime } from "@/lib/formatters";
 import { toast } from "@/hooks/use-toast";
 
@@ -94,7 +101,7 @@ export default function Collections() {
         <div className="flex items-start justify-between mb-8 gap-4">
           <div>
             <div className="flex items-center gap-2 text-xs font-medium text-muted-foreground mb-2">
-              <ListVideo className="w-3.5 h-3.5 text-primary" />
+              <Playlist size={15} weight="duotone" className="text-primary" />
               <span>Collections</span>
             </div>
             <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-foreground">
@@ -109,7 +116,7 @@ export default function Collections() {
             onClick={() => setShowCreate((v) => !v)}
             className="inline-flex items-center gap-1.5 h-9 px-4 text-xs font-semibold border border-primary/30 text-primary hover:border-primary/60 transition-colors shrink-0 rounded-lg"
           >
-            <Plus className="w-3.5 h-3.5" />
+            <Plus size={13} weight="bold" />
             New Collection
           </button>
         </div>
@@ -175,7 +182,7 @@ export default function Collections() {
         ) : isError ? (
           <div className="py-24 text-center border border-border/30 rounded-2xl bg-secondary/10 animate-fade-in-up">
             <div className="w-14 h-14 rounded-full bg-destructive/10 flex items-center justify-center mx-auto mb-4">
-              <AlertCircle className="w-6 h-6 text-destructive/60" />
+              <WarningCircle size={28} weight="duotone" className="text-destructive/70" />
             </div>
             <p className="text-sm font-medium text-foreground mb-1">Couldn&apos;t load your collections.</p>
             <p className="text-xs text-muted-foreground/60 mb-6 max-w-xs mx-auto">
@@ -186,14 +193,14 @@ export default function Collections() {
               onClick={() => void retryCollections()}
               className="inline-flex items-center gap-1.5 h-9 px-4 text-xs font-semibold border border-primary/30 text-primary hover:border-primary/60 transition-colors rounded-lg"
             >
-              <RefreshCw className="w-3.5 h-3.5" />
+              <ArrowClockwise size={13} weight="bold" />
               Try again
             </button>
           </div>
         ) : collections.length === 0 ? (
           <div className="py-24 text-center border border-border/30 rounded-2xl bg-secondary/10 animate-fade-in-up">
             <div className="w-14 h-14 rounded-full bg-secondary/50 flex items-center justify-center mx-auto mb-4">
-              <FolderOpen className="w-6 h-6 text-muted-foreground/30" />
+              <FolderSimplePlus size={28} weight="duotone" className="text-muted-foreground/30" />
             </div>
             <p className="text-sm font-medium text-muted-foreground mb-1">No collections yet</p>
             <p className="text-xs text-muted-foreground/60 mb-6 max-w-xs mx-auto">
@@ -203,7 +210,7 @@ export default function Collections() {
               onClick={() => setShowCreate(true)}
               className="inline-flex items-center gap-1.5 h-9 px-4 text-xs font-semibold border border-primary/30 text-primary hover:border-primary/60 transition-colors rounded-lg"
             >
-              <Plus className="w-3.5 h-3.5" />
+              <Plus size={13} weight="bold" />
               New Collection
             </button>
           </div>
@@ -225,13 +232,13 @@ export default function Collections() {
                       containerClassName="w-20 h-14"
                       fallback={
                         <div className="w-20 h-14 flex items-center justify-center bg-secondary">
-                          <Film className="w-5 h-5 text-muted-foreground/20" />
+                          <FilmStrip size={20} weight="duotone" className="text-muted-foreground/30" />
                         </div>
                       }
                     />
                   ) : (
                     <div className="w-20 h-14 flex items-center justify-center bg-secondary">
-                      <Film className="w-5 h-5 text-muted-foreground/20" />
+                      <FilmStrip size={20} weight="duotone" className="text-muted-foreground/30" />
                     </div>
                   )}
                 </div>
@@ -253,7 +260,7 @@ export default function Collections() {
                 <div className="flex items-center gap-1 pr-3 shrink-0">
                   <Link href={`/collections/${col.id}`}>
                     <span className="flex items-center justify-center w-8 h-8 text-muted-foreground hover:text-foreground hover:bg-secondary/50 transition-all rounded-lg">
-                      <ChevronRight className="w-4 h-4" />
+                      <CaretRight size={14} weight="bold" />
                     </span>
                   </Link>
                   <button
@@ -261,7 +268,7 @@ export default function Collections() {
                     className="flex items-center justify-center w-8 h-8 text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-all rounded-lg"
                     title="Delete collection"
                   >
-                    <Trash2 className="w-3.5 h-3.5" />
+                    <Trash size={14} weight="regular" />
                   </button>
                 </div>
               </div>

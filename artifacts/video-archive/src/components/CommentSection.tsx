@@ -13,7 +13,16 @@ import { getSessionId } from "@/lib/session";
 import { formatRelativeTime } from "@/lib/formatters";
 import { trackActivity } from "@/lib/rum";
 import { useAuth } from "@/contexts/AuthContext";
-import { MessageSquare, ThumbsUp, Reply, ChevronDown, ChevronUp, Loader2, Send, LogIn } from "lucide-react";
+import {
+  ChatCircleDots,
+  ThumbsUp,
+  ArrowBendUpLeft,
+  CaretDown,
+  CaretUp,
+  CircleNotch,
+  PaperPlaneRight,
+  SignIn,
+} from "@phosphor-icons/react";
 import { Skeleton } from "@/components/ui/skeleton";
 
 const SORT_OPTIONS: { value: ListCommentsSort; label: string }[] = [
@@ -75,7 +84,7 @@ const CommentForm = memo(function CommentForm({ placeholder = "Write a commentâ€
           disabled={loading || !content.trim()}
           className="inline-flex items-center gap-1.5 h-7 px-3 border border-primary/30 text-primary text-xs font-medium rounded-lg hover:border-primary/60 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
         >
-          {loading ? <Loader2 className="w-3 h-3 animate-spin" /> : <Send className="w-3 h-3" />}
+          {loading ? <CircleNotch size={12} weight="bold" className="animate-spin" /> : <PaperPlaneRight size={12} weight="bold" />}
           {compact ? "Reply" : "Post"}
         </button>
         {onCancel && (
@@ -154,7 +163,7 @@ const CommentNode = memo(function CommentNode({ comment, depth = 0, recordingId,
                   onClick={userLoggedIn ? handleLike : undefined}
                   className={`flex items-center gap-1 text-[10px] transition-colors ${localLiked ? "text-primary" : userLoggedIn ? "text-muted-foreground/50 hover:text-foreground/60" : "text-muted-foreground/30 cursor-default"}`}
                 >
-                  <ThumbsUp className="w-3 h-3" />
+                  <ThumbsUp size={12} weight={localLiked ? "fill" : "regular"} />
                   {localLikes > 0 && <span>{localLikes}</span>}
                 </button>
                 {depth === 0 && (
@@ -162,7 +171,7 @@ const CommentNode = memo(function CommentNode({ comment, depth = 0, recordingId,
                     onClick={userLoggedIn ? () => setShowReply((v) => !v) : undefined}
                     className={`flex items-center gap-1 text-[10px] transition-colors ${userLoggedIn ? "text-muted-foreground/50 hover:text-foreground/60" : "text-muted-foreground/30 cursor-default"}`}
                   >
-                    <Reply className="w-3 h-3" />
+                    <ArrowBendUpLeft size={12} weight="bold" />
                     Reply
                   </button>
                 )}
@@ -171,7 +180,7 @@ const CommentNode = memo(function CommentNode({ comment, depth = 0, recordingId,
                     onClick={() => setCollapsed((v) => !v)}
                     className="flex items-center gap-1 text-[10px] text-muted-foreground/40 hover:text-muted-foreground/60 transition-colors"
                   >
-                    {collapsed ? <ChevronDown className="w-3 h-3" /> : <ChevronUp className="w-3 h-3" />}
+                    {collapsed ? <CaretDown size={11} weight="bold" /> : <CaretUp size={11} weight="bold" />}
                     {collapsed
                       ? `${comment.replies?.length} repl${comment.replies?.length === 1 ? "y" : "ies"}`
                       : "hide"}
@@ -261,7 +270,7 @@ export function CommentSection({ recordingId }: CommentSectionProps) {
     <div className="space-y-5">
       <div className="flex items-center justify-between">
         <h3 className="flex items-center gap-2 text-sm font-semibold">
-          <MessageSquare className="w-4 h-4 text-primary/60" />
+          <ChatCircleDots size={16} weight="duotone" className="text-primary/70" />
           Comments
           {count > 0 && (
             <span className="text-xs text-muted-foreground/50 font-normal">{count}</span>
@@ -288,7 +297,7 @@ export function CommentSection({ recordingId }: CommentSectionProps) {
         <CommentForm onSubmit={handlePost} />
       ) : (
         <div className="flex items-center gap-2 p-4 border border-border/40 rounded-xl bg-secondary">
-          <LogIn className="w-4 h-4 text-muted-foreground/40" />
+          <SignIn size={16} weight="bold" className="text-muted-foreground/50" />
           <p className="text-xs text-muted-foreground/60">
             <Link href="/login" className="text-primary hover:underline font-medium">Sign in</Link> to leave a comment
           </p>

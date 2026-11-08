@@ -1,22 +1,45 @@
 import { Link } from "wouter";
-import { Sun, Moon, Bookmark, FolderOpen, Clock, History, Heart, Bell, Settings, Send, User } from "lucide-react";
+import {
+  Compass,
+  UsersThree,
+  Tag,
+  Playlist,
+  PaperPlaneTilt,
+  BookmarkSimple,
+  FolderSimplePlus,
+  Clock,
+  ClockCounterClockwise,
+  Heart,
+  UserCircle,
+  Bell,
+  Gear,
+  SunDim,
+  MoonStars,
+} from "@phosphor-icons/react";
 import { NAV_LINKS } from "./DesktopNav";
 import { prefetchRoute } from "@/lib/route-chunks";
 import { isActiveNavigationRoute } from "@/lib/navigation";
 
+const NAV_ICON_MAP: Record<string, React.ComponentType<{ size?: number; weight?: "regular" | "bold" | "fill" | "duotone"; className?: string }>> = {
+  "/browse": Compass,
+  "/performers": UsersThree,
+  "/tags": Tag,
+  "/playlists": Playlist,
+};
+
 const LIBRARY_LINKS = [
-  { href: "/bookmarks", label: "Bookmarks", icon: Bookmark },
-  { href: "/collections", label: "Collections", icon: FolderOpen },
+  { href: "/bookmarks", label: "Bookmarks", icon: BookmarkSimple },
+  { href: "/collections", label: "Collections", icon: FolderSimplePlus },
   { href: "/watch-later", label: "Watch Later", icon: Clock },
-  { href: "/history", label: "History", icon: History },
-  { href: "/my-requests", label: "My Requests", icon: Send },
+  { href: "/history", label: "History", icon: ClockCounterClockwise },
+  { href: "/my-requests", label: "My Requests", icon: PaperPlaneTilt },
   { href: "/following", label: "Following", icon: Heart },
 ] as const;
 
 const SETTINGS_LINKS = [
-  { href: "/profile", label: "Profile & Activity", icon: User },
+  { href: "/profile", label: "Profile & Activity", icon: UserCircle },
   { href: "/notifications", label: "Notifications", icon: Bell },
-  { href: "/settings", label: "Settings", icon: Settings },
+  { href: "/settings", label: "Settings", icon: Gear },
 ] as const;
 
 interface MobileMenuProps {
@@ -49,30 +72,34 @@ export function MobileMenu({
     >
           {/* Main navigation */}
           <div className="px-3 py-3 space-y-0.5">
-            {NAV_LINKS.map(({ href, label, icon: Icon }) => (
-              <Link key={href} href={href} aria-current={isActiveNavigationRoute(href, location) ? "page" : undefined}>
-                <span
-                  className={`block px-3 py-2.5 text-sm rounded-lg transition-all duration-150 inline-flex items-center gap-2.5 ${
-                    isActiveNavigationRoute(href, location)
-                      ? "text-foreground font-medium bg-secondary/50 dark:bg-white/8"
-                      : "text-muted-foreground hover:text-foreground hover:bg-secondary/30 dark:hover:bg-white/5"
-                  }`}
-                  onClick={onClose}
-                  onMouseEnter={() => prefetchRoute(href)}
-                  onFocus={() => prefetchRoute(href)}
-                >
-                  <Icon className={`w-4 h-4 ${isActiveNavigationRoute(href, location) ? "text-primary" : "text-muted-foreground/60"}`} />
-                  {label}
-                </span>
-              </Link>
-            ))}
+            {NAV_LINKS.map(({ href, label }) => {
+              const Icon = NAV_ICON_MAP[href] ?? Compass;
+              const active = isActiveNavigationRoute(href, location);
+              return (
+                <Link key={href} href={href} aria-current={active ? "page" : undefined}>
+                  <span
+                    className={`block px-3 py-2.5 text-sm rounded-lg transition-all duration-150 inline-flex items-center gap-2.5 ${
+                      active
+                        ? "text-foreground font-medium bg-secondary/50 dark:bg-white/8"
+                        : "text-muted-foreground hover:text-foreground hover:bg-secondary/30 dark:hover:bg-white/5"
+                    }`}
+                    onClick={onClose}
+                    onMouseEnter={() => prefetchRoute(href)}
+                    onFocus={() => prefetchRoute(href)}
+                  >
+                    <Icon size={17} weight={active ? "bold" : "regular"} className={active ? "text-primary" : "text-muted-foreground/70"} />
+                    {label}
+                  </span>
+                </Link>
+              );
+            })}
             <button
               onClick={() => { onClose?.(); onRequestOpen?.(); }}
               onMouseEnter={() => prefetchRoute("/request")}
               onFocus={() => prefetchRoute("/request")}
-              className="w-full flex items-center gap-2.5 px-3 py-2.5 text-sm rounded-lg transition-colors duration-150 text-muted-foreground hover:text-foreground hover:bg-secondary/30 dark:hover:bg-white/5"
+              className="w-full flex items-center gap-2.5 px-3 py-2.5 text-sm rounded-lg transition-colors duration-150 text-muted-foreground hover:text-foreground hover:bg-secondary/30 dark:hover:bg-white/5 cursor-pointer"
             >
-              <Send className="w-4 h-4 text-muted-foreground/60" />
+              <PaperPlaneTilt size={17} weight="regular" className="text-muted-foreground/70" />
               Request
             </button>
           </div>
@@ -84,46 +111,52 @@ export function MobileMenu({
             <p className="px-3 py-1 text-xs text-muted-foreground/70 font-medium">
               Library
             </p>
-            {LIBRARY_LINKS.map(({ href, label, icon: Icon }) => (
-              <Link key={href} href={href} aria-current={isActiveNavigationRoute(href, location) ? "page" : undefined}>
-                <span
-                  className={`block px-3 py-2 text-sm rounded-lg transition-colors duration-150 inline-flex items-center gap-2.5 ${
-                    isActiveNavigationRoute(href, location)
-                      ? "text-foreground font-medium bg-secondary/50 dark:bg-white/8"
-                      : "text-muted-foreground hover:text-foreground hover:bg-secondary/30 dark:hover:bg-white/5"
-                  }`}
-                  onClick={onClose}
-                  onMouseEnter={() => prefetchRoute(href)}
-                  onFocus={() => prefetchRoute(href)}
-                >
-                  <Icon className={`w-3.5 h-3.5 ${isActiveNavigationRoute(href, location) ? "text-primary" : "text-muted-foreground/60"}`} />
-                  {label}
-                </span>
-              </Link>
-            ))}
+            {LIBRARY_LINKS.map(({ href, label, icon: Icon }) => {
+              const active = isActiveNavigationRoute(href, location);
+              return (
+                <Link key={href} href={href} aria-current={active ? "page" : undefined}>
+                  <span
+                    className={`block px-3 py-2 text-sm rounded-lg transition-colors duration-150 inline-flex items-center gap-2.5 ${
+                      active
+                        ? "text-foreground font-medium bg-secondary/50 dark:bg-white/8"
+                        : "text-muted-foreground hover:text-foreground hover:bg-secondary/30 dark:hover:bg-white/5"
+                    }`}
+                    onClick={onClose}
+                    onMouseEnter={() => prefetchRoute(href)}
+                    onFocus={() => prefetchRoute(href)}
+                  >
+                    <Icon size={16} weight={active ? "bold" : "regular"} className={active ? "text-primary" : "text-muted-foreground/70"} />
+                    {label}
+                  </span>
+                </Link>
+              );
+            })}
           </div>
 
           <div className="border-t border-border/30 mx-3" />
 
           {/* Settings + Random */}
           <div className="px-3 py-2 space-y-0.5">
-            {SETTINGS_LINKS.map(({ href, label, icon: Icon }) => (
-              <Link key={href} href={href} aria-current={isActiveNavigationRoute(href, location) ? "page" : undefined}>
-                <span
-                  className={`block px-3 py-2 text-sm rounded-lg transition-colors duration-150 inline-flex items-center gap-2.5 ${
-                    isActiveNavigationRoute(href, location)
-                      ? "text-foreground font-medium bg-secondary/50 dark:bg-white/8"
-                      : "text-muted-foreground hover:text-foreground hover:bg-secondary/30 dark:hover:bg-white/5"
-                  }`}
-                  onClick={onClose}
-                  onMouseEnter={() => prefetchRoute(href)}
-                  onFocus={() => prefetchRoute(href)}
-                >
-                  <Icon className={`w-3.5 h-3.5 ${isActiveNavigationRoute(href, location) ? "text-primary" : "text-muted-foreground/60"}`} />
-                  {label}
-                </span>
-              </Link>
-            ))}
+            {SETTINGS_LINKS.map(({ href, label, icon: Icon }) => {
+              const active = isActiveNavigationRoute(href, location);
+              return (
+                <Link key={href} href={href} aria-current={active ? "page" : undefined}>
+                  <span
+                    className={`block px-3 py-2 text-sm rounded-lg transition-colors duration-150 inline-flex items-center gap-2.5 ${
+                      active
+                        ? "text-foreground font-medium bg-secondary/50 dark:bg-white/8"
+                        : "text-muted-foreground hover:text-foreground hover:bg-secondary/30 dark:hover:bg-white/5"
+                    }`}
+                    onClick={onClose}
+                    onMouseEnter={() => prefetchRoute(href)}
+                    onFocus={() => prefetchRoute(href)}
+                  >
+                    <Icon size={16} weight={active ? "bold" : "regular"} className={active ? "text-primary" : "text-muted-foreground/70"} />
+                    {label}
+                  </span>
+                </Link>
+              );
+            })}
           </div>
 
           <div className="border-t border-border/30 mx-3" />
@@ -133,9 +166,9 @@ export function MobileMenu({
             <div className="flex items-center gap-2.5">
               <div className={`w-7 h-7 rounded-lg flex items-center justify-center ${dark ? "bg-primary/10" : "bg-amber-500/10"}`}>
                 {dark ? (
-                  <Sun className="w-3.5 h-3.5 text-primary" />
+                  <SunDim size={16} weight="regular" className="text-primary" />
                 ) : (
-                  <Moon className="w-3.5 h-3.5 text-amber-500" />
+                  <MoonStars size={16} weight="regular" className="text-amber-500" />
                 )}
               </div>
               <span className="text-xs text-muted-foreground font-medium">{dark ? "Dark" : "Light"} mode</span>
@@ -143,7 +176,7 @@ export function MobileMenu({
             <button
               type="button"
               onClick={onDarkToggle}
-              className={`relative inline-flex h-5 w-9 items-center rounded-full transition-all duration-200 ${
+              className={`relative inline-flex h-5 w-9 items-center rounded-full transition-all duration-200 cursor-pointer ${
                 dark ? "border border-primary/60" : "border border-border/40"
               }`}
               role="switch"

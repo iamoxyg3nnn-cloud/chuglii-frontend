@@ -4,7 +4,7 @@ import { proxyUrl } from "@/lib/proxy-url";
 import { formatDuration } from "@/lib/formatters";
 import { clearQueue, nextQueueItem, queueHref, setQueueLoop, type PlayQueue } from "@/lib/play-queue";
 import { trackActivity } from "@/lib/rum";
-import { ListVideo, ChevronLeft, ChevronRight, X, Clapperboard, Repeat } from "lucide-react";
+import { Playlist, CaretLeft, CaretRight, X, FilmStrip, Repeat } from "@phosphor-icons/react";
 
 interface QueueBarProps {
   queue: PlayQueue;
@@ -54,7 +54,7 @@ export function QueueBar({ queue, index }: QueueBarProps) {
       {/* Queue identity + position */}
       <div className="flex items-center gap-2 shrink-0">
         <div className="w-7 h-7 rounded-md border border-primary/30 flex items-center justify-center">
-          <ListVideo className="w-3.5 h-3.5 text-primary" />
+          <Playlist size={15} weight="duotone" className="text-primary" />
         </div>
         <div className="leading-tight min-w-0">
           <p className="text-[9px] uppercase tracking-[0.2em] text-muted-foreground font-semibold">Queue</p>
@@ -83,13 +83,13 @@ export function QueueBar({ queue, index }: QueueBarProps) {
               containerClassName="w-16 h-9 rounded-[3px] shrink-0"
               fallback={
                 <div className="w-16 h-9 bg-secondary rounded-[3px] flex items-center justify-center shrink-0">
-                  <Clapperboard className="w-4 h-4 text-muted-foreground/20" />
+                  <FilmStrip size={16} weight="duotone" className="text-muted-foreground/30" />
                 </div>
               }
             />
           ) : (
             <div className="w-16 h-9 bg-secondary rounded-[3px] flex items-center justify-center shrink-0">
-              <Clapperboard className="w-4 h-4 text-muted-foreground/20" />
+              <FilmStrip size={16} weight="duotone" className="text-muted-foreground/30" />
             </div>
           )}
           <div className="min-w-0 flex-1">
@@ -128,7 +128,7 @@ export function QueueBar({ queue, index }: QueueBarProps) {
           aria-pressed={loop}
           title={loop ? "Loop on — queue repeats" : "Loop queue"}
         >
-          <Repeat className="w-3.5 h-3.5" />
+          <Repeat size={14} weight={loop ? "bold" : "regular"} />
         </button>
         <button
           onClick={() => goTo(prevIndex)}
@@ -137,7 +137,7 @@ export function QueueBar({ queue, index }: QueueBarProps) {
           aria-label="Previous in queue"
           title="Previous"
         >
-          <ChevronLeft className="w-4 h-4" />
+          <CaretLeft size={14} weight="bold" />
         </button>
         <button
           onClick={() => goTo(nextIndex)}
@@ -146,7 +146,7 @@ export function QueueBar({ queue, index }: QueueBarProps) {
           aria-label="Next in queue"
           title="Next"
         >
-          <ChevronRight className="w-4 h-4" />
+          <CaretRight size={14} weight="bold" />
         </button>
         <span className="w-px h-4 bg-border/40 mx-1" />
         <button
@@ -158,7 +158,7 @@ export function QueueBar({ queue, index }: QueueBarProps) {
           aria-label="Clear queue"
           title="Clear queue"
         >
-          <X className="w-3.5 h-3.5" />
+          <X size={13} weight="bold" />
         </button>
       </div>
     </div>

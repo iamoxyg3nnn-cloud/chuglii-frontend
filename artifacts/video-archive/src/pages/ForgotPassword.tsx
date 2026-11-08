@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { Link } from "wouter";
 import { useAuth } from "@/contexts/AuthContext";
-import { Film, AlertCircle, CheckCircle2 } from "lucide-react";
+import { FilmStrip, WarningCircle, CheckCircle } from "@phosphor-icons/react";
 
 const EMAIL_ERROR_HINTS: [RegExp, string][] = [
   [/verification email|email service|email provider/i, "This is a server configuration issue. Please contact support for help."],
@@ -41,7 +41,7 @@ export default function ForgotPassword() {
       <div className="w-full max-w-sm">
         <div className="text-center mb-10">
           <Link href="/" className="inline-flex items-center gap-1.5 group mb-8">
-            <Film className="w-5 h-5 text-primary" />
+            <FilmStrip size={20} weight="duotone" className="text-primary" />
             <span className="font-bold text-xl tracking-tight text-foreground group-hover:text-primary transition-colors">
               VAULT<span className="text-primary">.</span>
             </span>
@@ -54,7 +54,7 @@ export default function ForgotPassword() {
 
         {sent ? (
           <div className="text-center">
-            <CheckCircle2 className="w-10 h-10 text-primary mx-auto mb-4" />
+            <CheckCircle size={38} weight="duotone" className="text-primary mx-auto mb-4" />
             <p className="text-sm text-foreground font-medium mb-1">Email sent!</p>
             <p className="text-xs text-muted-foreground mb-6">
               Check <strong>{email}</strong> for the reset link.
@@ -71,7 +71,7 @@ export default function ForgotPassword() {
             {error && (
               <div className="flex flex-col gap-2 p-3 bg-destructive/10 border border-destructive/30 rounded-lg text-xs text-destructive">
                 <div className="flex items-start gap-2">
-                  <AlertCircle className="w-3.5 h-3.5 shrink-0 mt-0.5" />
+                  <WarningCircle size={15} weight="duotone" className="shrink-0 mt-0.5" />
                   <span>{error}</span>
                 </div>
                 {emailErrorHint(error) && (

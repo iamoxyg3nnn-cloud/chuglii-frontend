@@ -1,5 +1,5 @@
 import { Fragment, useState, useEffect, Children, type HTMLAttributes, type ReactNode } from "react";
-import { Check } from "lucide-react";
+import { Check } from "@phosphor-icons/react";
 
 interface StepperProps extends HTMLAttributes<HTMLDivElement> {
   children: ReactNode;
@@ -121,7 +121,7 @@ function StepIndicator({
       } ${step === currentStep ? "" : "cursor-pointer"}`}
     >
       {status === "complete" ? (
-        <Check className="w-3.5 h-3.5" />
+        <Check size={13} weight="bold" />
       ) : (
         <span>{step}</span>
       )}

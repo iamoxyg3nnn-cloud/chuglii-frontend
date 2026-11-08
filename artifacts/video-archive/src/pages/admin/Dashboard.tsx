@@ -2,9 +2,9 @@ import { useState, useEffect, useCallback } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import { resolveApiPath } from "@/lib/api-base";
 import {
-  Users, ListOrdered, Video, Shield,
-  TrendingUp, Activity, Clock, Database,
-} from "lucide-react";
+  UsersThree, ListNumbers, VideoCamera, Shield,
+  TrendUp, Pulse, Clock, Database,
+} from "@phosphor-icons/react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 
@@ -22,15 +22,15 @@ interface AdminStats {
 }
 
 const STAT_CARDS = [
-  { label: "Total Users", key: "users" as const, icon: Users, color: "text-blue-400" },
-  { label: "Recordings", key: "recordings" as const, icon: Video, color: "text-green-400" },
-  { label: "Performers", key: "performers" as const, icon: TrendingUp, color: "text-orange-400" },
-  { label: "Total Requests", key: "requests_total" as const, icon: ListOrdered, color: "text-purple-400" },
+  { label: "Total Users", key: "users" as const, icon: UsersThree, color: "text-blue-400" },
+  { label: "Recordings", key: "recordings" as const, icon: VideoCamera, color: "text-green-400" },
+  { label: "Performers", key: "performers" as const, icon: TrendUp, color: "text-orange-400" },
+  { label: "Total Requests", key: "requests_total" as const, icon: ListNumbers, color: "text-purple-400" },
 ];
 
 const REQUEST_STATUS_CARDS = [
   { label: "Pending", key: "pending" as const, icon: Clock, color: "text-yellow-400", variant: "pending" as const },
-  { label: "Approved", key: "approved" as const, icon: Activity, color: "text-green-400", variant: "approved" as const },
+  { label: "Approved", key: "approved" as const, icon: Pulse, color: "text-green-400", variant: "approved" as const },
   { label: "Rejected", key: "rejected" as const, icon: Shield, color: "text-red-400", variant: "rejected" as const },
   { label: "Done", key: "done" as const, icon: Shield, color: "text-primary", variant: "done" as const },
 ];
@@ -102,7 +102,7 @@ export default function AdminDashboard() {
     <div className="p-6">
       <div className="mb-8">
         <div className="flex items-center gap-2 text-xs font-medium text-muted-foreground mb-2">
-          <Shield className="w-3.5 h-3.5 text-primary" />
+          <Shield size={15} weight="duotone" className="text-primary" />
           <span>Dashboard</span>
         </div>
         <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-foreground">
@@ -128,7 +128,7 @@ export default function AdminDashboard() {
                   </p>
                 </div>
                 <div className={`w-10 h-10 rounded-lg bg-background border border-border/40 flex items-center justify-center ${color}`}>
-                  <Icon className="w-5 h-5" />
+                  <Icon size={20} weight="duotone" />
                 </div>
               </div>
             </CardContent>
@@ -143,7 +143,7 @@ export default function AdminDashboard() {
             <Card key={key}>
               <CardContent className="p-4">
                 <div className="flex items-center gap-3">
-                  <Icon className={`w-5 h-5 ${color}`} />
+                  <Icon size={20} weight="duotone" className={color} />
                   <div>
                     <p className="text-2xl font-black tracking-tighter">
                       {stats?.requests?.[key] ?? 0}
@@ -171,21 +171,21 @@ export default function AdminDashboard() {
               href="/admin/requests"
               className="inline-flex items-center gap-1.5 h-9 px-4 text-xs font-medium border border-border/50 text-muted-foreground hover:text-foreground hover:border-border transition-all rounded-md"
             >
-              <ListOrdered className="w-3.5 h-3.5" />
+              <ListNumbers size={14} />
               View all requests
             </a>
             <a
               href="/admin/users"
               className="inline-flex items-center gap-1.5 h-9 px-4 text-xs font-medium border border-border/50 text-muted-foreground hover:text-foreground hover:border-border transition-all rounded-md"
             >
-              <Users className="w-3.5 h-3.5" />
+              <UsersThree size={14} />
               Manage users
             </a>
             <a
               href="/admin/cache"
               className="inline-flex items-center gap-1.5 h-9 px-4 text-xs font-medium border border-border/50 text-muted-foreground hover:text-foreground hover:border-border transition-all rounded-md"
             >
-              <Database className="w-3.5 h-3.5" />
+              <Database size={14} />
               Cache settings
             </a>
           </CardContent>

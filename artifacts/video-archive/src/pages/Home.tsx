@@ -24,7 +24,18 @@ import { useConnectionConstrained } from "@/hooks/use-connection-quality";
 import { buildThumbnailFallbacks } from "@/lib/mirrors";
 import { formatBytes } from "@/lib/formatters";
 import { AdLeaderboard } from "@/components/ads/AdLeaderboard";
-import { Search, ArrowRight, TrendingUp, Clock, Users, Tags, Clapperboard, Star, AlertCircle, RefreshCw, HardDrive } from "lucide-react";
+import {
+  MagnifyingGlass,
+  ArrowRight,
+  TrendUp,
+  Clock,
+  UsersThree,
+  Tag,
+  FilmStrip,
+  Sparkle,
+  WarningCircle,
+  ArrowClockwise,
+} from "@phosphor-icons/react";
 
 type Tab = "recent" | "popular";
 
@@ -134,7 +145,7 @@ export default function Home() {
               className="mt-8 flex max-w-2xl flex-col gap-2 rounded-2xl border border-border/80 bg-card p-2 shadow-sm sm:flex-row sm:items-center"
             >
               <label className="flex min-w-0 flex-1 items-center gap-3 px-3">
-                <Search className="h-4 w-4 shrink-0 text-muted-foreground" aria-hidden="true" />
+                <MagnifyingGlass size={18} weight="regular" className="shrink-0 text-muted-foreground/70" aria-hidden="true" />
                 <input
                   type="search"
                   placeholder="Search performers, titles, or tags"
@@ -152,21 +163,21 @@ export default function Home() {
                 className="inline-flex h-11 shrink-0 items-center justify-center gap-2 rounded-xl bg-primary px-5 text-sm font-semibold text-primary-foreground transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-card"
               >
                 Search archive
-                <ArrowRight className="h-4 w-4" aria-hidden="true" />
+                <ArrowRight size={16} aria-hidden="true" />
               </button>
             </form>
 
             <nav aria-label="Explore the archive" className="mt-6 flex flex-wrap gap-x-6 gap-y-3 text-xs sm:text-sm text-muted-foreground">
               <Link href="/browse" className="inline-flex items-center gap-1.5 font-medium hover:text-foreground transition-colors">
-                <Clapperboard className="h-3.5 w-3.5 text-primary" aria-hidden="true" />
+                <FilmStrip size={14} weight="duotone" className="text-primary" aria-hidden="true" />
                 Recordings
               </Link>
               <Link href="/performers" className="inline-flex items-center gap-1.5 font-medium hover:text-foreground transition-colors">
-                <Users className="h-3.5 w-3.5 text-primary" aria-hidden="true" />
+                <UsersThree size={14} weight="duotone" className="text-primary" aria-hidden="true" />
                 Performers
               </Link>
               <Link href="/tags" className="inline-flex items-center gap-1.5 font-medium hover:text-foreground transition-colors">
-                <Tags className="h-3.5 w-3.5 text-primary" aria-hidden="true" />
+                <Tag size={14} weight="duotone" className="text-primary" aria-hidden="true" />
                 Topics
               </Link>
             </nav>
@@ -217,7 +228,7 @@ export default function Home() {
 
             <div className="pt-4 border-t border-border/50 flex items-center justify-between">
               <Link href="/browse" className="inline-flex items-center gap-1.5 text-xs font-semibold text-primary hover:text-primary/80 transition-colors">
-                Open complete catalog <ArrowRight className="h-3.5 w-3.5" aria-hidden="true" />
+                Open complete catalog <ArrowRight size={13} weight="bold" aria-hidden="true" />
               </Link>
               <span className="text-[10px] text-muted-foreground/60 font-mono">Updated real-time</span>
             </div>
@@ -232,7 +243,7 @@ export default function Home() {
             <div className="flex items-center justify-between mb-6">
               <div className="flex items-center gap-2">
                 <div className="w-7 h-7 rounded-lg bg-primary/10 flex items-center justify-center">
-                  <Clock className="w-3.5 h-3.5 text-primary" />
+                  <Clock size={15} weight="regular" className="text-primary" />
                 </div>
                 <h2 className="text-sm font-bold tracking-tight">Continue Watching</h2>
               </div>
@@ -268,13 +279,13 @@ export default function Home() {
                 role="tab"
                 aria-selected={tab === "recent"}
                 onClick={() => setTab("recent")}
-                className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-md transition-colors ${
+                className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-md transition-colors cursor-pointer ${
                   tab === "recent"
                     ? "bg-card text-foreground shadow-xs border border-border/80"
                     : "text-muted-foreground hover:text-foreground border border-transparent"
                 }`}
               >
-                <Clock className="w-3.5 h-3.5 text-primary" />
+                <Clock size={14} weight={tab === "recent" ? "bold" : "regular"} className={tab === "recent" ? "text-primary" : "text-muted-foreground/60"} />
                 Recent recordings
               </button>
               <button
@@ -282,13 +293,13 @@ export default function Home() {
                 role="tab"
                 aria-selected={tab === "popular"}
                 onClick={() => setTab("popular")}
-                className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-md transition-colors ${
+                className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-md transition-colors cursor-pointer ${
                   tab === "popular"
                     ? "bg-card text-foreground shadow-xs border border-border/80"
                     : "text-muted-foreground hover:text-foreground border border-transparent"
                 }`}
               >
-                <TrendingUp className="w-3.5 h-3.5 text-primary" />
+                <TrendUp size={14} weight={tab === "popular" ? "bold" : "regular"} className={tab === "popular" ? "text-primary" : "text-muted-foreground/60"} />
                 Most viewed
               </button>
             </div>
@@ -297,7 +308,7 @@ export default function Home() {
               href={`/browse${tab === "popular" ? "?sort=popular" : ""}`}
               className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors group"
             >
-              View all <ArrowRight className="w-3 h-3 transition-transform duration-200 group-hover:translate-x-0.5" />
+              View all <ArrowRight size={12} weight="bold" className="transition-transform duration-200 group-hover:translate-x-0.5" />
             </Link>
           </div>
 
@@ -310,7 +321,7 @@ export default function Home() {
           ) : feedError ? (
             <div className="py-20 text-center border border-border/40 rounded-xl bg-secondary/10 animate-fade-in-up">
               <div className="w-14 h-14 rounded-full bg-destructive/10 flex items-center justify-center mx-auto mb-4">
-                <AlertCircle className="w-6 h-6 text-destructive/60" />
+                <WarningCircle size={28} weight="duotone" className="text-destructive/70" />
               </div>
               <p className="text-sm text-foreground mb-1">Couldn&apos;t load recordings.</p>
               <p className="text-xs text-muted-foreground/60 mb-5 max-w-xs mx-auto">
@@ -319,9 +330,9 @@ export default function Home() {
               <button
                 type="button"
                 onClick={() => void retryFeed()}
-                className="inline-flex items-center gap-1.5 h-9 px-4 text-xs font-semibold text-primary border border-primary/30 hover:border-primary/60 rounded-lg transition-colors"
+                className="inline-flex items-center gap-1.5 h-9 px-4 text-xs font-semibold text-primary border border-primary/30 hover:border-primary/60 rounded-lg transition-colors cursor-pointer"
               >
-                <RefreshCw className="w-3.5 h-3.5" />
+                <ArrowClockwise size={14} weight="bold" />
                 Try again
               </button>
             </div>
@@ -337,7 +348,7 @@ export default function Home() {
           ) : (
             <div className="py-20 text-center border border-border/40 rounded-xl bg-secondary/10 animate-fade-in-up">
               <div className="w-14 h-14 rounded-full bg-secondary/50 flex items-center justify-center mx-auto mb-4">
-                <Clapperboard className="w-6 h-6 text-muted-foreground/20" />
+                <FilmStrip size={28} weight="duotone" className="text-muted-foreground/30" />
               </div>
               <p className="text-sm text-muted-foreground mb-1">No recordings found.</p>
               <p className="text-xs text-muted-foreground/40 mb-5 max-w-xs mx-auto">
@@ -365,7 +376,7 @@ export default function Home() {
                 <div className="w-1 h-6 bg-primary rounded-full shrink-0" aria-hidden="true" />
                 <div>
                   <h2 className="flex items-center gap-2 text-sm text-foreground font-semibold tracking-tight">
-                    <Star className="w-3.5 h-3.5 text-primary" />
+                    <Sparkle size={15} weight="duotone" className="text-primary" />
                     Recommended recordings
                   </h2>
                   <p className="text-xs text-muted-foreground mt-0.5">
@@ -410,7 +421,7 @@ export default function Home() {
                 <div className="w-1 h-6 bg-primary rounded-full shrink-0" aria-hidden="true" />
                 <div>
                   <h2 className="flex items-center gap-2 text-sm text-foreground font-semibold tracking-tight">
-                    <Users className="w-3.5 h-3.5 text-primary" />
+                    <UsersThree size={16} weight="duotone" className="text-primary" />
                     Top catalogued performers
                   </h2>
                   <p className="text-xs text-muted-foreground mt-0.5">
@@ -422,7 +433,7 @@ export default function Home() {
                 href="/performers"
                 className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors group font-medium"
               >
-                Directory <ArrowRight className="w-3 h-3 transition-transform duration-200 group-hover:translate-x-0.5" />
+                Directory <ArrowRight size={12} weight="bold" className="transition-transform duration-200 group-hover:translate-x-0.5" />
               </Link>
             </div>
             {performersLoading ? (
@@ -456,7 +467,7 @@ export default function Home() {
                 <div className="w-1 h-6 bg-primary rounded-full shrink-0" aria-hidden="true" />
                 <div>
                   <h2 className="flex items-center gap-2 text-sm text-foreground font-semibold tracking-tight">
-                    <Tags className="w-3.5 h-3.5 text-primary" />
+                    <Tag size={16} weight="duotone" className="text-primary" />
                     Browse topics &amp; tags
                   </h2>
                   <p className="text-xs text-muted-foreground mt-0.5">
@@ -468,7 +479,7 @@ export default function Home() {
                 href="/tags"
                 className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors group font-medium"
               >
-                All tags <ArrowRight className="w-3 h-3 transition-transform duration-200 group-hover:translate-x-0.5" />
+                All tags <ArrowRight size={12} weight="bold" className="transition-transform duration-200 group-hover:translate-x-0.5" />
               </Link>
             </div>
             <div className="flex flex-wrap gap-2">

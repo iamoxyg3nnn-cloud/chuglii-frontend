@@ -4,7 +4,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { userApi } from "@/lib/user-api";
 import { trackActivity } from "@/lib/rum";
 import { useAuth } from "@/contexts/AuthContext";
-import { ListVideo, Plus, Check, Clock, X } from "lucide-react";
+import { Playlist, Plus, Check, Clock, X } from "@phosphor-icons/react";
 
 /**
  * AddToCollectionDialog — add any recording to a collection or Watch Later
@@ -174,7 +174,7 @@ export function AddToCollectionDialog() {
             className="w-6 h-6 flex items-center justify-center rounded text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors"
             aria-label="Close"
           >
-            <X className="w-4 h-4" />
+            <X size={14} weight="bold" />
           </button>
         </div>
 
@@ -204,9 +204,9 @@ export function AddToCollectionDialog() {
               className="w-full flex items-center gap-2.5 px-4 py-2.5 text-left hover:bg-secondary transition-colors disabled:opacity-50"
             >
               {wlAdded ? (
-                <Check className="w-4 h-4 text-green-500 shrink-0" />
+                <Check size={14} weight="bold" className="text-green-500 shrink-0" />
               ) : (
-                <Clock className="w-4 h-4 text-muted-foreground shrink-0" />
+                <Clock size={15} weight="regular" className="text-muted-foreground shrink-0" />
               )}
               <span className="text-xs font-medium flex-1">Watch Later</span>
               {addingTo === "__wl" && <span className="text-[10px] text-muted-foreground">adding…</span>}
@@ -223,9 +223,9 @@ export function AddToCollectionDialog() {
                   className="w-full flex items-center gap-2.5 px-4 py-2.5 text-left hover:bg-secondary transition-colors disabled:opacity-50"
                 >
                   {added === col.id ? (
-                    <Check className="w-4 h-4 text-green-500 shrink-0" />
+                    <Check size={14} weight="bold" className="text-green-500 shrink-0" />
                   ) : (
-                    <ListVideo className="w-4 h-4 text-muted-foreground shrink-0" />
+                    <Playlist size={15} weight="regular" className="text-muted-foreground shrink-0" />
                   )}
                   <span className="text-xs font-medium flex-1 truncate">{col.name}</span>
                   <span className="text-[10px] text-muted-foreground/50 shrink-0">{col.item_count ?? 0}</span>
@@ -254,7 +254,7 @@ export function AddToCollectionDialog() {
                 aria-label="Create and add"
                 title="Create and add"
               >
-                <Plus className="w-3.5 h-3.5" />
+                <Plus size={13} weight="bold" />
               </button>
             </div>
             {error && <p className="px-4 pb-2 text-[11px] text-destructive">{error}</p>}

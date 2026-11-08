@@ -1,14 +1,14 @@
 import { Link } from "wouter";
 import { useCallback, memo } from "react";
-import { Clapperboard, Users, Tags, ListVideo, Send } from "lucide-react";
+import { PaperPlaneTilt } from "@phosphor-icons/react";
 import { prefetchRoute } from "@/lib/route-chunks";
 import { isActiveNavigationRoute } from "@/lib/navigation";
 
 export const NAV_LINKS = [
-  { href: "/browse", label: "Browse", icon: Clapperboard },
-  { href: "/performers", label: "Performers", icon: Users },
-  { href: "/tags", label: "Tags", icon: Tags },
-  { href: "/playlists", label: "Playlists", icon: ListVideo },
+  { href: "/browse", label: "Browse" },
+  { href: "/performers", label: "Performers" },
+  { href: "/tags", label: "Tags" },
+  { href: "/playlists", label: "Playlists" },
 ] as const;
 
 interface DesktopNavProps {
@@ -18,9 +18,9 @@ interface DesktopNavProps {
 
 export const DesktopNav = memo(function DesktopNav({ location, onRequestOpen }: DesktopNavProps) {
   return (
-    <nav aria-label="Primary navigation" className="hidden md:flex items-center gap-0.5 text-sm">
-      {NAV_LINKS.map(({ href, label, icon: Icon }) => (
-        <NavLink key={href} href={href} label={label} icon={Icon} isActive={isActiveNavigationRoute(href, location)} />
+    <nav aria-label="Primary navigation" className="hidden md:flex items-center gap-1 text-sm">
+      {NAV_LINKS.map(({ href, label }) => (
+        <NavLink key={href} href={href} label={label} isActive={isActiveNavigationRoute(href, location)} />
       ))}
       <span className="w-px h-4 bg-border/20 mx-1" />
       <button
@@ -28,7 +28,7 @@ export const DesktopNav = memo(function DesktopNav({ location, onRequestOpen }: 
         type="button"
         className="nav-underline px-3 py-1.5 rounded-lg inline-flex items-center gap-1.5 transition-colors duration-150 text-muted-foreground hover:text-foreground cursor-pointer"
       >
-        <Send className="w-3.5 h-3.5 text-muted-foreground/70" />
+        <PaperPlaneTilt size={14} weight="regular" className="text-muted-foreground/70" />
         Request
       </button>
     </nav>
@@ -38,11 +38,10 @@ export const DesktopNav = memo(function DesktopNav({ location, onRequestOpen }: 
 interface NavLinkProps {
   href: string;
   label: string;
-  icon: React.ComponentType<{ className?: string }>;
   isActive: boolean;
 }
 
-const NavLink = memo(function NavLink({ href, label, icon: Icon, isActive: active }: NavLinkProps) {
+const NavLink = memo(function NavLink({ href, label, isActive: active }: NavLinkProps) {
   const prefetch = useCallback(() => {
     prefetchRoute(href);
   }, [href]);
@@ -52,15 +51,12 @@ const NavLink = memo(function NavLink({ href, label, icon: Icon, isActive: activ
       <span
         onMouseEnter={prefetch}
         onFocus={prefetch}
-        className={`nav-underline px-3 py-1.5 rounded-lg inline-flex items-center gap-1.5 transition-colors duration-150 cursor-pointer ${
+        className={`nav-underline px-3 py-1.5 rounded-lg inline-flex items-center transition-colors duration-150 cursor-pointer ${
           active
             ? "text-foreground font-medium active"
             : "text-muted-foreground hover:text-foreground"
         }`}
       >
-        <Icon className={`w-3.5 h-3.5 transition-colors duration-150 ${
-          active ? "text-primary" : "text-muted-foreground/60 group-hover:text-foreground/80"
-        }`} />
         {label}
       </span>
     </Link>

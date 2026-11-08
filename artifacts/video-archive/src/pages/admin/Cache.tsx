@@ -2,9 +2,9 @@ import { useState, useEffect, useCallback } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import { resolveApiPath } from "@/lib/api-base";
 import {
-  Shield, RefreshCw, Database, Zap, AlertTriangle,
-  Trash2, Info, Activity,
-} from "lucide-react";
+  Shield, ArrowsClockwise, Database, Lightning, Warning,
+  Trash, Info, Pulse,
+} from "@phosphor-icons/react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -76,7 +76,7 @@ export default function AdminCache() {
       <div className="flex items-center justify-between mb-6">
         <div>
           <div className="flex items-center gap-2 text-xs font-medium text-muted-foreground mb-2">
-            <Shield className="w-3.5 h-3.5 text-primary" />
+            <Shield size={15} weight="duotone" className="text-primary" />
             <span>Admin</span>
           </div>
           <h1 className="text-2xl font-bold tracking-tight text-foreground">Cache Management</h1>
@@ -85,7 +85,7 @@ export default function AdminCache() {
           </p>
         </div>
         <Button variant="outline" size="sm" onClick={loadStatus} disabled={loading}>
-          <RefreshCw className={`w-3.5 h-3.5 ${loading ? "animate-spin" : ""}`} />
+          <ArrowsClockwise size={14} className={loading ? "animate-spin" : ""} />
           Refresh
         </Button>
       </div>
@@ -96,7 +96,7 @@ export default function AdminCache() {
             ? "bg-green-500/10 border-green-500/30 text-green-400"
             : "bg-destructive/10 border-destructive/30 text-destructive"
         }`}>
-          {result.type === "success" ? <Activity className="w-4 h-4 mt-0.5 shrink-0" /> : <AlertTriangle className="w-4 h-4 mt-0.5 shrink-0" />}
+          {result.type === "success" ? <Pulse size={16} weight="bold" className="mt-0.5 shrink-0" /> : <Warning size={16} weight="duotone" className="mt-0.5 shrink-0" />}
           <div className="font-mono text-xs">{result.message}</div>
         </div>
       )}
@@ -105,7 +105,7 @@ export default function AdminCache() {
         <Card>
           <CardHeader>
             <CardTitle className="text-sm font-bold tracking-tight flex items-center gap-2">
-              <Database className="w-4 h-4 text-primary" />
+              <Database size={16} weight="duotone" className="text-primary" />
               Cache Status
             </CardTitle>
           </CardHeader>
@@ -140,7 +140,7 @@ export default function AdminCache() {
         <Card>
           <CardHeader>
             <CardTitle className="text-sm font-bold tracking-tight flex items-center gap-2">
-              <Zap className="w-4 h-4 text-primary" />
+              <Lightning size={16} weight="duotone" className="text-primary" />
               Quick Actions
             </CardTitle>
           </CardHeader>
@@ -151,7 +151,7 @@ export default function AdminCache() {
               onClick={() => doAction("Purge All", "/api/admin/cache/purge")}
               disabled={actionLoading !== null}
             >
-              <Trash2 className="w-4 h-4 text-orange-400" />
+              <Trash size={16} className="text-orange-400" />
               Purge All Cache
               <span className="text-xs text-muted-foreground ml-auto">(performers, recordings, stats, tags)</span>
             </Button>
@@ -161,7 +161,7 @@ export default function AdminCache() {
               onClick={() => doAction("Flush", "/api/admin/cache/flush", "DELETE")}
               disabled={actionLoading !== null}
             >
-              <AlertTriangle className="w-4 h-4 text-destructive" />
+              <Warning size={16} weight="duotone" className="text-destructive" />
               Flush All Redis Keys
               <span className="text-xs text-muted-foreground ml-auto">(api:* and tag:* keys)</span>
             </Button>
@@ -171,7 +171,7 @@ export default function AdminCache() {
         <Card>
           <CardHeader>
             <CardTitle className="text-sm font-bold tracking-tight flex items-center gap-2">
-              <Info className="w-4 h-4 text-primary" />
+              <Info size={16} weight="duotone" className="text-primary" />
               Invalidate by Tags
             </CardTitle>
           </CardHeader>
@@ -205,7 +205,7 @@ export default function AdminCache() {
         <Card>
           <CardHeader>
             <CardTitle className="text-sm font-bold tracking-tight flex items-center gap-2">
-              <Info className="w-4 h-4 text-primary" />
+              <Info size={16} weight="duotone" className="text-primary" />
               Invalidate by Pattern
             </CardTitle>
           </CardHeader>

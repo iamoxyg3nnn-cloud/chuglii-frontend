@@ -3,7 +3,7 @@ import { Link } from "wouter";
 import { useQueryClient } from "@tanstack/react-query";
 import { getRecording, getGetRecordingQueryKey, listRelatedRecordings, getListRelatedRecordingsQueryKey, type Recording } from "@workspace/api-client-react";
 import { formatBytes, formatRelativeTime, formatViewers, formatDuration } from "@/lib/formatters";
-import { Eye, HardDrive, Clock, CheckCircle, FolderPlus } from "lucide-react";
+import { Eye, HardDrive, Clock, CheckCircle, FolderSimplePlus } from "@phosphor-icons/react";
 import { OptimizedImage, ImageUnavailable } from "@/components/ui/optimized-image";
 import { useHoverPreview } from "@/hooks/use-hover-preview";
 import { useProgressiveImage } from "@/hooks/use-progressive-image";
@@ -531,7 +531,7 @@ export const VideoCard = memo(function VideoCard({ recording, showRemove, onRemo
           <div className="absolute top-2 right-2 z-30 flex items-center gap-1.5 pointer-events-none">
             {isWatched && (
               <div className="flex items-center gap-1 bg-black/60 backdrop-blur-md ring-1 ring-white/10 px-1.5 py-0.5 rounded-md">
-                <CheckCircle className="w-2.5 h-2.5 text-emerald-400" />
+                <CheckCircle size={11} weight="fill" className="text-emerald-400" />
                 <span className="text-[10px] font-medium text-emerald-300">Watched</span>
               </div>
             )}
@@ -556,7 +556,7 @@ export const VideoCard = memo(function VideoCard({ recording, showRemove, onRemo
                 aria-label="Add to collection"
                 title="Add to collection"
               >
-                <FolderPlus className="w-3.5 h-3.5" />
+                <FolderSimplePlus size={15} weight="regular" />
               </button>
             )}
             {showRemove && onRemove && (
@@ -598,12 +598,12 @@ export const VideoCard = memo(function VideoCard({ recording, showRemove, onRemo
           <div className="absolute bottom-2 left-2 right-2 flex items-end justify-between pointer-events-none">
             {showDuration ? (
               <span className="flex items-center gap-1 text-[10px] font-medium text-white/80 bg-black/60 backdrop-blur-md ring-1 ring-white/10 px-1.5 py-0.5 rounded-md tabular-nums">
-                <Clock className="w-2.5 h-2.5" />
+                <Clock size={11} weight="regular" />
                 {formatDuration(recording.duration)}
               </span>
             ) : showFilesize ? (
               <span className="flex items-center gap-1 text-[10px] font-medium text-white/80 bg-black/60 backdrop-blur-md ring-1 ring-white/10 px-1.5 py-0.5 rounded-md tabular-nums">
-                <HardDrive className="w-2.5 h-2.5" />
+                <HardDrive size={11} weight="regular" />
                 {formatBytes(recording.filesize)}
               </span>
             ) : <span />}
@@ -623,7 +623,7 @@ export const VideoCard = memo(function VideoCard({ recording, showRemove, onRemo
             </span>
             {showViewers && (
               <span className="flex items-center gap-1">
-                <Eye className="w-3 h-3 text-muted-foreground/50" />
+                <Eye size={12} weight="regular" className="text-muted-foreground/50" />
                 {formatViewers(recording.viewers)}
               </span>
             )}

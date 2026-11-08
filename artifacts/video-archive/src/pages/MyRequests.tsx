@@ -11,9 +11,9 @@ import { userApi, type UserNotification } from "@/lib/user-api";
 import { formatRelativeTime } from "@/lib/formatters";
 import { toast } from "@/hooks/use-toast";
 import {
-  Send, Loader2, ExternalLink, ArrowLeft, ListFilter, Trash2,
-  ChevronLeft, ChevronRight, XCircle,
-} from "lucide-react";
+  PaperPlaneTilt, CircleNotch, ArrowSquareOut, ArrowLeft, Funnel, Trash,
+  CaretLeft, CaretRight, XCircle,
+} from "@phosphor-icons/react";
 import { getStatusConfig } from "@/lib/request-constants";
 
 type StatusFilter = "all" | "pending" | "approved" | "rejected" | "done";
@@ -56,7 +56,7 @@ function RequestCard({ request, onDelete, onViewRequest }: { request: UserReques
         <div className="p-4 flex items-start gap-4">
           {/* Status icon */}
           <div className={`w-10 h-10 rounded-full flex items-center justify-center shrink-0 ${cfg.bg} group-hover:scale-105 transition-transform`}>
-            <StatusIcon className={`w-5 h-5 ${cfg.color}`} />
+            <StatusIcon size={20} className={cfg.color} />
           </div>
 
           {/* Info */}
@@ -87,7 +87,7 @@ function RequestCard({ request, onDelete, onViewRequest }: { request: UserReques
 
           {/* Arrow */}
           <div className="shrink-0 self-center text-muted-foreground/30 group-hover:text-primary/50 transition-colors">
-            <ExternalLink className="w-4 h-4" />
+            <ArrowSquareOut size={16} />
           </div>
         </div>
       </Link>
@@ -101,9 +101,9 @@ function RequestCard({ request, onDelete, onViewRequest }: { request: UserReques
         aria-label="Delete request"
       >
         {deleting ? (
-          <Loader2 className="w-3 h-3 animate-spin" />
+          <CircleNotch size={13} className="animate-spin" />
         ) : (
-          <Trash2 className="w-3 h-3" />
+          <Trash size={13} />
         )}
       </button>
     </div>
@@ -206,7 +206,7 @@ export default function MyRequests() {
               href="/request"
               className="inline-flex items-center gap-1 text-[11px] text-muted-foreground hover:text-foreground transition-colors mb-2"
             >
-              <ArrowLeft className="w-3 h-3" />
+              <ArrowLeft size={12} />
               New request
             </Link>
             <h1 className="text-xl font-bold tracking-tight text-foreground">
@@ -220,7 +220,7 @@ export default function MyRequests() {
             href="/request"
             className="inline-flex items-center gap-1.5 h-9 px-3 text-xs font-medium border border-primary/30 text-primary hover:border-primary/60 rounded-lg transition-colors"
           >
-            <Send className="w-3.5 h-3.5" />
+            <PaperPlaneTilt size={14} />
             New Request
           </Link>
         </div>
@@ -231,18 +231,18 @@ export default function MyRequests() {
         {/* Content */}
         {isLoading ? (
           <div className="flex items-center justify-center py-20">
-            <Loader2 className="w-6 h-6 text-primary/60 animate-spin" />
+            <CircleNotch size={24} className="text-primary/60 animate-spin" />
           </div>
         ) : isError ? (
           <div className="py-20 text-center">
-            <XCircle className="w-10 h-10 text-destructive/40 mx-auto mb-3" />
+            <XCircle size={36} weight="duotone" className="text-destructive/40 mx-auto mb-3" />
             <p className="text-sm text-muted-foreground">Failed to load requests.</p>
             <p className="text-xs text-muted-foreground/50 mt-1">Please try again later.</p>
           </div>
         ) : requests.length === 0 ? (
           <div className="py-20 text-center border border-border/30 rounded-xl bg-card/50">
             <div className="w-12 h-12 rounded-full bg-secondary/50 flex items-center justify-center mx-auto mb-4">
-              <Send className="w-5 h-5 text-muted-foreground/30" />
+              <PaperPlaneTilt size={20} weight="duotone" className="text-muted-foreground/30" />
             </div>
             <h2 className="text-base font-bold text-foreground mb-1">No requests yet</h2>
             <p className="text-xs text-muted-foreground/60 mb-6 max-w-xs mx-auto">
@@ -252,7 +252,7 @@ export default function MyRequests() {
               href="/request"
               className="inline-flex items-center gap-1.5 h-9 px-4 text-xs font-medium border border-primary/30 text-primary hover:border-primary/60 rounded-lg transition-colors"
             >
-              <Send className="w-3.5 h-3.5" />
+              <PaperPlaneTilt size={14} />
               Submit Your First Request
             </Link>
           </div>
@@ -260,7 +260,7 @@ export default function MyRequests() {
           <>
             {/* Filter tabs */}
             <div className="flex items-center gap-1 mb-5 overflow-x-auto">
-              <ListFilter className="w-3.5 h-3.5 text-muted-foreground/40 shrink-0 mr-1" />
+              <Funnel size={14} className="text-muted-foreground/40 shrink-0 mr-1" />
               {FILTERS.map(({ key, label }) => {
                 const isActive = statusFilter === key;
                 const count = counts[key] ?? 0;
@@ -289,7 +289,7 @@ export default function MyRequests() {
             {/* Filtered list */}
             {filteredRequests.length === 0 ? (
               <div className="py-16 text-center border border-border/30 rounded-lg bg-card/50">
-                <ListFilter className="w-8 h-8 text-muted-foreground/20 mx-auto mb-3" />
+                <Funnel size={28} weight="duotone" className="text-muted-foreground/20 mx-auto mb-3" />
                 <p className="text-sm text-muted-foreground">No {statusFilter} requests</p>
               </div>
             ) : (
@@ -319,7 +319,7 @@ export default function MyRequests() {
                       className="inline-flex items-center justify-center w-8 h-8 rounded-lg border border-border/50 text-muted-foreground hover:text-foreground hover:border-border disabled:opacity-30 disabled:pointer-events-none transition-all"
                       aria-label="Previous page"
                     >
-                      <ChevronLeft className="w-4 h-4" />
+                      <CaretLeft size={16} />
                     </button>
 
                     {(() => {
@@ -359,7 +359,7 @@ export default function MyRequests() {
                       className="inline-flex items-center justify-center w-8 h-8 rounded-lg border border-border/50 text-muted-foreground hover:text-foreground hover:border-border disabled:opacity-30 disabled:pointer-events-none transition-all"
                       aria-label="Next page"
                     >
-                      <ChevronRight className="w-4 h-4" />
+                      <CaretRight size={16} />
                     </button>
 
                     <span className="ml-2 text-[11px] text-muted-foreground/50">

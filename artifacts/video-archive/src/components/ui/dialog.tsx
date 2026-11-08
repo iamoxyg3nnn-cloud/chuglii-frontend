@@ -1,5 +1,5 @@
 import * as DialogPrimitive from "@radix-ui/react-dialog";
-import { X } from "lucide-react";
+import { X } from "@phosphor-icons/react";
 
 export function DialogRoot({ children, ...props }: DialogPrimitive.DialogProps) {
   return <DialogPrimitive.Root {...props}>{children}</DialogPrimitive.Root>;
@@ -32,7 +32,7 @@ export function DialogContent({ className = "", children, ...props }: DialogPrim
       >
         {children}
         <DialogPrimitive.Close className="absolute right-4 top-4 rounded-sm opacity-50 hover:opacity-100 transition-opacity cursor-pointer">
-          <X className="w-4 h-4" />
+          <X size={15} weight="bold" />
           <span className="sr-only">Close</span>
         </DialogPrimitive.Close>
       </DialogPrimitive.Content>

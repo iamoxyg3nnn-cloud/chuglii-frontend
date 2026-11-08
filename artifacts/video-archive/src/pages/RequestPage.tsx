@@ -9,7 +9,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { Layout } from "@/components/Layout";
 import { AdBanner } from "@/components/ads/AdBanner";
 import { toast } from "@/hooks/use-toast";
-import { Film, Sparkles, CheckCircle, Loader2, ArrowLeft, Trash2, XCircle } from "lucide-react";
+import { FilmStrip, Sparkle, CheckCircle, CircleNotch, ArrowLeft, Trash, XCircle } from "@phosphor-icons/react";
 import { formatRelativeTime } from "@/lib/formatters";
 import { resolveApiPath } from "@/lib/api-base";
 import { STATUS_LABEL_DETAIL, getStatusConfig, type StatusKey } from "@/lib/request-constants";
@@ -137,7 +137,7 @@ export default function RequestPage() {
       return (
         <Layout>
           <div className="min-h-[60vh] flex items-center justify-center">
-            <Loader2 className="w-6 h-6 text-primary/60 animate-spin" />
+            <CircleNotch size={24} className="text-primary/60 animate-spin" />
           </div>
         </Layout>
       );
@@ -156,7 +156,7 @@ export default function RequestPage() {
                 href="/request"
                 className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors mb-6"
               >
-                <ArrowLeft className="w-3.5 h-3.5" />
+                <ArrowLeft size={14} />
                 Back to new request
               </Link>
 
@@ -215,7 +215,7 @@ export default function RequestPage() {
                     }}
                     className="inline-flex items-center gap-1.5 px-4 py-2 text-xs border border-destructive/30 text-destructive hover:border-destructive/60 rounded-lg transition-colors"
                   >
-                    <Trash2 className="w-3 h-3" />
+                    <Trash size={12} />
                     Delete request
                   </button>
                 )}
@@ -237,14 +237,14 @@ export default function RequestPage() {
       <Layout>
         <div className="min-h-[60vh] flex items-center justify-center px-4">
           <div className="text-center max-w-sm">
-            <XCircle className="w-12 h-12 text-muted-foreground/30 mx-auto mb-4" />
+            <XCircle size={44} weight="duotone" className="text-muted-foreground/30 mx-auto mb-4" />
             <h2 className="text-lg font-bold text-foreground mb-1">Request not found</h2>
             <p className="text-xs text-muted-foreground mb-6">This request could not be found or may have been deleted.</p>
             <Link
               href="/request"
               className="inline-flex items-center gap-1 text-xs text-primary hover:underline"
             >
-              <ArrowLeft className="w-3 h-3" />
+              <ArrowLeft size={12} />
               Back to requests
             </Link>
           </div>
@@ -263,7 +263,7 @@ export default function RequestPage() {
               animate={{ scale: 1 }}
               transition={{ type: "spring", duration: 0.6 }}
             >
-              <CheckCircle className="w-16 h-16 text-green-500 mx-auto mb-6" />
+              <CheckCircle size={56} weight="duotone" className="text-green-500 mx-auto mb-6" />
             </motion.div>
             <h2 className="text-xl font-bold text-foreground mb-2">Request Submitted!</h2>
             <p className="text-sm text-muted-foreground mb-6">
@@ -311,7 +311,7 @@ export default function RequestPage() {
         <div className="w-full max-w-lg">
           <div className="text-center mb-8">
             <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-primary/8 border border-primary/20 text-xs text-primary mb-4">
-              <Sparkles className="w-3 h-3" />
+              <Sparkle size={13} weight="duotone" />
               Request a performer
             </div>
             <h1 className="text-2xl font-bold tracking-tight text-foreground">
@@ -383,7 +383,7 @@ function Step1PlatformSelect({ onSelect }: { onSelect: (p: Platform) => void }) 
           className="group relative flex flex-col items-center gap-3 p-6 rounded-xl border border-border/40 bg-card hover:border-emerald-500/40 hover:bg-emerald-500/5 transition-all duration-200"
         >
           <div className="w-14 h-14 rounded-full bg-emerald-500/10 flex items-center justify-center group-hover:bg-emerald-500/20 transition-colors">
-            <Film className="w-6 h-6 text-emerald-400" />
+            <FilmStrip size={24} weight="duotone" className="text-emerald-400" />
           </div>
           <div className="text-center">
             <p className="text-sm font-bold text-foreground group-hover:text-emerald-400 transition-colors">
@@ -399,7 +399,7 @@ function Step1PlatformSelect({ onSelect }: { onSelect: (p: Platform) => void }) 
           className="group relative flex flex-col items-center gap-3 p-6 rounded-xl border border-border/40 bg-card hover:border-violet-500/40 hover:bg-violet-500/5 transition-all duration-200"
         >
           <div className="w-14 h-14 rounded-full bg-violet-500/10 flex items-center justify-center group-hover:bg-violet-500/20 transition-colors">
-            <Sparkles className="w-6 h-6 text-violet-400" />
+            <Sparkle size={24} weight="duotone" className="text-violet-400" />
           </div>
           <div className="text-center">
             <p className="text-sm font-bold text-foreground group-hover:text-violet-400 transition-colors">
@@ -510,7 +510,7 @@ function Step2PerformerLookup({
       {!username && (
         <div className="flex flex-col items-center justify-center py-8 text-center">
           <div className="w-10 h-10 rounded-full bg-secondary flex items-center justify-center mb-3">
-            <Film className="w-4 h-4 text-muted-foreground/40" />
+            <FilmStrip size={18} weight="duotone" className="text-muted-foreground/40" />
           </div>
           <p className="text-xs text-muted-foreground">
             Type a username to check if the performer exists on {platform}

@@ -1,4 +1,13 @@
-import { ExternalLink, Users, Eye, Calendar, Film, CheckCircle, XCircle, Loader2 } from "lucide-react";
+import {
+  ArrowSquareOut,
+  UsersThree,
+  Eye,
+  CalendarBlank,
+  FilmStrip,
+  CheckCircle,
+  XCircle,
+  CircleNotch,
+} from "@phosphor-icons/react";
 import { type PerformerLookupResult } from "@/lib/api";
 import { proxyUrl } from "@/lib/proxy-url";
 
@@ -31,7 +40,7 @@ function StateContainer({ children }: { children: React.ReactNode }) {
 export function PerformerLookupLoading({ platform, username }: LoadingStateProps) {
   return (
     <StateContainer>
-      <Loader2 className="w-6 h-6 text-primary/60 animate-spin" />
+      <CircleNotch size={24} weight="bold" className="text-primary/60 animate-spin" />
       <p className="text-xs text-muted-foreground">
         Checking <span className="font-semibold text-foreground">{platform}</span> for{" "}
         <span className="font-semibold text-foreground">@{username}</span>
@@ -49,7 +58,7 @@ interface NotFoundStateProps {
 export function PerformerLookupNotFound({ platform, username, onRetry }: NotFoundStateProps) {
   return (
     <StateContainer>
-      <XCircle className="w-8 h-8 text-destructive/50" />
+      <XCircle size={32} weight="duotone" className="text-destructive/50" />
       <div className="text-center">
         <p className="text-xs font-medium text-foreground">Performer not found</p>
         <p className="text-[11px] text-muted-foreground mt-0.5">
@@ -71,7 +80,7 @@ interface ErrorStateProps {
 export function PerformerLookupError({ message, onRetry }: ErrorStateProps) {
   return (
     <StateContainer>
-      <XCircle className="w-8 h-8 text-destructive/50" />
+      <XCircle size={32} weight="duotone" className="text-destructive/50" />
       <div className="text-center">
         <p className="text-xs font-medium text-foreground">Lookup failed</p>
         <p className="text-[11px] text-muted-foreground mt-0.5">{message}</p>
@@ -129,7 +138,7 @@ export function PerformerDetailsCard({ data }: PerformerDetailsCardProps) {
               {platformLabel}
             </span>
             {data.exists && (
-              <CheckCircle className="w-3 h-3 text-green-500" />
+              <CheckCircle size={12} weight="fill" className="text-green-500" />
             )}
           </div>
           <h3 className="text-sm font-bold text-foreground truncate">
@@ -151,7 +160,7 @@ export function PerformerDetailsCard({ data }: PerformerDetailsCardProps) {
                 <span className="font-medium text-green-500 text-[11px]">Live now</span>
                 {data.viewer_count !== undefined && (
                   <span className="text-muted-foreground text-[11px]">
-                    <Eye className="inline w-2.5 h-2.5 mr-0.5" />
+                    <Eye size={11} weight="regular" className="inline mr-0.5" />
                     {data.viewer_count.toLocaleString()}
                   </span>
                 )}
@@ -179,7 +188,7 @@ export function PerformerDetailsCard({ data }: PerformerDetailsCardProps) {
         <div className="flex flex-wrap gap-x-3 gap-y-1 text-[11px] text-muted-foreground/70">
           {data.follower_count !== undefined && (
             <span className="flex items-center gap-1">
-              <Users className="w-2.5 h-2.5" />
+              <UsersThree size={12} weight="duotone" />
               {data.follower_count >= 1000
                 ? `${(data.follower_count / 1000).toFixed(1)}k`
                 : data.follower_count}{" "}
@@ -188,13 +197,13 @@ export function PerformerDetailsCard({ data }: PerformerDetailsCardProps) {
           )}
           {data.in_archive && data.archive_recording_count !== undefined && (
             <span className="flex items-center gap-1">
-              <Film className="w-2.5 h-2.5" />
+              <FilmStrip size={12} weight="duotone" />
               {data.archive_recording_count} recording{data.archive_recording_count !== 1 ? "s" : ""}
             </span>
           )}
           {data.archive_last_recording && (
             <span className="flex items-center gap-1">
-              <Calendar className="w-2.5 h-2.5" />
+              <CalendarBlank size={12} weight="duotone" />
               {formatRelativeTime(data.archive_last_recording)}
             </span>
           )}
@@ -213,7 +222,7 @@ export function PerformerDetailsCard({ data }: PerformerDetailsCardProps) {
           className="inline-flex items-center gap-1 text-[11px] text-primary hover:underline"
         >
           View on {platformLabel}
-          <ExternalLink className="w-2.5 h-2.5" />
+          <ArrowSquareOut size={12} weight="bold" />
         </a>
       </div>
     </div>

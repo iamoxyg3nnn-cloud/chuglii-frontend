@@ -2,17 +2,17 @@ import { useAuth } from "@/contexts/AuthContext";
 import { Link, useLocation } from "wouter";
 import { cn } from "@/lib/utils";
 import {
-  LayoutDashboard, ListOrdered, Users, Database, ChevronLeft,
-  Shield, LogOut, Settings, Crown, Megaphone,
-} from "lucide-react";
+  SquaresFour, ListNumbers, UsersThree, Database, CaretLeft,
+  Shield, SignOut, Crown, Megaphone,
+} from "@phosphor-icons/react";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
 
 const NAV_ITEMS = [
-  { href: "/admin", label: "Dashboard", icon: LayoutDashboard, exact: true },
-  { href: "/admin/requests", label: "Requests", icon: ListOrdered },
-  { href: "/admin/users", label: "Users", icon: Users },
+  { href: "/admin", label: "Dashboard", icon: SquaresFour, exact: true },
+  { href: "/admin/requests", label: "Requests", icon: ListNumbers },
+  { href: "/admin/users", label: "Users", icon: UsersThree },
   { href: "/admin/ads", label: "Ads", icon: Megaphone },
   { href: "/admin/cache", label: "Cache", icon: Database },
   { href: "/admin/premium", label: "Premium", icon: Crown },
@@ -34,7 +34,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
           <Link href="/admin">
             <div className="flex items-center gap-2.5 cursor-pointer">
               <div className="w-8 h-8 rounded-lg bg-primary/10 border border-primary/20 flex items-center justify-center">
-                <Shield className="w-4 h-4 text-primary" />
+                <Shield size={16} weight="duotone" className="text-primary" />
               </div>
               <div>
                 <div className="text-sm font-bold tracking-tight">Admin</div>
@@ -57,7 +57,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
                     : "text-muted-foreground hover:text-foreground hover:bg-accent/50 border border-transparent",
                 )}
               >
-                <Icon className="w-4 h-4 shrink-0" />
+                <Icon size={16} className="shrink-0" />
                 {label}
               </div>
             </Link>
@@ -69,7 +69,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
         <div className="p-3 space-y-2">
           <Link href="/">
             <div className="flex items-center gap-2 px-3 py-2 text-xs text-muted-foreground hover:text-foreground transition-colors cursor-pointer rounded-md hover:bg-accent/50">
-              <ChevronLeft className="w-3.5 h-3.5" />
+              <CaretLeft size={14} />
               Back to site
             </div>
           </Link>
@@ -93,7 +93,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
               className="text-muted-foreground hover:text-foreground transition-colors"
               title="Sign out"
             >
-              <LogOut className="w-4 h-4" />
+              <SignOut size={16} />
             </button>
           </div>
         </div>
@@ -104,7 +104,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
           <div className="flex items-center justify-between px-4 h-14">
             <Link href="/admin">
               <div className="flex items-center gap-2">
-                <Shield className="w-4 h-4 text-primary" />
+                <Shield size={16} weight="duotone" className="text-primary" />
                 <span className="text-sm font-bold">Admin</span>
               </div>
             </Link>
@@ -118,7 +118,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
                 aria-label="Sign out of admin"
                 className="inline-flex h-9 w-9 items-center justify-center rounded-md text-muted-foreground hover:bg-accent/50 hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
               >
-                <LogOut className="w-4 h-4" />
+                <SignOut size={16} />
               </button>
             </div>
           </div>
@@ -139,7 +139,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
                         : "border-transparent text-muted-foreground hover:bg-accent/50 hover:text-foreground",
                     )}
                   >
-                    <Icon className="h-3.5 w-3.5" />
+                    <Icon size={14} className="shrink-0" />
                     {label}
                   </div>
                 </Link>
@@ -147,7 +147,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
             })}
             <Link href="/">
               <div className="inline-flex min-h-9 shrink-0 items-center gap-2 rounded-md border border-transparent px-3 text-xs font-medium text-muted-foreground hover:bg-accent/50 hover:text-foreground">
-                <ChevronLeft className="h-3.5 w-3.5" />
+                <CaretLeft size={14} />
                 Back to site
               </div>
             </Link>

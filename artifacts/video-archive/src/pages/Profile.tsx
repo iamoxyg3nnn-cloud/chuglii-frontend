@@ -12,18 +12,16 @@ import { Skeleton } from "@/components/ui/skeleton";
 import {
   User,
   Clock,
-  Bookmark,
+  BookmarkSimple,
   Heart,
-  Settings,
-  Send,
-  ListVideo,
+  Gear,
+  PaperPlaneTilt,
+  Playlist,
   Shield,
-  Activity,
+  Pulse,
   ArrowRight,
-  ExternalLink,
-  Film,
-  Sparkles,
-} from "lucide-react";
+  FilmStrip,
+} from "@phosphor-icons/react";
 
 interface ActivityEvent {
   id: string;
@@ -35,7 +33,7 @@ interface ActivityEvent {
 }
 
 const ACTIVITY_ICONS = {
-  bookmark: Bookmark,
+  bookmark: BookmarkSimple,
   history: Clock,
   follow: Heart,
 };
@@ -196,7 +194,7 @@ export default function Profile() {
                   </h1>
                   {role && role !== "user" ? (
                     <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider bg-primary/15 text-primary border border-primary/30">
-                      <Shield className="w-3 h-3" />
+                      <Shield size={12} weight="duotone" />
                       {role}
                     </span>
                   ) : (
@@ -220,7 +218,7 @@ export default function Profile() {
                   type="button"
                   className="inline-flex items-center gap-1.5 h-9 px-4 text-xs font-semibold rounded-lg border border-border/60 hover:border-primary/50 hover:text-primary bg-secondary/50 hover:bg-secondary transition-all"
                 >
-                  <Settings className="w-3.5 h-3.5" />
+                  <Gear size={14} />
                   Account Settings
                 </button>
               </Link>
@@ -237,7 +235,7 @@ export default function Profile() {
             <div className="group p-4 rounded-xl border border-border/40 bg-card hover:bg-secondary/40 hover:border-amber-500/30 transition-all cursor-pointer">
               <div className="flex items-center justify-between mb-2">
                 <span className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground">Bookmarks</span>
-                <Bookmark className="w-4 h-4 text-amber-500 group-hover:scale-110 transition-transform" />
+                <BookmarkSimple size={16} weight="duotone" className="text-amber-500 group-hover:scale-110 transition-transform" />
               </div>
               <div className="text-2xl font-black text-foreground">
                 {savedLoading ? <Skeleton className="h-7 w-10 inline-block" /> : savedItems.length}
@@ -249,7 +247,7 @@ export default function Profile() {
             <div className="group p-4 rounded-xl border border-border/40 bg-card hover:bg-secondary/40 hover:border-blue-500/30 transition-all cursor-pointer">
               <div className="flex items-center justify-between mb-2">
                 <span className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground">History</span>
-                <Clock className="w-4 h-4 text-blue-400 group-hover:scale-110 transition-transform" />
+                <Clock size={16} weight="duotone" className="text-blue-400 group-hover:scale-110 transition-transform" />
               </div>
               <div className="text-2xl font-black text-foreground">
                 {historyLoading ? <Skeleton className="h-7 w-10 inline-block" /> : historyItems.length}
@@ -261,7 +259,7 @@ export default function Profile() {
             <div className="group p-4 rounded-xl border border-border/40 bg-card hover:bg-secondary/40 hover:border-pink-500/30 transition-all cursor-pointer">
               <div className="flex items-center justify-between mb-2">
                 <span className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground">Following</span>
-                <Heart className="w-4 h-4 text-pink-500 group-hover:scale-110 transition-transform" />
+                <Heart size={16} weight="duotone" className="text-pink-500 group-hover:scale-110 transition-transform" />
               </div>
               <div className="text-2xl font-black text-foreground">
                 {followsLoading ? <Skeleton className="h-7 w-10 inline-block" /> : follows.length}
@@ -273,7 +271,7 @@ export default function Profile() {
             <div className="group p-4 rounded-xl border border-border/40 bg-card hover:bg-secondary/40 hover:border-primary/30 transition-all cursor-pointer">
               <div className="flex items-center justify-between mb-2">
                 <span className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground">Watch Later</span>
-                <ListVideo className="w-4 h-4 text-primary group-hover:scale-110 transition-transform" />
+                <Playlist size={16} weight="duotone" className="text-primary group-hover:scale-110 transition-transform" />
               </div>
               <div className="text-2xl font-black text-foreground">
                 {watchLaterItems.length}
@@ -285,7 +283,7 @@ export default function Profile() {
             <div className="group p-4 rounded-xl border border-border/40 bg-card hover:bg-secondary/40 hover:border-green-500/30 transition-all cursor-pointer col-span-2 sm:col-span-1">
               <div className="flex items-center justify-between mb-2">
                 <span className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground">Requests</span>
-                <Send className="w-4 h-4 text-green-500 group-hover:scale-110 transition-transform" />
+                <PaperPlaneTilt size={16} weight="duotone" className="text-green-500 group-hover:scale-110 transition-transform" />
               </div>
               <div className="text-2xl font-black text-foreground">
                 {requests.length}
@@ -299,7 +297,7 @@ export default function Profile() {
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-5 border-b border-border/30">
             <div className="flex items-center gap-2.5">
               <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center text-primary">
-                <Activity className="w-4 h-4" />
+                <Pulse size={16} weight="bold" />
               </div>
               <div>
                 <h2 className="text-base font-bold text-foreground">Recent Activity</h2>
@@ -350,7 +348,7 @@ export default function Profile() {
             ) : filteredActivity.length === 0 ? (
               <div className="text-center py-14 px-4">
                 <div className="w-12 h-12 rounded-full bg-secondary/80 flex items-center justify-center mx-auto mb-3 text-muted-foreground">
-                  <Activity className="w-6 h-6 opacity-40" />
+                  <Pulse size={24} weight="duotone" className="opacity-40" />
                 </div>
                 <h3 className="text-sm font-semibold text-foreground mb-1">
                   {filter === "all" ? "No activity recorded yet" : `No ${filter} activity yet`}
@@ -369,7 +367,7 @@ export default function Profile() {
                     type="button"
                     className="inline-flex items-center gap-1.5 h-8 px-4 text-xs font-semibold rounded-lg bg-primary text-primary-foreground hover:opacity-90 transition-opacity"
                   >
-                    <Film className="w-3.5 h-3.5" />
+                    <FilmStrip size={14} weight="duotone" />
                     Browse recordings
                   </button>
                 </Link>
@@ -385,7 +383,7 @@ export default function Profile() {
                         <div
                           className={`w-8 h-8 rounded-full border flex items-center justify-center shrink-0 ${colorClass}`}
                         >
-                          <Icon className="w-3.5 h-3.5" />
+                          <Icon size={14} weight="duotone" />
                         </div>
                         <div className="flex-1 min-w-0">
                           <div className="text-sm font-semibold truncate group-hover:text-primary transition-colors text-foreground">
@@ -397,7 +395,7 @@ export default function Profile() {
                             <span>{formatRelativeTime(event.timestamp)}</span>
                           </div>
                         </div>
-                        <ArrowRight className="w-3.5 h-3.5 text-muted-foreground/30 group-hover:text-primary group-hover:translate-x-0.5 transition-all shrink-0" />
+                        <ArrowRight size={14} className="text-muted-foreground/30 group-hover:text-primary group-hover:translate-x-0.5 transition-all shrink-0" />
                       </div>
                     </Link>
                   );

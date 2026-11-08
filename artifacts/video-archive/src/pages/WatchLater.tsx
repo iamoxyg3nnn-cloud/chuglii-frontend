@@ -14,7 +14,7 @@ import { useRecentlyWatched } from "@/hooks/use-recently-watched";
 import { usePreloadRecordings } from "@/hooks/use-preload-recordings";
 import { setQueue, shuffleQueueItems, toQueueItem, type QueueItem } from "@/lib/play-queue";
 import { trackActivity } from "@/lib/rum";
-import { Clock, Trash2, ListX, Play, Shuffle } from "lucide-react";
+import { Clock, Trash, Queue, Play, Shuffle } from "@phosphor-icons/react";
 
 
 export default function WatchLater() {
@@ -100,7 +100,7 @@ export default function WatchLater() {
         <div className="flex items-center justify-between mb-8 pb-6 border-b border-border/40">
           <div>
             <div className="flex items-center gap-2 text-xs font-medium text-muted-foreground mb-2">
-              <Clock className="w-3.5 h-3.5 text-primary" />
+              <Clock size={15} weight="duotone" className="text-primary" />
               <span>Watch Later</span>
             </div>
             <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-foreground">Watch Later</h1>
@@ -116,21 +116,21 @@ export default function WatchLater() {
                 className="inline-flex items-center gap-1.5 h-8 px-2.5 text-xs font-medium border border-border/50 text-muted-foreground hover:border-primary/40 hover:text-primary transition-all rounded-lg"
                 title="Shuffle play"
               >
-                <Shuffle className="w-3.5 h-3.5" />
+                <Shuffle size={14} weight="regular" />
                 <span className="hidden sm:inline">Shuffle</span>
               </button>
               <button
                 onClick={handlePlayAll}
                 className="inline-flex items-center gap-1.5 h-8 px-3 text-xs font-semibold border border-primary/30 text-primary hover:border-primary/60 transition-all rounded-lg"
               >
-                <Play className="w-3.5 h-3.5" />
+                <Play size={14} weight="fill" />
                 Play all
               </button>
               <button
                 onClick={handleClearAll}
                 className="inline-flex items-center gap-1.5 h-8 px-3 text-xs text-muted-foreground/50 hover:text-destructive border border-border/40 hover:border-destructive/30 rounded-lg transition-all"
               >
-                <Trash2 className="w-3.5 h-3.5" />
+                <Trash size={14} weight="regular" />
                 Clear queue
               </button>
             </div>
@@ -149,7 +149,7 @@ export default function WatchLater() {
         ) : queue.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-24 text-center border border-border/30 rounded-2xl bg-secondary/10 animate-fade-in-up">
             <div className="w-14 h-14 rounded-full bg-secondary/50 flex items-center justify-center mb-4">
-              <ListX className="w-6 h-6 text-muted-foreground/30" />
+              <Queue size={28} weight="duotone" className="text-muted-foreground/30" />
             </div>
             <p className="text-sm font-medium text-muted-foreground mb-1">Queue is empty</p>
             <p className="text-xs text-muted-foreground/40 mb-6 max-w-xs">

@@ -5,7 +5,7 @@ import { Layout } from "@/components/Layout";
 import { getWatchedIds } from "@/lib/watched-storage";
 import { userApi } from "@/lib/user-api";
 import { resolveApiPath } from "@/lib/api-base";
-import { Loader2 } from "lucide-react";
+import { CircleNotch } from "@phosphor-icons/react";
 
 export default function RandomRedirect() {
   const [, setLocation] = useLocation();
@@ -70,7 +70,7 @@ export default function RandomRedirect() {
   return (
     <Layout>
       <div className="flex flex-col items-center justify-center min-h-[50vh] gap-3">
-        <Loader2 className="w-8 h-8 text-primary/40 animate-spin" />
+        <CircleNotch size={28} className="text-primary/40 animate-spin" />
         <p className="text-sm text-muted-foreground">Finding a random recording…</p>
       </div>
     </Layout>

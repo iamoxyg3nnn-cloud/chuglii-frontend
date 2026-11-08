@@ -14,7 +14,14 @@ import { userApi, type PerformerFollow } from "@/lib/user-api";
 import { trackActivity } from "@/lib/rum";
 import { useRecentlyWatched } from "@/hooks/use-recently-watched";
 import { usePreloadRecordings } from "@/hooks/use-preload-recordings";
-import { AlertCircle, ArrowLeft, Heart, LogIn, Users, Film } from "lucide-react";
+import {
+  WarningCircle,
+  ArrowLeft,
+  Heart,
+  SignIn,
+  UsersThree,
+  FilmStrip,
+} from "@phosphor-icons/react";
 import { AdLeaderboard } from "@/components/ads/AdLeaderboard";
 import { toast } from "@/hooks/use-toast";
 import { proxyUrl } from "@/lib/proxy-url";
@@ -214,12 +221,12 @@ export default function PerformerProfile() {
       <Layout>
         <div className="container mx-auto px-4 sm:px-6 py-20 text-center animate-fade-in-up">
           <div className="w-14 h-14 rounded-full bg-secondary/50 flex items-center justify-center mx-auto mb-4">
-            <AlertCircle className="w-6 h-6 text-muted-foreground/30" />
+            <WarningCircle size={28} weight="duotone" className="text-muted-foreground/40" />
           </div>
           <h1 className="text-xl font-bold mb-2">Performer not found</h1>
           <p className="text-sm text-muted-foreground mb-6">No records for this performer.</p>
           <Link href="/performers" className="inline-flex items-center gap-1.5 h-9 px-4 text-xs font-medium text-primary hover:text-primary/80 border border-primary/20 hover:border-primary/40 rounded-lg transition-colors">
-            <ArrowLeft className="w-3 h-3" />
+            <ArrowLeft size={13} weight="bold" />
             Back to directory
           </Link>
         </div>
@@ -276,7 +283,7 @@ export default function PerformerProfile() {
                 href="/performers"
                 className="inline-flex items-center gap-1 text-[11px] text-muted-foreground hover:text-foreground transition-colors mb-2"
               >
-                <ArrowLeft className="w-3 h-3" /> Performers
+                <ArrowLeft size={12} weight="bold" /> Performers
               </Link>
               {isLoading ? (
                 <div className="space-y-2">
@@ -288,14 +295,14 @@ export default function PerformerProfile() {
                   <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-foreground">{profile.username}</h1>
                   <div className="flex items-center gap-3 mt-1.5 text-xs text-muted-foreground">
                     <span className="flex items-center gap-1.5">
-                      <Film className="w-3 h-3 text-muted-foreground/50" />
+                      <FilmStrip size={13} weight="duotone" className="text-muted-foreground/60" />
                       <span className="font-medium tabular-nums">{profile.recording_count != null ? profile.recording_count : profile.recordings?.length ?? 0}</span> recordings
                     </span>
                     {profile.gender && (
                       <>
                         <span className="w-px h-3 bg-border/40" />
                         <span className="flex items-center gap-1.5 capitalize">
-                          <Users className="w-3 h-3 text-muted-foreground/50" />
+                          <UsersThree size={13} weight="duotone" className="text-muted-foreground/60" />
                           {profile.gender}
                         </span>
                       </>
@@ -304,7 +311,7 @@ export default function PerformerProfile() {
                       <>
                         <span className="w-px h-3 bg-border/40" />
                         <span className="flex items-center gap-1.5 text-primary/80">
-                          <Heart className="w-3 h-3" />
+                          <Heart size={13} weight="fill" />
                           <span className="font-medium">You watched {performerStats.count} video{performerStats.count === 1 ? "" : "s"}</span>
                           {performerStats.watchMs > 0 && (
                             <span className="text-muted-foreground/50">({Math.round(performerStats.watchMs / 60000)} min)</span>
@@ -328,9 +335,9 @@ export default function PerformerProfile() {
                   : "border-border/50 text-muted-foreground hover:border-primary/40 hover:text-primary hover:bg-primary/5 active:scale-95"
               }`}
             >
-              <Heart className={`w-3.5 h-3.5 transition-all ${user && isFollowing ? "stroke-primary" : ""}`} />
+              <Heart size={15} weight={user && isFollowing ? "fill" : "regular"} className="transition-all" />
               {!user ? (
-                <><LogIn className="w-3 h-3" /> Sign in to Follow</>
+                <><SignIn size={13} weight="bold" /> Sign in to Follow</>
               ) : isFollowing ? (
                 "Following"
               ) : (
@@ -393,7 +400,7 @@ export default function PerformerProfile() {
         ) : (
           <div className="py-24 text-center border border-border/30 rounded-2xl bg-secondary/10 animate-fade-in-up">
             <div className="w-14 h-14 rounded-full bg-secondary/50 flex items-center justify-center mx-auto mb-4">
-              <Film className="w-6 h-6 text-muted-foreground/20" />
+              <FilmStrip size={28} weight="duotone" className="text-muted-foreground/30" />
             </div>
             <p className="text-sm text-muted-foreground mb-1">No recordings found for this performer.</p>
             <p className="text-xs text-muted-foreground/40">

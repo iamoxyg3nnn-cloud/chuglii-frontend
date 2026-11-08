@@ -8,7 +8,7 @@ import { AdLeaderboard } from "@/components/ads/AdLeaderboard";
 import { useAuth } from "@/contexts/AuthContext";
 import { userApi, type PerformerFollow } from "@/lib/user-api";
 import { formatRelativeTime } from "@/lib/formatters";
-import { Heart, User2, Trash2, ArrowRight, HeartOff } from "lucide-react";
+import { Heart, User, Trash, ArrowRight, HeartBreak } from "@phosphor-icons/react";
 
 export default function Following() {
   const { user, loading } = useAuth();
@@ -38,7 +38,7 @@ export default function Following() {
         <div className="flex items-center justify-between mb-8 pb-6 border-b border-border/40">
           <div>
             <h1 className="flex items-center gap-2 text-xl font-bold tracking-tight">
-              <Heart className="w-5 h-5 text-primary" />
+              <Heart size={20} weight="fill" className="text-primary" />
               Following
             </h1>
             <p className="text-xs text-muted-foreground mt-1">
@@ -58,7 +58,7 @@ export default function Following() {
           </div>
         ) : follows.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-32 text-center">
-            <HeartOff className="w-10 h-10 text-muted-foreground/20 mb-4" />
+            <HeartBreak size={40} weight="duotone" className="text-muted-foreground/20 mb-4" />
             <p className="text-sm font-medium text-muted-foreground/50 mb-1">Not following anyone</p>
             <p className="text-xs text-muted-foreground/30 mb-6">
               Follow performers from their profile page to see them here.
@@ -75,7 +75,7 @@ export default function Following() {
                 className="flex items-center gap-3 px-4 py-3 border border-border/40 hover:border-border/70 rounded-xl transition-all group"
               >
                 <div className="w-8 h-8 rounded-full bg-secondary flex items-center justify-center shrink-0">
-                  <User2 className="w-4 h-4 text-muted-foreground/50" />
+                  <User size={16} weight="regular" className="text-muted-foreground/50" />
                 </div>
                 <div className="flex-1 min-w-0">
                   <div className="text-sm font-semibold truncate">{f.performer_username}</div>
@@ -86,7 +86,7 @@ export default function Following() {
                 <div className="flex items-center gap-1 shrink-0">
                   <Link href={`/performers/${f.performer_username}`}>
                     <span className="flex items-center gap-1 h-7 px-2.5 text-[11px] text-muted-foreground hover:text-primary border border-border/40 hover:border-primary/40 rounded-lg transition-all">
-                      View <ArrowRight className="w-3 h-3" />
+                      View <ArrowRight size={12} weight="bold" />
                     </span>
                   </Link>
                   <button
@@ -95,7 +95,7 @@ export default function Following() {
                     className="flex items-center justify-center w-7 h-7 text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors rounded"
                     title="Unfollow"
                   >
-                    <Trash2 className="w-3.5 h-3.5" />
+                    <Trash size={14} weight="regular" />
                   </button>
                 </div>
               </div>

@@ -10,9 +10,9 @@ import { getSupabase } from "@/lib/supabase";
 import { useCacheProfiler, type CacheProfile } from "@/hooks/use-cache-profiler";
 import { clearImageCache, getCacheStats } from "@/lib/image-cache";
 import {
-  Settings as SettingsIcon, User, Lock, Save, AlertCircle, CheckCircle2,
-  Bell, BellOff, Volume2, Smartphone, Database, Trash2, RefreshCw, Activity,
-} from "lucide-react";
+  Gear, User, Lock, FloppyDisk, WarningCircle, CheckCircle,
+  Bell, BellSlash, SpeakerHigh, DeviceMobile, Database, Trash, ArrowsClockwise, Pulse,
+} from "@phosphor-icons/react";
 
 const NOTIF_LABELS: Record<string, { label: string; description: string }> = {
   request_submitted: {
@@ -155,7 +155,7 @@ export default function Settings() {
         <div className="mb-8 flex items-center justify-between gap-4 flex-wrap">
           <div>
             <div className="flex items-center gap-2 text-xs font-medium text-muted-foreground mb-2">
-              <SettingsIcon className="w-3.5 h-3.5 text-primary" />
+              <Gear size={15} className="text-primary" />
               <span>Settings</span>
             </div>
             <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-foreground">Account Settings</h1>
@@ -165,7 +165,7 @@ export default function Settings() {
               type="button"
               className="inline-flex items-center gap-1.5 h-9 px-3.5 text-xs font-semibold rounded-lg border border-primary/30 text-primary hover:border-primary/60 bg-primary/5 hover:bg-primary/10 transition-colors cursor-pointer"
             >
-              <Activity className="w-3.5 h-3.5" />
+              <Pulse size={14} />
               View Profile & Activity →
             </button>
           </Link>
@@ -178,7 +178,7 @@ export default function Settings() {
         <section className="mb-8 border border-border/40 rounded-xl p-5 sm:p-6 bg-card">
           <div className="flex items-center gap-2 mb-5 pb-3 border-b border-border/30">
             <div className="w-7 h-7 rounded-lg bg-primary/10 flex items-center justify-center">
-              <User className="w-3.5 h-3.5 text-primary" />
+              <User size={15} className="text-primary" />
             </div>
             <h2 className="text-sm font-semibold">Profile</h2>
           </div>
@@ -246,9 +246,9 @@ export default function Settings() {
                 }`}
               >
                 {saveMsg.ok ? (
-                  <CheckCircle2 className="w-3.5 h-3.5 shrink-0" />
+                  <CheckCircle size={15} weight="duotone" className="shrink-0" />
                 ) : (
-                  <AlertCircle className="w-3.5 h-3.5 shrink-0" />
+                  <WarningCircle size={15} weight="duotone" className="shrink-0" />
                 )}
                 {saveMsg.text}
               </div>
@@ -259,7 +259,7 @@ export default function Settings() {
               disabled={saving}
               className="inline-flex items-center gap-1.5 h-9 px-4 text-xs font-semibold border border-primary/30 text-primary hover:border-primary/60 transition-colors rounded-lg disabled:opacity-60"
             >
-              <Save className="w-3.5 h-3.5" />
+              <FloppyDisk size={14} />
               {saving ? "Saving…" : "Save profile"}
             </button>
           </form>
@@ -269,7 +269,7 @@ export default function Settings() {
         <section className="mb-8 border border-border/40 rounded-xl p-5 sm:p-6 bg-card">
           <div className="flex items-center gap-2 mb-5 pb-3 border-b border-border/30">
             <div className="w-7 h-7 rounded-lg bg-primary/10 flex items-center justify-center">
-              <Bell className="w-3.5 h-3.5 text-primary" />
+              <Bell size={15} weight="duotone" className="text-primary" />
             </div>
             <h2 className="text-sm font-semibold">Notifications</h2>
           </div>
@@ -291,9 +291,9 @@ export default function Settings() {
                       : "bg-muted/50 text-muted-foreground/50"
                   }`}>
                     {notifPrefs.every((p) => p.enabled) ? (
-                      <Bell className="w-4 h-4" />
+                      <Bell size={16} weight="duotone" />
                     ) : (
-                      <BellOff className="w-4 h-4" />
+                      <BellSlash size={16} weight="duotone" />
                     )}
                   </div>
                   <div>
@@ -427,9 +427,9 @@ export default function Settings() {
               }`}
             >
               {notifPrefsMsg.ok ? (
-                <CheckCircle2 className="w-3.5 h-3.5 shrink-0" />
+                <CheckCircle size={15} weight="duotone" className="shrink-0" />
               ) : (
-                <AlertCircle className="w-3.5 h-3.5 shrink-0" />
+                <WarningCircle size={15} weight="duotone" className="shrink-0" />
               )}
               {notifPrefsMsg.text}
             </div>
@@ -445,7 +445,7 @@ export default function Settings() {
               <label className="flex items-center justify-between px-3 py-3 rounded-lg hover:bg-secondary/30 transition-colors cursor-pointer">
                 <div className="flex items-center gap-3 min-w-0 pr-4">
                   <div className={`w-8 h-8 rounded-lg flex items-center justify-center ${soundOn ? "bg-primary/10 text-primary" : "bg-muted/50 text-muted-foreground/50"}`}>
-                    <Volume2 className="w-4 h-4" />
+                    <SpeakerHigh size={16} />
                   </div>
                   <div>
                     <p className="text-sm font-medium text-foreground">Notification Sound</p>
@@ -478,7 +478,7 @@ export default function Settings() {
               <label className="flex items-center justify-between px-3 py-3 rounded-lg hover:bg-secondary/30 transition-colors cursor-pointer">
                 <div className="flex items-center gap-3 min-w-0 pr-4">
                   <div className={`w-8 h-8 rounded-lg flex items-center justify-center ${vibrateOn ? "bg-primary/10 text-primary" : "bg-muted/50 text-muted-foreground/50"}`}>
-                    <Smartphone className="w-4 h-4" />
+                    <DeviceMobile size={16} />
                   </div>
                   <div>
                     <p className="text-sm font-medium text-foreground">Vibration</p>
@@ -521,7 +521,7 @@ export default function Settings() {
               >
                 <div className="flex items-center gap-3 mb-4">
                   <div className="w-10 h-10 rounded-xl bg-destructive/15 flex items-center justify-center">
-                    <BellOff className="w-5 h-5 text-destructive" />
+                    <BellSlash size={20} weight="duotone" className="text-destructive" />
                   </div>
                   <div>
                     <h3 className="text-sm font-bold text-foreground">
@@ -572,7 +572,7 @@ export default function Settings() {
         <section className="border border-border/40 rounded-xl p-5 sm:p-6 bg-card">
           <div className="flex items-center gap-2 mb-5 pb-3 border-b border-border/30">
             <div className="w-7 h-7 rounded-lg bg-primary/10 flex items-center justify-center">
-              <Lock className="w-3.5 h-3.5 text-primary" />
+              <Lock size={15} weight="duotone" className="text-primary" />
             </div>
             <h2 className="text-sm font-semibold">Change Password</h2>
           </div>
@@ -613,9 +613,9 @@ export default function Settings() {
                 }`}
               >
                 {pwMsg.ok ? (
-                  <CheckCircle2 className="w-3.5 h-3.5 shrink-0" />
+                  <CheckCircle size={15} weight="duotone" className="shrink-0" />
                 ) : (
-                  <AlertCircle className="w-3.5 h-3.5 shrink-0" />
+                  <WarningCircle size={15} weight="duotone" className="shrink-0" />
                 )}
                 {pwMsg.text}
               </div>
@@ -626,7 +626,7 @@ export default function Settings() {
               disabled={pwSaving || !newPw}
               className="inline-flex items-center gap-1.5 h-9 px-4 text-xs font-semibold border border-primary/30 text-primary hover:border-primary/60 transition-colors rounded-lg disabled:opacity-60"
             >
-              <Lock className="w-3.5 h-3.5" />
+              <Lock size={14} />
               {pwSaving ? "Updating…" : "Update password"}
             </button>
           </form>
@@ -636,7 +636,7 @@ export default function Settings() {
         <section className="border border-border/40 rounded-xl p-5 sm:p-6 bg-card">
           <div className="flex items-center gap-2 mb-5 pb-3 border-b border-border/30">
             <div className="w-7 h-7 rounded-lg bg-primary/10 flex items-center justify-center">
-              <Database className="w-3.5 h-3.5 text-primary" />
+              <Database size={15} weight="duotone" className="text-primary" />
             </div>
             <h2 className="text-sm font-semibold">Cache Performance</h2>
           </div>
@@ -743,7 +743,7 @@ export default function Settings() {
                     onClick={() => window.location.reload()}
                     className="inline-flex items-center gap-1 h-7 px-2.5 text-[11px] font-medium border border-border/40 rounded-md text-muted-foreground hover:text-foreground hover:border-border transition-colors"
                   >
-                    <RefreshCw className="w-3 h-3" />
+                    <ArrowsClockwise size={13} />
                     Refresh
                   </button>
                   <button
@@ -752,7 +752,7 @@ export default function Settings() {
                     disabled={clearingCache}
                     className="inline-flex items-center gap-1 h-7 px-2.5 text-[11px] font-medium border border-destructive/30 rounded-md text-destructive/80 hover:text-destructive hover:border-destructive/50 transition-colors disabled:opacity-60"
                   >
-                    <Trash2 className="w-3 h-3" />
+                    <Trash size={13} />
                     {clearingCache ? "Clearing…" : "Clear Cache"}
                   </button>
                 </div>

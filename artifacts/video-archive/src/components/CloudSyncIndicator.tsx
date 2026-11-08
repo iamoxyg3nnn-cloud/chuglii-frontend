@@ -1,7 +1,7 @@
 import { Link } from "wouter";
 import { useAuth } from "@/contexts/AuthContext";
 import { useSyncStatus } from "@/contexts/SyncStatusContext";
-import { Cloud, CloudOff, Loader2 } from "lucide-react";
+import { Cloud, CloudSlash, CircleNotch } from "@phosphor-icons/react";
 
 interface CloudSyncIndicatorProps {
   /**
@@ -23,14 +23,14 @@ export function CloudSyncIndicator({
     if (compact) {
       return (
         <span className="inline-flex items-center gap-1 text-[11px] text-amber-400/80">
-          <Loader2 className="w-3 h-3 animate-spin" />
+          <CircleNotch size={12} weight="bold" className="animate-spin" />
           {pendingCount > 1 ? `${pendingCount} queued` : "saving"}
         </span>
       );
     }
     return (
       <div className="flex items-center gap-1.5 text-[11px] text-amber-400/80">
-        <Loader2 className="w-3 h-3 animate-spin" />
+        <CircleNotch size={12} weight="bold" className="animate-spin" />
         <span>
           {pendingCount > 1
             ? `${pendingCount} changes saving…`
@@ -56,14 +56,14 @@ export function CloudSyncIndicator({
     if (compact) {
       return (
         <span className="inline-flex items-center gap-1 text-[11px] text-primary/60">
-          <Cloud className="w-3 h-3" />
+          <Cloud size={12} weight="duotone" />
           synced
         </span>
       );
     }
     return (
       <div className="flex items-center gap-1.5 text-[11px] text-primary/60">
-        <Cloud className="w-3 h-3" />
+        <Cloud size={12} weight="duotone" />
         <span>Cloud sync</span>
       </div>
     );
@@ -73,7 +73,7 @@ export function CloudSyncIndicator({
   if (compact) {
     return (
       <span className="inline-flex items-center gap-1 text-[11px] text-muted-foreground/30">
-        <CloudOff className="w-3 h-3" />
+        <CloudSlash size={12} weight="regular" />
         local
       </span>
     );
@@ -81,7 +81,7 @@ export function CloudSyncIndicator({
 
   return (
     <div className="flex items-center gap-1.5 text-[11px] text-muted-foreground/40">
-      <CloudOff className="w-3 h-3" />
+      <CloudSlash size={12} weight="regular" />
       <span>Local only</span>
       <Link
         href="/login"

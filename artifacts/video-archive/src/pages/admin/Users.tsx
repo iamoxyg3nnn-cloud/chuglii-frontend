@@ -2,8 +2,8 @@ import { useState, useEffect, useCallback } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import { resolveApiPath } from "@/lib/api-base";
 import {
-  Shield, RefreshCw, Trash2, Mail, Calendar,
-} from "lucide-react";
+  Shield, ArrowsClockwise, Trash, EnvelopeSimple, CalendarBlank,
+} from "@phosphor-icons/react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -102,7 +102,7 @@ export default function AdminUsers() {
       <div className="flex items-center justify-between mb-6">
         <div>
           <div className="flex items-center gap-2 text-xs font-medium text-muted-foreground mb-2">
-            <Shield className="w-3.5 h-3.5 text-primary" />
+            <Shield size={15} weight="duotone" className="text-primary" />
             <span>Admin</span>
           </div>
           <h1 className="text-2xl font-bold tracking-tight text-foreground">Users</h1>
@@ -111,7 +111,7 @@ export default function AdminUsers() {
           </p>
         </div>
         <Button variant="outline" size="sm" onClick={loadUsers} disabled={loading}>
-          <RefreshCw className={`w-3.5 h-3.5 ${loading ? "animate-spin" : ""}`} />
+          <ArrowsClockwise size={14} className={loading ? "animate-spin" : ""} />
           Refresh
         </Button>
       </div>
@@ -169,7 +169,7 @@ export default function AdminUsers() {
                     </TableCell>
                     <TableCell>
                       <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                        <Mail className="w-3.5 h-3.5" />
+                        <EnvelopeSimple size={14} />
                         {u.email ?? "—"}
                       </div>
                     </TableCell>
@@ -185,7 +185,7 @@ export default function AdminUsers() {
                     </TableCell>
                     <TableCell className="text-xs text-muted-foreground">
                       <div className="flex items-center gap-1.5">
-                        <Calendar className="w-3 h-3" />
+                        <CalendarBlank size={12} />
                         {formatRelativeTime(u.created_at)}
                       </div>
                     </TableCell>
@@ -214,7 +214,7 @@ export default function AdminUsers() {
                           className="h-8 w-8 text-muted-foreground hover:text-destructive"
                           title="Delete user"
                         >
-                          <Trash2 className="w-3.5 h-3.5" />
+                          <Trash size={14} />
                         </Button>
                       </div>
                     </TableCell>

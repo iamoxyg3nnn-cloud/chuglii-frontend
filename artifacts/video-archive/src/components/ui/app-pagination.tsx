@@ -1,5 +1,5 @@
 import { useState, type FormEvent } from "react";
-import { ChevronLeft, ChevronRight, MoreHorizontal } from "lucide-react";
+import { CaretLeft, CaretRight, DotsThree } from "@phosphor-icons/react";
 import { cn } from "@/lib/utils";
 
 interface AppPaginationProps {
@@ -98,14 +98,14 @@ export function AppPagination({
         )}
         aria-label="Previous page"
       >
-        <ChevronLeft className="w-3.5 h-3.5" />
+        <CaretLeft size={13} weight="bold" />
         <span className="hidden sm:inline">Prev</span>
       </button>
 
       {pages.map((p, i) =>
         p === "ellipsis" ? (
           <span key={`ellipsis-${i}`} className="flex items-center justify-center w-8 h-8 text-muted-foreground/40">
-            <MoreHorizontal className="w-3.5 h-3.5" />
+            <DotsThree size={16} weight="bold" />
           </span>
         ) : (
           <button
@@ -134,7 +134,7 @@ export function AppPagination({
         aria-label="Next page"
       >
         <span className="hidden sm:inline">Next</span>
-        <ChevronRight className="w-3.5 h-3.5" />
+        <CaretRight size={13} weight="bold" />
       </button>
 
       {totalPages > 25 && (

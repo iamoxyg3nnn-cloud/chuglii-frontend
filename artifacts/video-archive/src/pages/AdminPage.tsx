@@ -4,10 +4,10 @@ import { Layout } from "@/components/Layout";
 import { useAuth } from "@/contexts/AuthContext";
 import { resolveApiPath } from "@/lib/api-base";
 import {
-  Shield, RefreshCw, CheckCircle2, XCircle, Clock, AlertTriangle,
-  User, Link2, FileText, ChevronDown, ChevronUp, Inbox,
-  ArrowLeft, Trash2, Filter, Lock,
-} from "lucide-react";
+  Shield, ArrowsClockwise, CheckCircle, XCircle, Clock, Warning,
+  User, LinkSimple, FileText, CaretDown, CaretUp, Tray,
+  ArrowLeft, Trash, Funnel, Lock,
+} from "@phosphor-icons/react";
 import { formatRelativeTime } from "@/lib/formatters";
 import { safeExternalUrl } from "@/lib/safe-url";
 
@@ -102,7 +102,7 @@ export default function AdminPage() {
     return (
       <Layout>
         <div className="container mx-auto px-4 sm:px-6 py-24 text-center max-w-sm">
-          <Lock className="w-10 h-10 text-muted-foreground/20 mx-auto mb-6" />
+          <Lock size={36} weight="duotone" className="text-muted-foreground/20 mx-auto mb-6" />
           <h1 className="text-xl font-bold mb-2">Admin access required</h1>
           <p className="text-sm text-muted-foreground mb-6">
             {!user
@@ -145,7 +145,7 @@ export default function AdminPage() {
         <div className="flex items-start justify-between mb-8 gap-4">
           <div>
             <div className="flex items-center gap-2 text-xs font-medium text-muted-foreground mb-2">
-              <Shield className="w-3.5 h-3.5 text-primary" />
+              <Shield size={15} weight="duotone" className="text-primary" />
               <span>Admin</span>
             </div>
             <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-foreground">
@@ -161,7 +161,7 @@ export default function AdminPage() {
               disabled={pageLoading}
               className="inline-flex items-center gap-1.5 h-9 px-4 text-xs font-medium border border-border/50 text-muted-foreground hover:text-foreground hover:border-border transition-all rounded-lg disabled:opacity-50"
             >
-              <RefreshCw className={`w-3.5 h-3.5 ${pageLoading ? "animate-spin" : ""}`} />
+              <ArrowsClockwise size={14} className={pageLoading ? "animate-spin" : ""} />
               Refresh
             </button>
           </div>
@@ -187,7 +187,7 @@ export default function AdminPage() {
         </div>
 
         <div className="flex gap-1 mb-4 items-center">
-          <Filter className="w-3.5 h-3.5 text-muted-foreground/50 mr-1" />
+          <Funnel size={14} className="text-muted-foreground/50 mr-1" />
           {filterTabs.map(({ id, label }) => (
             <button
               key={id}
@@ -210,7 +210,7 @@ export default function AdminPage() {
 
         {error && (
           <div className="flex items-center gap-2 p-4 bg-destructive/10 border border-destructive/30 rounded-lg text-sm text-destructive mb-4">
-            <AlertTriangle className="w-4 h-4 shrink-0" />
+            <Warning size={16} weight="duotone" className="shrink-0" />
             {error}
           </div>
         )}
@@ -223,7 +223,7 @@ export default function AdminPage() {
           </div>
         ) : filtered.length === 0 ? (
           <div className="py-24 text-center border border-dashed border-border/40 rounded-2xl">
-            <Inbox className="w-10 h-10 text-muted-foreground/20 mx-auto mb-4" />
+            <Tray size={36} weight="duotone" className="text-muted-foreground/20 mx-auto mb-4" />
             <p className="text-sm text-muted-foreground">
               {statusFilter === "all" ? "No requests submitted yet." : `No ${statusFilter} requests.`}
             </p>
@@ -249,7 +249,7 @@ export default function AdminPage() {
                       <div className="flex items-center gap-2 flex-wrap">
                         {req.performer_username && (
                           <span className="text-sm font-semibold flex items-center gap-1">
-                            <User className="w-3 h-3 text-muted-foreground/50" />
+                            <User size={12} className="text-muted-foreground/50" />
                             {req.performer_username}
                           </span>
                         )}
@@ -261,7 +261,7 @@ export default function AdminPage() {
                               rel="noopener noreferrer"
                               className="text-sm font-semibold text-primary hover:underline flex items-center gap-1 truncate max-w-xs"
                             >
-                              <Link2 className="w-3 h-3 shrink-0" />
+                              <LinkSimple size={12} className="shrink-0" />
                               {req.stream_link}
                             </a>
                           ) : (
@@ -275,7 +275,7 @@ export default function AdminPage() {
                         )}
                       </div>
                       <div className="flex items-center gap-3 mt-0.5 text-[11px] text-muted-foreground/60">
-                        <Clock className="w-3 h-3" />
+                        <Clock size={12} />
                         {formatRelativeTime(req.created_at)}
                         {req.notes && (
                           <>
@@ -294,7 +294,7 @@ export default function AdminPage() {
                             className="w-7 h-7 flex items-center justify-center text-muted-foreground hover:text-green-400 hover:bg-green-400/10 transition-colors rounded"
                             title="Approve"
                           >
-                            <CheckCircle2 className="w-4 h-4" />
+                            <CheckCircle size={16} weight="duotone" />
                           </button>
                           <button
                             onClick={() => updateStatus(req.id!, "rejected")}
@@ -302,7 +302,7 @@ export default function AdminPage() {
                             className="w-7 h-7 flex items-center justify-center text-muted-foreground hover:text-red-400 hover:bg-red-400/10 transition-colors rounded"
                             title="Reject"
                           >
-                            <XCircle className="w-4 h-4" />
+                            <XCircle size={16} weight="duotone" />
                           </button>
                         </>
                       )}
@@ -320,14 +320,14 @@ export default function AdminPage() {
                         className="w-7 h-7 flex items-center justify-center text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors rounded"
                         title="Remove"
                       >
-                        <Trash2 className="w-3.5 h-3.5" />
+                        <Trash size={14} />
                       </button>
                       {(req.notes || req.stream_link) && (
                         <button
                           onClick={() => setExpandedId(isExpanded ? null : req.id)}
                           className="w-7 h-7 flex items-center justify-center text-muted-foreground hover:text-foreground transition-colors rounded"
                         >
-                          {isExpanded ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+                          {isExpanded ? <CaretUp size={16} /> : <CaretDown size={16} />}
                         </button>
                       )}
                     </div>
@@ -337,7 +337,7 @@ export default function AdminPage() {
                     <div className="px-4 pb-4 border-t border-border/30 pt-3 space-y-2">
                       {req.stream_link && (
                         <div className="flex items-start gap-2 text-xs">
-                          <Link2 className="w-3.5 h-3.5 text-muted-foreground/50 mt-0.5 shrink-0" />
+                          <LinkSimple size={14} className="text-muted-foreground/50 mt-0.5 shrink-0" />
                           {safeStreamLink ? (
                             <a
                               href={safeStreamLink}
@@ -354,7 +354,7 @@ export default function AdminPage() {
                       )}
                       {req.notes && (
                         <div className="flex items-start gap-2 text-xs">
-                          <FileText className="w-3.5 h-3.5 text-muted-foreground/50 mt-0.5 shrink-0" />
+                          <FileText size={14} className="text-muted-foreground/50 mt-0.5 shrink-0" />
                           <p className="text-muted-foreground leading-relaxed">{req.notes}</p>
                         </div>
                       )}

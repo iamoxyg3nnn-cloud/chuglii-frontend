@@ -1,6 +1,6 @@
 import { Component, Suspense, useEffect, type ErrorInfo, type ReactNode } from "react";
 import { Switch, Route, Router as WouterRouter, useLocation } from "wouter";
-import { AlertCircle, RefreshCw } from "lucide-react";
+import { WarningCircle, ArrowClockwise } from "@phosphor-icons/react";
 import { QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -116,7 +116,7 @@ class GlobalErrorBoundary extends Component<{ children: ReactNode }, { hasError:
       <div className="min-h-[60vh] flex items-center justify-center px-4">
         <div className="w-full max-w-sm text-center">
           <div className="w-14 h-14 rounded-full bg-destructive/10 flex items-center justify-center mx-auto mb-4">
-            <AlertCircle className="w-6 h-6 text-destructive/60" />
+            <WarningCircle size={28} weight="duotone" className="text-destructive/70" />
           </div>
           <h2 className="text-lg font-bold mb-2">Something went wrong</h2>
           <p className="text-sm text-muted-foreground mb-6">
@@ -133,7 +133,7 @@ class GlobalErrorBoundary extends Component<{ children: ReactNode }, { hasError:
               onClick={() => window.location.reload()}
               className="inline-flex items-center gap-1.5 h-9 px-4 text-xs font-semibold border border-primary/30 text-primary hover:border-primary/60 rounded-lg transition-colors"
             >
-              <RefreshCw className="w-3 h-3" />
+              <ArrowClockwise size={13} weight="bold" />
               Reload page
             </button>
           </div>

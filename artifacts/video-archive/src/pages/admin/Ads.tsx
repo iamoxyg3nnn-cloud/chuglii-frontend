@@ -7,10 +7,10 @@ import {
 } from "@/lib/ad-slots";
 import { resolveApiPath } from "@/lib/api-base";
 import {
-  Megaphone, Plus, Trash2, Pencil, Check, X,
-  AlertTriangle, RefreshCw, Code2, Link2, Radio, Database,
-  ChevronUp, ChevronDown, Copy, Eye, SlidersHorizontal, Save, RotateCcw, Film,
-} from "lucide-react";
+  Megaphone, Plus, Trash, PencilSimple, Check, X,
+  Warning, ArrowsClockwise, Code, LinkSimple, Broadcast, Database,
+  CaretUp, CaretDown, Copy, Eye, SlidersHorizontal, FloppyDisk, ArrowCounterClockwise, FilmStrip,
+} from "@phosphor-icons/react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -324,7 +324,7 @@ export default function AdminAds() {
       <div className="flex items-center justify-between mb-6">
         <div>
           <div className="flex items-center gap-2 text-xs font-medium text-muted-foreground mb-2">
-            <Megaphone className="w-3.5 h-3.5 text-primary" />
+            <Megaphone size={15} weight="duotone" className="text-primary" />
             <span>Admin</span>
           </div>
           <h1 className="text-2xl font-bold tracking-tight text-foreground">Ad Management</h1>
@@ -336,11 +336,11 @@ export default function AdminAds() {
         <div className="flex items-center gap-2">
           {status === "database" && (
             <Badge variant="approved" className="gap-1">
-              <Radio className="w-3 h-3" /> Live · Supabase
+              <Broadcast size={12} weight="bold" /> Live · Supabase
             </Badge>
           )}
           <Button variant="outline" size="sm" onClick={() => void refresh()} disabled={busy}>
-            <RefreshCw className="w-3.5 h-3.5" />
+            <ArrowsClockwise size={14} />
             Refresh
           </Button>
         </div>
@@ -350,7 +350,7 @@ export default function AdminAds() {
       <div className="flex gap-1 p-1 w-fit rounded-lg bg-secondary/40 border border-border/40 mb-6">
         {(
           [
-            ["creatives", "Creatives", Code2],
+            ["creatives", "Creatives", Code],
             ["placements", "Placements", SlidersHorizontal],
           ] as const
         ).map(([id, label, Icon]) => (
@@ -363,7 +363,7 @@ export default function AdminAds() {
                 : "text-muted-foreground hover:text-foreground border border-transparent"
             }`}
           >
-            <Icon className="w-3.5 h-3.5" />
+            <Icon size={14} />
             {label}
           </button>
         ))}
@@ -372,7 +372,7 @@ export default function AdminAds() {
       {/* Source warnings */}
       {status === "file" && (
         <div className="flex items-start gap-2 p-4 mb-4 rounded-md text-sm border bg-destructive/10 border-destructive/30 text-destructive">
-          <AlertTriangle className="w-4 h-4 mt-0.5 shrink-0" />
+          <Warning size={16} weight="duotone" className="mt-0.5 shrink-0" />
           <div className="text-xs font-mono">
             Supabase unreachable or the <b>ad_creatives</b> table is missing — the site is running on the
             ads/*.txt file fallback and panel changes won't render. Run{" "}
@@ -382,7 +382,7 @@ export default function AdminAds() {
       )}
       {status === "database" && rows !== null && rows.length === 0 && (
         <div className="flex items-start gap-2 p-4 mb-4 rounded-md text-sm border bg-yellow-500/10 border-yellow-500/30 text-yellow-500">
-          <Database className="w-4 h-4 mt-0.5 shrink-0" />
+          <Database size={16} weight="duotone" className="mt-0.5 shrink-0" />
           <div className="text-xs font-mono">
             Connected, but the table is empty — in database mode the ads/*.txt fallback is NOT used, so no
             ads are showing. Run <b>supabase/migrations/011-ads.sql</b> to seed your existing creatives,
@@ -400,9 +400,9 @@ export default function AdminAds() {
           }`}
         >
           {result.type === "success" ? (
-            <Check className="w-4 h-4 mt-0.5 shrink-0" />
+            <Check size={16} weight="bold" className="mt-0.5 shrink-0" />
           ) : (
-            <AlertTriangle className="w-4 h-4 mt-0.5 shrink-0" />
+            <Warning size={16} weight="duotone" className="mt-0.5 shrink-0" />
           )}
           <div className="font-mono text-xs">{result.message}</div>
         </div>
@@ -453,13 +453,13 @@ export default function AdminAds() {
                 <div>
                   <CardTitle className="text-sm font-bold tracking-tight flex items-center gap-2">
                     {activeSlot === "direct-link" ? (
-                      <Link2 className="w-4 h-4 text-primary" />
+                      <LinkSimple size={16} weight="bold" className="text-primary" />
                     ) : activeSlot === "popunder" ? (
-                      <Code2 className="w-4 h-4 text-primary" />
+                      <Code size={16} weight="bold" className="text-primary" />
                     ) : activeSlot === "preroll" ? (
-                      <Film className="w-4 h-4 text-primary" />
+                      <FilmStrip size={16} weight="duotone" className="text-primary" />
                     ) : (
-                      <Megaphone className="w-4 h-4 text-primary" />
+                      <Megaphone size={16} weight="duotone" className="text-primary" />
                     )}
                     {slotDef.label}
                     <Badge variant="outline">{slotDef.size}</Badge>
@@ -483,7 +483,7 @@ export default function AdminAds() {
                     onClick={handleClearSlot}
                     disabled={busy || totalRows === 0}
                   >
-                    <Trash2 className="w-3.5 h-3.5" />
+                    <Trash size={14} />
                     Clear
                   </Button>
                 </div>
@@ -512,7 +512,7 @@ export default function AdminAds() {
                     Multiple URL lines are added as separate rotating creatives.
                   </span>
                   <Button size="sm" onClick={handleAdd} disabled={busy || !draft.trim()}>
-                    <Plus className="w-3.5 h-3.5" />
+                    <Plus size={14} />
                     Add{draft.trim() && draft.includes("\n") ? " all" : ""}
                   </Button>
                 </div>
@@ -569,7 +569,7 @@ export default function AdminAds() {
                         )
                       ) : (
                         <div className="w-20 h-16 flex items-center justify-center bg-black/40 rounded border border-border/40 shrink-0">
-                          <Code2 className="w-5 h-5 text-muted-foreground" />
+                          <Code size={20} className="text-muted-foreground" />
                         </div>
                       )}
 
@@ -622,7 +622,7 @@ export default function AdminAds() {
                             onClick={() => handleMove(i, -1)}
                             disabled={busy || i === 0}
                           >
-                            <ChevronUp className="w-3.5 h-3.5" />
+                            <CaretUp size={14} />
                           </Button>
                           <Button
                             size="sm"
@@ -632,7 +632,7 @@ export default function AdminAds() {
                             onClick={() => handleMove(i, 1)}
                             disabled={busy || i === slotRows.length - 1}
                           >
-                            <ChevronDown className="w-3.5 h-3.5" />
+                            <CaretDown size={14} />
                           </Button>
                         </div>
 
@@ -646,7 +646,7 @@ export default function AdminAds() {
                                 onClick={() => handleSave(row)}
                                 disabled={busy}
                               >
-                                <Check className="w-3.5 h-3.5" />
+                                <Check size={14} />
                               </Button>
                               <Button
                                 size="sm"
@@ -658,7 +658,7 @@ export default function AdminAds() {
                                 }}
                                 disabled={busy}
                               >
-                                <X className="w-3.5 h-3.5" />
+                                <X size={14} />
                               </Button>
                             </>
                           ) : (
@@ -671,7 +671,7 @@ export default function AdminAds() {
                                 onClick={() => handleToggle(row)}
                                 disabled={busy}
                               >
-                                {row.enabled ? <Check className="w-3.5 h-3.5 text-green-400" /> : <X className="w-3.5 h-3.5" />}
+                                {row.enabled ? <Check size={14} className="text-green-400" /> : <X size={14} />}
                               </Button>
                               <Button
                                 size="sm"
@@ -684,7 +684,7 @@ export default function AdminAds() {
                                 }}
                                 disabled={busy}
                               >
-                                <Pencil className="w-3.5 h-3.5" />
+                                <PencilSimple size={14} />
                               </Button>
                               <Button
                                 size="sm"
@@ -694,7 +694,7 @@ export default function AdminAds() {
                                 onClick={() => handleDuplicate(row)}
                                 disabled={busy}
                               >
-                                <Copy className="w-3.5 h-3.5" />
+                                <Copy size={14} />
                               </Button>
                               {row.kind === "html" && (
                                 <Button
@@ -705,7 +705,7 @@ export default function AdminAds() {
                                   onClick={() => setPreviewId(previewId === row.id ? null : row.id)}
                                   disabled={busy}
                                 >
-                                  <Eye className="w-3.5 h-3.5" />
+                                  <Eye size={14} />
                                 </Button>
                               )}
                               <Button
@@ -716,7 +716,7 @@ export default function AdminAds() {
                                 onClick={() => handleDelete(row)}
                                 disabled={busy}
                               >
-                                <Trash2 className="w-3.5 h-3.5" />
+                                <Trash size={14} />
                               </Button>
                             </>
                           )}
@@ -809,7 +809,7 @@ export default function AdminAds() {
           <Card>
             <CardHeader>
               <CardTitle className="text-sm font-bold tracking-tight flex items-center gap-2">
-                <Radio className="w-4 h-4" />
+                <Broadcast size={16} weight="bold" />
                 StripCash (Stripchat) smartlink
               </CardTitle>
               <p className="text-xs text-muted-foreground">
@@ -829,7 +829,7 @@ export default function AdminAds() {
                   variant="outline"
                   className="border-destructive/40 bg-destructive/10 text-destructive"
                 >
-                  <AlertTriangle className="w-3 h-3 mr-1" />
+                  <Warning size={12} weight="duotone" className="mr-1" />
                   Not configured — set STRIPCASH_API_KEY on the API
                 </Badge>
               ) : stripcash.verified ? (
@@ -837,7 +837,7 @@ export default function AdminAds() {
                   variant="outline"
                   className="border-primary/40 bg-primary/10 text-primary"
                 >
-                  <Check className="w-3 h-3 mr-1" />
+                  <Check size={12} weight="bold" className="mr-1" />
                   API key active — link verified live
                 </Badge>
               ) : (
@@ -845,7 +845,7 @@ export default function AdminAds() {
                   variant="outline"
                   className="border-amber-500/40 bg-amber-500/10 text-amber-500"
                 >
-                  <AlertTriangle className="w-3 h-3 mr-1" />
+                  <Warning size={12} weight="duotone" className="mr-1" />
                   Key set — link not responding yet
                 </Badge>
               )}
@@ -860,7 +860,7 @@ export default function AdminAds() {
                     className="shrink-0 p-1 rounded border border-border/40 hover:bg-secondary/30"
                     title="Copy smartlink"
                   >
-                    <Copy className="w-3 h-3" />
+                    <Copy size={12} />
                   </button>
                   <a
                     href={stripcash.smartlink}
@@ -951,11 +951,11 @@ export default function AdminAds() {
             </span>
             <div className="flex items-center gap-2">
               <Button variant="outline" size="sm" onClick={handleResetSettings} disabled={busy}>
-                <RotateCcw className="w-3.5 h-3.5" />
+                <ArrowCounterClockwise size={14} />
                 Reset defaults
               </Button>
               <Button size="sm" onClick={handleSaveSettings} disabled={busy || !settingsDirty}>
-                <Save className="w-3.5 h-3.5" />
+                <FloppyDisk size={14} />
                 Save placements
               </Button>
             </div>

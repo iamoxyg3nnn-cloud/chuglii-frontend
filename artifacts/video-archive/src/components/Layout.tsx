@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef, lazy, Suspense } from "react";
 import * as DialogPrimitive from "@radix-ui/react-dialog";
 import { Link, useLocation } from "wouter";
-import { Menu, X, Film, Sun, Moon, Crown, Check, Shuffle } from "lucide-react";
+import { FilmStrip, SunDim, MoonStars, Crown, Check, Shuffle, List, X } from "@phosphor-icons/react";
 import { UserMenu } from "@/components/UserMenu";
 import { usePremium } from "@/contexts/PremiumContext";
 import { useAds } from "@/contexts/AdsContext";
@@ -32,7 +32,7 @@ function Logo() {
   return (
     <Link href="/" className="shrink-0 flex items-center gap-2.5 group">
       <div className="relative flex items-center justify-center w-8 h-8 rounded-lg bg-primary/10 border border-primary/20 group-hover:border-primary/40 transition-colors duration-200">
-        <Film className="w-4 h-4 text-primary" />
+        <FilmStrip size={17} weight="duotone" className="text-primary" />
       </div>
       <div className="flex items-baseline gap-1">
         <span className="font-bold text-lg tracking-tight text-foreground group-hover:text-primary transition-colors duration-200">
@@ -56,7 +56,7 @@ function RandomButton() {
       aria-label="Random video"
       title="Surprise me / Random recording"
     >
-      <Shuffle className="w-4 h-4" />
+      <Shuffle size={16} weight="regular" />
     </button>
   );
 }
@@ -257,14 +257,14 @@ export function Navbar() {
           {!searchOpen && (
             <button
               onClick={toggleTheme}
-              className="nav-btn hidden sm:flex"
+              className="nav-btn hidden sm:flex cursor-pointer"
               aria-label="Dark mode"
               title={dark ? "Switch to light mode" : "Switch to dark mode"}
               aria-pressed={dark}
               type="button"
             >
               <div className="relative z-10 transition-transform duration-200 hover:scale-105">
-                {dark ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
+                {dark ? <SunDim size={17} weight="regular" /> : <MoonStars size={17} weight="regular" />}
               </div>
             </button>
           )}
@@ -276,13 +276,13 @@ export function Navbar() {
             title={isPremium ? "You're Premium — see benefits" : "Go Premium — see details & upgrade"}
           >
             <Crown
-              className={`w-4 h-4 transition-colors ${isPremium ? "text-primary" : ""}`}
-              fill={isPremium ? "currentColor" : "none"}
-              strokeWidth={isPremium ? 1.5 : 2}
+              size={17}
+              weight={isPremium ? "fill" : "regular"}
+              className={`transition-colors ${isPremium ? "text-primary" : ""}`}
             />
             {isPremium ? (
               <span className="absolute -top-0.5 -right-0.5 w-3 h-3 rounded-full bg-primary text-background flex items-center justify-center border border-background">
-                <Check className="w-2 h-2" strokeWidth={3.5} />
+                <Check size={9} weight="bold" />
               </span>
             ) : (
               !loading && (
@@ -299,14 +299,14 @@ export function Navbar() {
           <button
             ref={mobileMenuButtonRef}
             type="button"
-            className="flex md:hidden items-center justify-center w-8 h-8 text-muted-foreground hover:text-foreground hover:bg-secondary/50 dark:hover:bg-white/5 rounded-full transition-all relative"
+            className="flex md:hidden items-center justify-center w-8 h-8 text-muted-foreground hover:text-foreground hover:bg-secondary/50 dark:hover:bg-white/5 rounded-full transition-all relative cursor-pointer"
             onClick={() => setMobileOpen((o) => !o)}
             aria-label={mobileOpen ? "Close navigation menu" : "Open navigation menu"}
             aria-controls="mobile-navigation"
             aria-expanded={mobileOpen}
           >
             <div className="relative transition-transform duration-200" style={{ transform: mobileOpen ? 'rotate(90deg)' : 'rotate(0deg)' }}>
-              {mobileOpen ? <X className="w-4 h-4" /> : <Menu className="w-4 h-4" />}
+              {mobileOpen ? <X size={18} weight="bold" /> : <List size={18} weight="bold" />}
             </div>
           </button>
         </div>
@@ -393,7 +393,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
             <div className="lg:col-span-2 space-y-4">
               <Link href="/" className="flex items-center gap-2 group w-fit">
                 <div className="flex items-center justify-center w-7 h-7 rounded-md bg-primary/10 border border-primary/20 group-hover:border-primary/40 transition-colors">
-                  <Film className="w-3.5 h-3.5 text-primary" />
+                  <FilmStrip size={15} weight="duotone" className="text-primary" />
                 </div>
                 <div className="flex items-baseline gap-1">
                   <span className="font-bold text-base tracking-tight text-foreground group-hover:text-primary transition-colors">
