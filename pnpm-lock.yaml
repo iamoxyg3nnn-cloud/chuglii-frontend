@@ -193,6 +193,12 @@ importers:
       '@supabase/supabase-js':
         specifier: ^2.107.0
         version: 2.107.0
+      '@vercel/analytics':
+        specifier: ^2.0.1
+        version: 2.0.1(react@19.1.0)
+      '@vercel/speed-insights':
+        specifier: ^2.1.0
+        version: 2.1.0(react@19.1.0)
       '@workspace/api-zod':
         specifier: workspace:*
         version: link:../../lib/api-zod
@@ -2344,6 +2350,61 @@ packages:
 
   '@vercel/static-config@3.4.0':
     resolution: {integrity: sha512-wCq90CMUB//ggnFh77NQO1xaLFsS4LigQIqKrH6ohnr9Br/KI1FhlErx62WfCOuueWaW+LVsbLOqNXIUjK8t6A==}
+
+  '@vercel/analytics@2.0.1':
+    resolution: {integrity: sha512-MTQG6V9qQrt1tsDeF+2Uoo5aPjqbVPys1xvnIftXSJYG2SrwXRHnqEvVoYID7BTruDz4lCd2Z7rM1BdkUehk2g==}
+    peerDependencies:
+      '@remix-run/react': ^2
+      '@sveltejs/kit': ^1 || ^2
+      next: '>= 13'
+      nuxt: '>= 3'
+      react: ^18 || ^19 || ^19.0.0-rc
+      svelte: '>= 4'
+      vue: ^3
+      vue-router: ^4
+    peerDependenciesMeta:
+      '@remix-run/react':
+        optional: true
+      '@sveltejs/kit':
+        optional: true
+      next:
+        optional: true
+      nuxt:
+        optional: true
+      react:
+        optional: true
+      svelte:
+        optional: true
+      vue:
+        optional: true
+      vue-router:
+        optional: true
+
+  '@vercel/speed-insights@2.1.0':
+    resolution: {integrity: sha512-tkDiIEjjmlwPpTFnOK14hBhsRLMo5yoCeK2Er3AHWlL7WTzHgFSyItps3TOW0HukErUlYlaUeHiVLCyfiE4WAA==}
+    peerDependencies:
+      '@sveltejs/kit': ^1 || ^2 || ^3 || ^3.0.0-next.0
+      next: '>= 13'
+      nuxt: '>= 3'
+      react: ^18 || ^19 || ^19.0.0-rc
+      svelte: '>= 4'
+      vue: ^3
+      vue-router: ^4
+    peerDependenciesMeta:
+      '@sveltejs/kit':
+        optional: true
+      next:
+        optional: true
+      nuxt:
+        optional: true
+      react:
+        optional: true
+      svelte:
+        optional: true
+      vue:
+        optional: true
+      vue-router:
+        optional: true
 
   '@vitejs/plugin-react@5.2.0':
     resolution: {integrity: sha512-YmKkfhOAi3wsB1PhJq5Scj3GXMn3WvtQ/JC0xoopuHoXSdmtdStOpFrYaT1kie2YgFBcIe64ROzMYRjCrYOdYw==}
@@ -6527,6 +6588,14 @@ snapshots:
       ajv: 8.6.3
       json-schema-to-ts: 1.6.4
       ts-morph: 12.0.0
+
+  '@vercel/analytics@2.0.1(react@19.1.0)':
+    optionalDependencies:
+      react: 19.1.0
+
+  '@vercel/speed-insights@2.1.0(react@19.1.0)':
+    optionalDependencies:
+      react: 19.1.0
 
   '@vitejs/plugin-react@5.2.0(vite@7.3.3(@types/node@25.6.2)(jiti@2.7.0)(lightningcss@1.32.0)(tsx@4.21.0)(yaml@2.8.4))':
     dependencies:

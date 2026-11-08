@@ -1,4 +1,6 @@
 import { createRoot } from "react-dom/client";
+import { Analytics } from "@vercel/analytics/react";
+import { SpeedInsights } from "@vercel/speed-insights/react";
 import { setBaseUrl } from "@workspace/api-client-react";
 import { getApiBaseUrl } from "./lib/api-base";
 import App from "./App";
@@ -65,4 +67,10 @@ if (import.meta.env.PROD && "serviceWorker" in navigator) {
   });
 }
 
-createRoot(document.getElementById("root")!).render(<App />);
+createRoot(document.getElementById("root")!).render(
+  <>
+    <App />
+    <Analytics />
+    <SpeedInsights />
+  </>,
+);
