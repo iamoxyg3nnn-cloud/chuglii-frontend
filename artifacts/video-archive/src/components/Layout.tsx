@@ -4,6 +4,7 @@ import { Link, useLocation } from "wouter";
 import { Menu, X, Film, Sun, Moon, Crown, Check } from "lucide-react";
 import { UserMenu } from "@/components/UserMenu";
 import { usePremium } from "@/contexts/PremiumContext";
+import { useAds } from "@/contexts/AdsContext";
 import { DesktopNav } from "@/components/nav/DesktopNav";
 import { SearchDropdown } from "@/components/nav/SearchDropdown";
 import { markAgeGatePassed } from "@/lib/gating";
@@ -340,6 +341,15 @@ export function Navbar() {
 
 export function Layout({ children }: { children: React.ReactNode }) {
   const { showAds } = usePremium();
+  const { creativesFor } = useAds();
+  // Site-wide strips only take space once a creative exists for one of their
+  // tiers — an empty strip would otherwise leave a bordered bar / gap.
+  const hasCreative = (files: string[]) =>
+    files.some((file) => creativesFor(file).length > 0);
+  const topStripAds =
+    showAds && hasCreative(["billboard-970x250", "leaderboard-728x90", "mobile-banner-320x50"]);
+  const footerAds =
+    showAds && hasCreative(["leaderboard-728x90", "banner-468x60", "rect-300x100"]);
 
   return (
     <div className="min-h-screen text-foreground flex flex-col font-sans">
@@ -354,8 +364,8 @@ export function Layout({ children }: { children: React.ReactNode }) {
 
       {/* ── Site-wide top ad strip (every page) ──────────────────────────
           970×250 billboard on large screens, 728×90 on medium, 320×50 on
-          phones — codes live in ads/*.txt, styled placeholder until pasted. */}
-      {showAds && (
+          phones — codes live in ads/*.txt; hidden until a tier has one. */}
+      {topStripAds && (
         <div className="border-b border-border/40 bg-secondary/10">
           <div className="container mx-auto px-4 sm:px-6 py-4">
             <AdLeaderboard
@@ -388,7 +398,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
         <div className="container mx-auto px-4 sm:px-6">
           {/* ── Site-wide footer ad (every page) ────────────────────────
               728×90 desktop / 468×60 tablet / 300×100 phones (rectangle). */}
-          {showAds && (
+          {footerAds && (
             <div className="mb-8 flex justify-center">
               <AdLeaderboard
                 lg="leaderboard-728x90"

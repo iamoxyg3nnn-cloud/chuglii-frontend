@@ -4,5 +4,5 @@
 
   Paste your ad code below. Separate multiple creatives with a line
   containing only: ---
-  Empty file = styled placeholder at 320 x 50.
+  Empty file = nothing renders (reserved placeholders are off for now).
 -->

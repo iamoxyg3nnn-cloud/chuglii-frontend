@@ -7,5 +7,5 @@
 
   Paste your ad code below. Separate multiple creatives with a line
   containing only: ---
-  Empty file = styled placeholder at 300 x 100 (fluid width in feed rows).
+  Empty file = nothing renders (reserved placeholders are off for now).
 -->

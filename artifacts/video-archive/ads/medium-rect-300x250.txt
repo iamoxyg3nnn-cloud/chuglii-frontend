@@ -6,7 +6,7 @@
 
   Paste your ad code below. Separate multiple creatives with a line
   containing only: ---
-  Empty file = styled placeholder at 300 x 250.
+  Empty file = nothing renders (reserved placeholders are off for now).
 -->
 
 https://www.imglnky.com/3778/stripchat_300250_sara_fun_en.gif

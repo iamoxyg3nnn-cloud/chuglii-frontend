@@ -5,6 +5,6 @@
 
   Paste your CrakRevenue banner / HTML ad / iframe code below.
   Rotate several creatives: separate each one with a line containing only
-  three dashes (see README.txt). Empty file = styled placeholder at
-  728 x 90.
+  three dashes (see README.txt). Empty file = nothing renders (reserved
+  placeholders are off for now).
 -->

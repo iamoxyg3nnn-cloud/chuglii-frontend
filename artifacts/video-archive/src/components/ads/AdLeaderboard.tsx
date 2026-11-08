@@ -1,5 +1,7 @@
 import { usePremium } from "@/contexts/PremiumContext";
+import { useAds } from "@/contexts/AdsContext";
 import { AdBanner } from "@/components/ads/AdBanner";
+import { AD_PLACEHOLDERS_ENABLED } from "@/lib/ads-enabled";
 
 /**
  * AdLeaderboard — one responsive banner placement across three tiers:
@@ -10,7 +12,8 @@ import { AdBanner } from "@/components/ads/AdBanner";
  * Each tier is an independent slot reading its own `ads/<file>.txt`, so you
  * can paste different creatives per breakpoint (and the same file in two
  * tiers stays consistent). Renders NOTHING (no wrapper, no margins) when
- * ads are not shown, so pages can drop it anywhere without guarding.
+ * ads are not shown or no tier has a creative yet, so pages can drop it
+ * anywhere without guarding.
  *
  * Example — site-wide top strip:
  *   <AdLeaderboard lg="billboard-970x250" md="leaderboard-728x90"
@@ -34,7 +37,16 @@ export function AdLeaderboard({
   className,
 }: AdLeaderboardProps) {
   const { showAds } = usePremium();
+  const { creativesFor } = useAds();
   if (!showAds) return null;
+  // No creative in any tier and placeholders are off → nothing to show
+  // (also keeps the wrapper's spacing out of the page).
+  if (
+    !AD_PLACEHOLDERS_ENABLED &&
+    ![lg, md, mobile].some((file) => creativesFor(file).length > 0)
+  ) {
+    return null;
+  }
 
   return (
     <div className={"w-full flex justify-center " + (className ?? "")}>

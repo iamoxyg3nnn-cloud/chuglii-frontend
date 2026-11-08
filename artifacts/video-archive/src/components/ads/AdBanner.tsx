@@ -3,6 +3,7 @@ import { usePremium } from "@/contexts/PremiumContext";
 import { injectAdMarkup, parseAdDimensions } from "@/lib/ad-creatives";
 import { useAds } from "@/contexts/AdsContext";
 import { placementForFile, type AdPlacementId } from "@/lib/ad-slots";
+import { AD_PLACEHOLDERS_ENABLED } from "@/lib/ads-enabled";
 
 /**
  * AdBanner — the site's single ad slot primitive.
@@ -14,6 +15,8 @@ import { placementForFile, type AdPlacementId } from "@/lib/ad-slots";
  *      (default 20s) when the slot holds several codes.
  *   2. Otherwise a styled dashed placeholder reserved at the exact size —
  *      it matches the site UI, so layout is stable until real codes land.
+ *      Reserved placeholders are OFF for now (`AD_PLACEHOLDERS_ENABLED`):
+ *      an empty slot renders nothing until real codes land.
  *
  * Placement zone (Admin → Ads → Placements): each banner belongs to a zone —
  * "strip" (leaderboards/billboards), "feed" (300×100 in-feed), or "box"
@@ -57,7 +60,7 @@ export interface AdBannerProps {
   placement?: AdPlacementId;
   /** Override the rotation period (default: admin `settings.rotationSeconds`). */
   rotateMs?: number;
-  /** Render the reserved placeholder when the slot is empty (default true). */
+  /** Render the reserved placeholder when the slot is empty (default: `AD_PLACEHOLDERS_ENABLED`). */
   placeholder?: boolean;
   /** Extra classes on the slot root (e.g. `col-span-full`, `mb-8`). */
   className?: string;
@@ -72,7 +75,7 @@ export function AdBanner({
   fluid = false,
   placement: placementProp,
   rotateMs,
-  placeholder = true,
+  placeholder = AD_PLACEHOLDERS_ENABLED,
   className,
 }: AdBannerProps) {
   const { showAds } = usePremium();

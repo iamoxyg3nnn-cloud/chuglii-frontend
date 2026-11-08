@@ -4,7 +4,7 @@ VAULT BANNER SLOTS — HOW THEY WORK
 ADS ARE NOW MANAGED FROM THE ADMIN PANEL (Supabase), NOT FROM THESE FILES.
 
   Admin → Ads  (/admin/ads)
-    - Add, edit, enable/disable and delete creatives for EVERY placeholder
+    - Add, edit, enable/disable and delete creatives for EVERY slot
       below, from the browser.
     - Saved in the Supabase `ad_creatives` table (migration 011-ads.sql).
     - Every change goes live on ALL open pages immediately (Supabase
@@ -27,14 +27,18 @@ FILE FORMAT (same in files and in the admin panel)
   * Anything else is treated as raw HTML/JS ad code and injected as-is.
   * In the files: separate multiple creatives with a line containing only ---
     Lines starting with <!-- are comments (headers) and are ignored.
-  * Empty slot = styled placeholder at the slot's size.
+  * Empty slot = NOTHING renders: the reserved "Advertisement" boxes are
+    OFF for now (AD_PLACEHOLDERS_ENABLED in src/lib/ads-enabled.ts). An
+    empty slot takes no space at all — flip that constant to true (or pass
+    `placeholder` to one <AdBanner />) to bring the dashed boxes back.
+    Real creatives render normally either way.
   * Rotation: components cycle creatives every 20s from a random start;
     each in-feed ad card picks a random creative per page load.
     Popunder: ONE random creative fires once per page load, maximum.
   * Popunder.html and direct-link.txt (smartlink URLs) take the same
     content types — they are also managed from Admin → Ads.
 
-SLOT INVENTORY (14 placeholders — admin panel lists them all)
+SLOT INVENTORY (14 slots — admin panel lists them all)
 -------------------------------------------------------------
   File                        Size      Used on
   --------------------------- --------- -----------------------------------
@@ -67,6 +71,9 @@ SLOT INVENTORY (14 placeholders — admin panel lists them all)
 IMPORTANT NOTES
 ---------------
   * VITE_ADS_ENABLED: empty/unset or "false" = OFF. Set to "true" and redeploy to enable ALL ads.
+  * Hidden until filled: a slot only renders once it has a creative, and the
+    site-wide top/footer strip only appears when one of its breakpoint tiers
+    does — so pages never show an empty ad bar or a reserved gap.
   * Ads never show for premium members or before the age gate is passed,
     and never on: login, signup, auth callback, premium, admin, RandomRedirect.
   * All network codes: CrakRevenue (slot codes) + StripCash/Stripchat
