@@ -56,7 +56,8 @@ export default function PerformersList() {
                 <Users className="w-[18px] h-[18px] text-primary" />
               </div>
               <div>
-                <h1 className="text-xl font-bold tracking-tight">Performers</h1>
+                <h1 className="text-xl font-bold tracking-tight">Performer directory</h1>
+                <p className="text-xs text-muted-foreground mt-1 max-w-lg">Browse public performer listings connected with the VAULT recording archive. Search by performer name and use the available filters to explore the directory. 18+ only.</p>
                 <p className="text-[11px] text-muted-foreground/60 mt-px">
                   {isLoading ? (
                     <span className="w-12 h-[10px] rounded bg-muted-foreground/20 animate-pulse inline-block align-middle" />
