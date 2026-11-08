@@ -43,6 +43,25 @@ describe("recent search history", () => {
     expect(readRecentSearches(createStorage(JSON.stringify({ search: "private" })))).toEqual([]);
   });
 
+  it("reads legacy navbar history when the shared Browse history is not present", () => {
+    const values = new Map<string, string>([
+      ["vault-recent-searches", JSON.stringify(["Old navbar search", "Another search"])],
+    ]);
+    const storage = {
+      getItem: (key: string) => values.get(key) ?? null,
+      setItem: (key: string, value: string) => { values.set(key, value); },
+      removeItem: (key: string) => { values.delete(key); },
+    };
+
+    expect(readRecentSearches(storage)).toEqual(["Old navbar search", "Another search"]);
+    expect(rememberRecentSearch("New search", storage)).toEqual([
+      "New search",
+      "Old navbar search",
+      "Another search",
+    ]);
+    expect(values.has("vault_recent_searches")).toBe(true);
+  });
+
   it("moves a case-insensitive duplicate to the front and keeps five entries", () => {
     const storage = createStorage(JSON.stringify(["Alpha", "Bravo", "Charlie", "Delta", "Echo"]));
 

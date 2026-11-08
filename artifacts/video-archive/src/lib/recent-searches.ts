@@ -1,4 +1,5 @@
 const STORAGE_KEY = "vault_recent_searches";
+const LEGACY_STORAGE_KEY = "vault-recent-searches";
 const MAX_RECENT_SEARCHES = 5;
 
 type RecentSearchStorage = Pick<Storage, "getItem" | "setItem" | "removeItem">;
@@ -19,7 +20,10 @@ export function readRecentSearches(
 ): string[] {
   if (!storage) return [];
   try {
-    const saved: unknown = JSON.parse(storage.getItem(STORAGE_KEY) || "[]");
+    // The navbar historically used a second key. Read it as a one-time fallback so
+    // existing searches survive the migration to the shared Browse history.
+    const raw = storage.getItem(STORAGE_KEY) ?? storage.getItem(LEGACY_STORAGE_KEY) ?? "[]";
+    const saved: unknown = JSON.parse(raw || "[]");
     if (!Array.isArray(saved)) return [];
 
     const unique: string[] = [];
@@ -64,6 +68,7 @@ export function clearRecentSearches(
 ): void {
   try {
     storage?.removeItem(STORAGE_KEY);
+    storage?.removeItem(LEGACY_STORAGE_KEY);
   } catch {
     // The in-memory UI can still clear if browser storage is unavailable.
   }

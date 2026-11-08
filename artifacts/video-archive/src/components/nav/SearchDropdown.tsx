@@ -1,4 +1,5 @@
-import { useState, useEffect, useRef, useCallback, useMemo } from "react";
+import { useState, useEffect, useRef, useCallback, useMemo, useId } from "react";
+import type { FormEvent, KeyboardEvent, ReactNode } from "react";
 import { useLocation } from "wouter";
 import {
   Search,
@@ -9,32 +10,51 @@ import {
   TrendingUp,
   Trash2,
   Clock,
+  ArrowRight,
+  LoaderCircle,
 } from "lucide-react";
-import { addRecentSearch, getRecentSearches, clearRecentSearches } from "@/lib/bookmarks";
 import { useSearchSuggestions, useListTags, useListPerformers, type SearchSuggestion } from "@/lib/api";
+import { readRecentSearches, rememberRecentSearch, clearRecentSearches } from "@/lib/recent-searches";
 import { proxyImageUrl } from "@/lib/proxy-url";
 import { trackActivity } from "@/lib/rum";
 
 interface SearchDropdownProps {
-  /** Controlled: whether the search bar is expanded */
   open: boolean;
-  /** Called when the search opens or closes */
   onOpenChange: (open: boolean) => void;
 }
 
-// ── Text highlighting helper ──────────────────────────────
+type TrendingItem = { label: string; href: string; icon: ReactNode };
 
-function highlightMatch(text: string, query: string): React.ReactNode {
-  if (!query.trim()) return text;
-  const lowerText = text.toLowerCase();
-  const lowerQuery = query.toLowerCase();
-  const idx = lowerText.indexOf(lowerQuery);
-  if (idx === -1) return text;
+function normalize(value: string): string {
+  return value
+    .normalize("NFKD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLocaleLowerCase()
+    .trim()
+    .replace(/\s+/g, " ");
+}
+
+function matchScore(label: string, query: string): number {
+  const value = normalize(label);
+  if (value === query) return 0;
+  if (value.startsWith(query)) return 1;
+  if (value.includes(query)) return 2;
+  const words = value.split(/\s+/);
+  if (words.some((word) => word.startsWith(query))) return 3;
+  return Number.MAX_SAFE_INTEGER;
+}
+
+function highlightMatch(text: string, query: string): ReactNode {
+  const index = normalize(text).indexOf(normalize(query));
+  if (!query.trim() || index < 0) return text;
+  // Keep the original string's casing and punctuation in the rendered label.
+  const exactIndex = text.toLocaleLowerCase().indexOf(query.trim().toLocaleLowerCase());
+  if (exactIndex < 0) return text;
   return (
     <>
-      {text.slice(0, idx)}
-      <strong className="text-foreground font-semibold">{text.slice(idx, idx + query.length)}</strong>
-      {text.slice(idx + query.length)}
+      {text.slice(0, exactIndex)}
+      <strong className="font-semibold text-foreground">{text.slice(exactIndex, exactIndex + query.trim().length)}</strong>
+      {text.slice(exactIndex + query.trim().length)}
     </>
   );
 }
@@ -48,104 +68,81 @@ export function SearchDropdown({ open, onOpenChange }: SearchDropdownProps) {
   const [recentSearches, setRecentSearches] = useState<string[]>([]);
   const searchInputRef = useRef<HTMLInputElement>(null);
   const suggestionsRef = useRef<HTMLDivElement>(null);
+  const listboxId = useId();
 
-  // Short debounce keeps the UI responsive without issuing a request per keystroke.
+  // A short debounce balances responsive typing with fewer requests on fast typists.
   useEffect(() => {
-    const timer = setTimeout(() => setDebouncedSearch(search), 200);
-    return () => clearTimeout(timer);
+    const timer = window.setTimeout(() => setDebouncedSearch(normalize(search)), 140);
+    return () => window.clearTimeout(timer);
   }, [search]);
 
-  // React Query cancels the previous request when the query key changes. The API
-  // client forwards that abort signal so old prefixes don't waste connections.
-  const { data: predictionsData, isLoading: predictionsLoading } =
-    useSearchSuggestions(debouncedSearch, { enabled: open });
-  const serverPredictions = predictionsData?.suggestions ?? [];
+  const query = normalize(search);
+  const hasQuery = query.length >= 2;
+  const { data: predictionsData, isLoading: predictionsLoading, isFetching: predictionsFetching } =
+    useSearchSuggestions(debouncedSearch, { enabled: open && debouncedSearch.length >= 2 });
 
-  // Load tags only while the search UI is open. Use the already cached tag list
-  // as a cheap local fallback so tag matches remain available while the server's
-  // Redis suggestion snapshot is rebuilding or temporarily unavailable.
-  const { data: trendingTags } = useListTags({ enabled: open, staleTime: 15 * 60_000 });
-  const showTrendingPerformers = open && search.trim().length === 0;
+  const { data: trendingTags } = useListTags({
+    enabled: open,
+    staleTime: 15 * 60_000,
+  });
+  const showTrendingPerformers = open && query.length === 0;
   const { data: trendingPerformers } = useListPerformers(
     showTrendingPerformers ? { limit: 5, sort: "count" } : undefined,
     { staleTime: 3 * 60_000, enabled: showTrendingPerformers },
   );
 
-  const normalizedSearch = search.trim().toLowerCase();
   const predictions = useMemo(() => {
-    if (!open || normalizedSearch.length < 2) return serverPredictions;
+    if (!open || !hasQuery) return [];
+    const serverItems = query === debouncedSearch ? predictionsData?.suggestions ?? [] : [];
+    const seen = new Set(serverItems.map((item) => `${item.type}:${normalize(item.label)}`));
 
-    const existingTags = new Set(
-      serverPredictions
-        .filter((item) => item.type === "tag")
-        .map((item) => item.label.toLowerCase()),
-    );
-    const tagSlots = Math.max(0, 4 - existingTags.size);
-    if (tagSlots === 0 || !trendingTags?.length) return serverPredictions;
-
-    const localTagSuggestions: SearchSuggestion[] = trendingTags
-      .filter((tag) => tag.tag.toLowerCase().includes(normalizedSearch))
-      .filter((tag) => !existingTags.has(tag.tag.toLowerCase()))
-      .slice(0, tagSlots)
-      .map((tag) => ({
+    // Cached tags fill the small gap while the server suggestion request is in flight.
+    const localTags: SearchSuggestion[] = (trendingTags ?? [])
+      .map((tag) => ({ tag, score: matchScore(tag.tag, query) }))
+      .filter((item) => item.score < Number.MAX_SAFE_INTEGER && !seen.has(`tag:${normalize(item.tag.tag)}`))
+      .sort((a, b) => a.score - b.score || b.tag.count - a.tag.count)
+      .slice(0, 3)
+      .map(({ tag }) => ({
         type: "tag",
         label: tag.tag,
-        subtitle: "Tag",
+        subtitle: "Topic tag",
         href: `/browse?tags=${encodeURIComponent(tag.tag)}`,
       }));
 
-    return localTagSuggestions.length
-      ? [...serverPredictions, ...localTagSuggestions]
-      : serverPredictions;
-  }, [open, normalizedSearch, serverPredictions, trendingTags]);
+    const combined = [...serverItems, ...localTags];
+    // Render order and keyboard order must be identical; otherwise Enter can
+    // activate a different item from the one highlighted by the arrow keys.
+    const typeOrder: SearchSuggestion["type"][] = ["performer", "recording", "tag"];
+    return typeOrder.flatMap((type) =>
+      combined
+        .filter((item) => item.type === type)
+        .sort((a, b) => matchScore(a.label, query) - matchScore(b.label, query)),
+    ).slice(0, 10);
+  }, [open, hasQuery, predictionsData, trendingTags, query, debouncedSearch]);
 
-  // Reset selected index when results change
-  useEffect(() => {
-    setSelectedIndex(-1);
-  }, [predictions, debouncedSearch]);
+  const filteredRecent = useMemo(() => {
+    const list = recentSearches;
+    return query ? list.filter((term) => normalize(term).includes(query)).slice(0, 5) : list.slice(0, 5);
+  }, [recentSearches, query]);
 
-  // Load recent searches when search opens
-  useEffect(() => {
-    if (open) setRecentSearches(getRecentSearches());
-  }, [open]);
-
-  // Scroll selected item into view in the suggestions dropdown
-  useEffect(() => {
-    if (selectedIndex >= 0 && suggestionsRef.current) {
-      const items =
-        suggestionsRef.current.querySelectorAll<HTMLElement>("[data-index]");
-      items[selectedIndex]?.scrollIntoView({ block: "nearest" });
+  const trendingItems = useMemo<TrendingItem[]>(() => {
+    const items: TrendingItem[] = [];
+    for (const tag of (trendingTags ?? []).slice(0, 4)) {
+      items.push({
+        label: `#${tag.tag}`,
+        href: `/browse?tags=${encodeURIComponent(tag.tag)}`,
+        icon: <Tag className="h-3 w-3" />,
+      });
     }
-  }, [selectedIndex]);
-
-  // Auto-focus input when opened
-  useEffect(() => {
-    if (open && searchInputRef.current) {
-      searchInputRef.current.focus();
+    for (const performer of (trendingPerformers?.performers ?? []).slice(0, 3)) {
+      items.push({
+        label: performer.username,
+        href: `/performers/${encodeURIComponent(performer.username)}`,
+        icon: <User className="h-3 w-3" />,
+      });
     }
-  }, [open]);
-
-  // Close suggestions when user scrolls page
-  useEffect(() => {
-    if (!showSuggestions) return;
-    const handleScroll = () => setShowSuggestions(false);
-    window.addEventListener("scroll", handleScroll, { passive: true });
-    return () => window.removeEventListener("scroll", handleScroll);
-  }, [showSuggestions]);
-
-  const submitSearch = useCallback(
-    (q: string) => {
-      if (q.trim()) {
-        addRecentSearch(q.trim());
-        trackActivity("search", { meta: { q: q.trim().slice(0, 200) } });
-        setLocation(`/browse?search=${encodeURIComponent(q.trim())}`);
-      } else {
-        setLocation("/browse");
-      }
-      closeSearch();
-    },
-    [setLocation],
-  );
+    return items.slice(0, 7);
+  }, [trendingTags, trendingPerformers]);
 
   const closeSearch = useCallback(() => {
     onOpenChange(false);
@@ -155,108 +152,130 @@ export function SearchDropdown({ open, onOpenChange }: SearchDropdownProps) {
     setSelectedIndex(-1);
   }, [onOpenChange]);
 
+  const navigateTo = useCallback((href: string) => {
+    setLocation(href);
+    closeSearch();
+  }, [setLocation, closeSearch]);
+
+  const submitSearch = useCallback((value: string) => {
+    const term = value.trim().replace(/\s+/g, " ");
+    if (term) {
+      rememberRecentSearch(term);
+      trackActivity("search", { meta: { q: term.slice(0, 200) } });
+      setLocation(`/browse?search=${encodeURIComponent(term)}`);
+    } else {
+      setLocation("/browse");
+    }
+    closeSearch();
+  }, [setLocation, closeSearch]);
+
   const handleClearRecent = useCallback(() => {
     clearRecentSearches();
     setRecentSearches([]);
+    setSelectedIndex(-1);
   }, []);
 
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
+  useEffect(() => {
+    if (!open) return;
+    setRecentSearches(readRecentSearches());
+    setShowSuggestions(true);
+    searchInputRef.current?.focus();
+  }, [open]);
+
+  useEffect(() => {
+    setSelectedIndex(-1);
+  }, [predictions, debouncedSearch]);
+
+  useEffect(() => {
+    if (selectedIndex < 0 || !suggestionsRef.current) return;
+    suggestionsRef.current
+      .querySelector<HTMLElement>(`[data-index="${selectedIndex}"]`)
+      ?.scrollIntoView({ block: "nearest" });
+  }, [selectedIndex]);
+
+  useEffect(() => {
+    if (!showSuggestions) return;
+    const handleScroll = () => setShowSuggestions(false);
+    window.addEventListener("scroll", handleScroll, { passive: true });
+    return () => window.removeEventListener("scroll", handleScroll);
+  }, [showSuggestions]);
+
+  // "/" opens global search from anywhere, but never steals focus from a field/editor.
+  useEffect(() => {
+    if (open) return;
+    const handleShortcut = (event: globalThis.KeyboardEvent) => {
+      const target = event.target as HTMLElement | null;
+      const typing = target?.isContentEditable || ["INPUT", "TEXTAREA", "SELECT"].includes(target?.tagName ?? "");
+      if (event.key === "/" && !typing && !event.metaKey && !event.ctrlKey && !event.altKey) {
+        event.preventDefault();
+        onOpenChange(true);
+      }
+    };
+    window.addEventListener("keydown", handleShortcut);
+    return () => window.removeEventListener("keydown", handleShortcut);
+  }, [open, onOpenChange]);
+
+  const handleSubmit = (event: FormEvent) => {
+    event.preventDefault();
     submitSearch(search);
   };
 
-  const handleKeyDown = (e: React.KeyboardEvent) => {
-    const predictionsCount = predictions.length;
-    const recentCount = filteredSuggestions.length;
-    const showTrending =
-      (search.trim().length === 0 || search.trim().length === 1) && !filteredSuggestions.length;
-    const trendingCount = showTrending ? trendingItems.length : 0;
-
-    // Calculate total items: currently visible section
-    let totalItems = 0;
-    if (search.trim().length >= 2) {
-      totalItems = predictionsCount || 1; // at least the "no results" or loading
-    } else if (recentCount) {
-      totalItems = recentCount + 1; // +1 for clear button
-    } else if (trendingCount) {
-      totalItems = trendingCount;
+  const handleKeyDown = (event: KeyboardEvent<HTMLInputElement>) => {
+    if (event.key === "ArrowDown" || event.key === "ArrowUp") {
+      const count = hasQuery
+        ? predictions.length
+        : filteredRecent.length
+          ? filteredRecent.length + 1
+          : trendingItems.length;
+      if (count > 0) {
+        event.preventDefault();
+        setShowSuggestions(true);
+        setSelectedIndex((current) =>
+          event.key === "ArrowDown"
+            ? (current + 1) % count
+            : current <= 0 ? count - 1 : current - 1,
+        );
+      }
+      return;
     }
 
-    switch (e.key) {
-      case "ArrowDown":
-        e.preventDefault();
-        setSelectedIndex((prev) => (prev < totalItems - 1 ? prev + 1 : 0));
-        break;
-      case "ArrowUp":
-        e.preventDefault();
-        setSelectedIndex((prev) => (prev > 0 ? prev - 1 : totalItems - 1));
-        break;
-      case "Enter":
-        if (selectedIndex >= 0) {
-          e.preventDefault();
-          if (search.trim().length >= 2 && predictions[selectedIndex]) {
-            const suggestion = predictions[selectedIndex];
-            setLocation(suggestion.href);
-            closeSearch();
-          } else if (recentCount && selectedIndex < recentCount) {
-            const recentItem = filteredSuggestions[selectedIndex];
-            if (recentItem) submitSearch(recentItem);
-          } else if (recentCount && selectedIndex === recentCount) {
-            // Clear recent button selected
-            handleClearRecent();
-          } else if (showTrending && trendingCount && trendingItems[selectedIndex]) {
-            const item = trendingItems[selectedIndex];
-            if (item?.href) {
-              setLocation(item.href);
-              closeSearch();
-            }
-          }
-        }
-        break;
-      case "Escape":
-        closeSearch();
-        break;
+    if (event.key === "Enter" && selectedIndex >= 0) {
+      if (hasQuery && predictions[selectedIndex]) {
+        event.preventDefault();
+        navigateTo(predictions[selectedIndex].href);
+      } else if (hasQuery) {
+        event.preventDefault();
+        submitSearch(search);
+      } else if (!hasQuery && filteredRecent[selectedIndex]) {
+        event.preventDefault();
+        submitSearch(filteredRecent[selectedIndex]);
+      } else if (!hasQuery && filteredRecent.length && selectedIndex === filteredRecent.length) {
+        event.preventDefault();
+        handleClearRecent();
+      } else if (!hasQuery && !filteredRecent.length && trendingItems[selectedIndex]) {
+        event.preventDefault();
+        navigateTo(trendingItems[selectedIndex].href);
+      }
+      return;
     }
+
+    if (event.key === "Escape") closeSearch();
   };
 
-  const filteredSuggestions = search.trim()
-    ? recentSearches.filter((s) => s.toLowerCase().includes(search.toLowerCase())).slice(0, 5)
-    : recentSearches.slice(0, 5);
-
-  // Build trending items from popular tags and performers
-  const trendingItems = useMemo(() => {
-    const items: { label: string; href: string; icon: React.ReactNode }[] = [];
-    if (trendingTags) {
-      for (const t of trendingTags.slice(0, 4)) {
-        items.push({
-          label: `#${t.tag}`,
-          href: `/browse?tags=${encodeURIComponent(t.tag)}`,
-          icon: <Tag className="w-3 h-3" />,
-        });
-      }
-    }
-    if (trendingPerformers?.performers) {
-      for (const p of trendingPerformers.performers.slice(0, 3)) {
-        if (items.length >= 7) break;
-        items.push({
-          label: p.username,
-          href: `/performers/${encodeURIComponent(p.username)}`,
-          icon: <User className="w-3 h-3" />,
-        });
-      }
-    }
-    return items;
-  }, [trendingTags, trendingPerformers]);
+  const suggestionsPending = query !== debouncedSearch || predictionsLoading;
+  const activeDescendant = selectedIndex >= 0 ? `${listboxId}-option-${selectedIndex}` : undefined;
 
   if (!open) {
     return (
       <button
+        type="button"
         onClick={() => onOpenChange(true)}
         className="nav-btn group"
         aria-label="Open search"
-        title="Search"
+        title="Search ( / )"
+        aria-keyshortcuts="/"
       >
-        <Search className="w-4 h-4 relative z-10" />
+        <Search className="relative z-10 h-4 w-4" />
       </button>
     );
   }
@@ -265,328 +284,180 @@ export function SearchDropdown({ open, onOpenChange }: SearchDropdownProps) {
     <div className="relative flex items-center">
       <form onSubmit={handleSubmit} className="flex items-center gap-1.5">
         <div className="relative">
-          <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground/50 pointer-events-none" />
+          <Search className="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground/50" />
           <input
             ref={searchInputRef}
-            autoFocus
-            type="text"
+            type="search"
+            role="combobox"
             aria-label="Search recordings, performers, and tags"
+            aria-autocomplete="list"
+            aria-expanded={showSuggestions}
+            aria-controls={listboxId}
+            aria-activedescendant={activeDescendant}
+            aria-keyshortcuts="ArrowDown ArrowUp Enter Escape"
+            autoComplete="off"
+            spellCheck={false}
             placeholder="Search recordings, performers, tags..."
             value={search}
-            onChange={(e) => {
-              setSearch(e.target.value);
+            onChange={(event) => {
+              setSearch(event.target.value);
               setShowSuggestions(true);
             }}
             onFocus={() => setShowSuggestions(true)}
-            onBlur={() => setTimeout(() => setShowSuggestions(false), 200)}
+            onBlur={() => window.setTimeout(() => setShowSuggestions(false), 180)}
             onKeyDown={handleKeyDown}
-            className="w-36 min-[380px]:w-44 sm:w-64 h-9 pl-8 pr-3 bg-secondary dark:bg-white/[0.08] border border-border/50 focus:border-primary/40 rounded-full text-sm outline-none transition-all placeholder:text-muted-foreground/40"
+            className="h-9 w-36 rounded-full border border-border/50 bg-secondary pl-8 pr-3 text-sm outline-none transition-all placeholder:text-muted-foreground/40 focus:border-primary/40 min-[380px]:w-44 sm:w-64 dark:bg-white/[0.08]"
           />
-
-          {/* Suggestions dropdown */}
-          {showSuggestions &&
-            (search.trim().length >= 2
-              ? renderPredictions({
-                  // If locally cached tags already match, show them immediately
-                  // while the server is still resolving performer/recording matches.
-                  predictionsLoading: predictionsLoading && predictions.length === 0,
-                  predictions,
-                  debouncedSearch,
-                  search,
-                  selectedIndex,
-                  suggestionsRef,
-                  onSelect: (suggestion) => {
-                    setLocation(suggestion.href);
-                    closeSearch();
-                  },
-                  onHover: setSelectedIndex,
-                })
-              : renderRecentSearches({
-                  searches: filteredSuggestions,
-                  trendingItems,
-                  selectedIndex,
-                  onSelect: submitSearch,
-                  onNavigate: (href) => { setLocation(href); closeSearch(); },
-                  onHover: setSelectedIndex,
-                  onClear: handleClearRecent,
-                }))}
+          {showSuggestions && (
+            <div
+              ref={suggestionsRef}
+              id={listboxId}
+              role="listbox"
+              aria-label="Search suggestions"
+              className="glass-dropdown absolute right-0 top-full z-50 mt-1.5 max-h-[70vh] w-[calc(100vw-2rem)] min-w-[280px] overflow-y-auto overflow-x-hidden rounded-lg animate-in fade-in zoom-in-95 duration-150 sm:w-[min(420px,calc(100vw-2rem))]"
+            >
+              {hasQuery ? (
+                <>
+                  {suggestionsPending && predictions.length === 0 ? (
+                    <div className="flex items-center gap-2 px-4 py-3 text-xs text-muted-foreground/60">
+                      <LoaderCircle className="h-3.5 w-3.5 animate-spin" /> Finding matches…
+                    </div>
+                  ) : predictions.length ? (
+                    <div>
+                      {(["performer", "recording", "tag"] as const).map((type) => {
+                        const group = predictions.filter((item) => item.type === type);
+                        if (!group.length) return null;
+                        const Icon = type === "performer" ? User : type === "tag" ? Tag : Clapperboard;
+                        const label = type === "performer" ? "Performers" : type === "recording" ? "Recordings" : "Tags";
+                        return (
+                          <section key={type}>
+                            <div className="flex items-center gap-1.5 bg-secondary px-3 py-1.5 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground/50 dark:bg-white/[0.06]">
+                              <Icon className="h-3 w-3" /> {label}
+                            </div>
+                            {group.map((item) => {
+                              const index = predictions.indexOf(item);
+                              return (
+                                <button
+                                  key={`${item.type}-${item.label}`}
+                                  id={`${listboxId}-option-${index}`}
+                                  type="button"
+                                  role="option"
+                                  aria-selected={selectedIndex === index}
+                                  data-index={index}
+                                  onMouseDown={() => navigateTo(item.href)}
+                                  onMouseEnter={() => setSelectedIndex(index)}
+                                  className={`flex w-full items-center gap-3 px-3 py-2.5 text-left text-xs transition-colors ${selectedIndex === index ? "bg-secondary text-foreground dark:bg-white/[0.12]" : "text-muted-foreground hover:bg-secondary/30 hover:text-foreground dark:hover:bg-white/5"}`}
+                                >
+                                  {item.image_url ? (
+                                    <span className="h-8 w-8 shrink-0 overflow-hidden rounded bg-secondary">
+                                      <img src={proxyImageUrl(item.image_url) ?? ""} alt="" className="h-full w-full object-cover" loading="lazy" />
+                                    </span>
+                                  ) : (
+                                    <span className={`flex h-8 w-8 shrink-0 items-center justify-center rounded ${type === "performer" ? "rounded-full bg-primary/10 text-primary/60" : type === "tag" ? "rounded-full bg-amber-500/10 text-amber-500/60" : "bg-primary/10 text-primary/60"}`}>
+                                      <Icon className="h-3.5 w-3.5" />
+                                    </span>
+                                  )}
+                                  <span className="min-w-0 flex-1">
+                                    <span className="block truncate font-medium">
+                                      {type === "tag" && <span className="text-muted-foreground/50">#</span>}
+                                      {highlightMatch(item.label, search)}
+                                    </span>
+                                    {item.subtitle && <span className="mt-0.5 block truncate text-[10px] text-muted-foreground/50">{item.subtitle}</span>}
+                                  </span>
+                                  <span className="shrink-0 text-[9px] text-muted-foreground/30">↵</span>
+                                </button>
+                              );
+                            })}
+                          </section>
+                        );
+                      })}
+                    </div>
+                  ) : (
+                    <div className="px-4 py-4">
+                      <p className="text-xs text-muted-foreground">No quick matches for “{debouncedSearch}”.</p>
+                      <button type="submit" className="mt-2 inline-flex items-center gap-1.5 text-xs font-medium text-primary hover:underline">
+                        Search all recordings <ArrowRight className="h-3 w-3" />
+                      </button>
+                    </div>
+                  )}
+                  {predictions.length > 0 && (
+                    <div className="flex items-center justify-between border-t border-border/30 px-3 py-2 text-[9px] text-muted-foreground/50">
+                      <span>{suggestionsPending || predictionsFetching ? "Updating matches…" : "Press Enter to search all recordings"}</span>
+                      <span>↑↓ to navigate · Esc to close</span>
+                    </div>
+                  )}
+                </>
+              ) : filteredRecent.length ? (
+                <>
+                  <div className="flex items-center justify-between bg-secondary px-3 py-1.5 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground/50 dark:bg-white/[0.06]">
+                    <span className="flex items-center gap-1.5"><Clock className="h-3 w-3" /> Recent searches</span>
+                    <button
+                      type="button"
+                      id={`${listboxId}-option-${filteredRecent.length}`}
+                      role="option"
+                      aria-selected={selectedIndex === filteredRecent.length}
+                      data-index={filteredRecent.length}
+                      onMouseDown={(event) => { event.preventDefault(); handleClearRecent(); }}
+                      onMouseEnter={() => setSelectedIndex(filteredRecent.length)}
+                      className="inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-[9px] hover:text-foreground"
+                    >
+                      <Trash2 className="h-2.5 w-2.5" /> Clear
+                    </button>
+                  </div>
+                  {filteredRecent.map((term, index) => (
+                    <button
+                      key={term}
+                      id={`${listboxId}-option-${index}`}
+                      type="button"
+                      role="option"
+                      aria-selected={selectedIndex === index}
+                      data-index={index}
+                      onMouseDown={() => submitSearch(term)}
+                      onMouseEnter={() => setSelectedIndex(index)}
+                      className={`flex w-full items-center gap-2 px-3 py-2.5 text-left text-xs transition-colors ${selectedIndex === index ? "bg-secondary text-foreground dark:bg-white/[0.08]" : "text-muted-foreground hover:bg-secondary/30 hover:text-foreground"}`}
+                    >
+                      <Clock className="h-3 w-3 shrink-0 text-muted-foreground/40" />
+                      <span className="flex-1 truncate">{term}</span>
+                      <span className="text-[9px] text-muted-foreground/30">↵</span>
+                    </button>
+                  ))}
+                </>
+              ) : (
+                <>
+                  <div className="flex items-center gap-1.5 bg-secondary px-3 py-1.5 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground/50 dark:bg-white/[0.06]">
+                    <TrendingUp className="h-3 w-3" /> Trending now
+                  </div>
+                  {trendingItems.length ? trendingItems.map((item, index) => (
+                    <button
+                      key={item.href}
+                      id={`${listboxId}-option-${index}`}
+                      type="button"
+                      role="option"
+                      aria-selected={selectedIndex === index}
+                      data-index={index}
+                      onMouseDown={() => navigateTo(item.href)}
+                      onMouseEnter={() => setSelectedIndex(index)}
+                      className={`flex w-full items-center gap-2 px-3 py-2.5 text-left text-xs transition-colors ${selectedIndex === index ? "bg-secondary text-foreground dark:bg-white/[0.08]" : "text-muted-foreground hover:bg-secondary/30 hover:text-foreground"}`}
+                    >
+                      <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-primary/5">{item.icon}</span>
+                      <span className="flex-1 truncate">{item.label}</span>
+                      <ArrowRight className="h-3 w-3 text-muted-foreground/30" />
+                    </button>
+                  )) : <p className="px-3 py-3 text-xs text-muted-foreground/50">Start typing to search the archive.</p>}
+                </>
+              )}
+            </div>
+          )}
         </div>
         <button
           type="button"
           onClick={closeSearch}
-          className="flex items-center justify-center w-7 h-7 text-muted-foreground hover:text-foreground hover:bg-secondary/50 dark:hover:bg-white/5 rounded-full transition-all"
+          className="flex h-7 w-7 items-center justify-center rounded-full text-muted-foreground transition-all hover:bg-secondary/50 hover:text-foreground dark:hover:bg-white/5"
           aria-label="Close search"
         >
-          <X className="w-3.5 h-3.5" />
+          <X className="h-3.5 w-3.5" />
         </button>
       </form>
-    </div>
-  );
-}
-
-// ── Sub-renderers ──────────────────────────────────────────────
-
-interface PredictionsProps {
-  predictionsLoading: boolean;
-  predictions: SearchSuggestion[];
-  debouncedSearch: string;
-  search: string;
-  selectedIndex: number;
-  suggestionsRef: React.RefObject<HTMLDivElement | null>;
-  onSelect: (suggestion: SearchSuggestion) => void;
-  onHover: (index: number) => void;
-}
-
-function renderPredictions({
-  predictionsLoading,
-  predictions,
-  debouncedSearch,
-  search,
-  selectedIndex,
-  suggestionsRef,
-  onSelect,
-  onHover,
-}: PredictionsProps) {
-  if (predictionsLoading) {
-    return (
-      <div className="absolute top-full right-0 mt-1.5 w-[calc(100vw-2rem)] sm:w-full min-w-[280px] sm:min-w-[320px] glass-dropdown rounded-lg z-50 overflow-hidden animate-in fade-in zoom-in-95 duration-150">
-        <div className="px-4 py-3 text-xs text-muted-foreground/50 flex items-center gap-2">
-          <div className="w-3 h-3 rounded-full border border-muted-foreground/30 border-t-transparent animate-spin" />
-          Searching…
-        </div>
-      </div>
-    );
-  }
-
-  if (predictions.length === 0 && debouncedSearch.length >= 2) {
-    return (
-      <div className="absolute top-full right-0 mt-1.5 w-[calc(100vw-2rem)] sm:w-full min-w-[280px] sm:min-w-[320px] glass-dropdown rounded-lg z-50 overflow-hidden animate-in fade-in zoom-in-95 duration-150">
-        <div className="px-4 py-3 text-xs text-muted-foreground/50">
-          No results for "{debouncedSearch}"
-        </div>
-      </div>
-    );
-  }
-
-  if (predictions.length === 0) return null;
-
-  // Group predictions by type
-  const groups: {
-    type: SearchSuggestion["type"];
-    items: SearchSuggestion[];
-    label: string;
-    icon: React.ReactNode;
-  }[] = [];
-
-  const performerItems = predictions.filter((s) => s.type === "performer");
-  const recordingItems = predictions.filter((s) => s.type === "recording");
-  const tagItems = predictions.filter((s) => s.type === "tag");
-
-  if (performerItems.length) {
-    groups.push({
-      type: "performer",
-      items: performerItems,
-      label: "Performers",
-      icon: <User className="w-3 h-3" />,
-    });
-  }
-  if (recordingItems.length) {
-    groups.push({
-      type: "recording",
-      items: recordingItems,
-      label: "Recordings",
-      icon: <Clapperboard className="w-3 h-3" />,
-    });
-  }
-  if (tagItems.length) {
-    groups.push({
-      type: "tag",
-      items: tagItems,
-      label: "Tags",
-      icon: <Tag className="w-3 h-3" />,
-    });
-  }
-
-  let idx = 0;
-
-  return (
-    <div
-      ref={suggestionsRef}
-      className="absolute top-full right-0 mt-1.5 w-[calc(100vw-2rem)] sm:w-full min-w-[280px] sm:min-w-[320px] glass-dropdown rounded-lg z-50 max-h-[70vh] overflow-y-auto overflow-x-hidden animate-in fade-in zoom-in-95 duration-150"
-    >
-      {groups.map((group) => (
-        <div key={group.type}>
-          <div className="flex items-center gap-1.5 px-3 py-1.5 text-[10px] uppercase tracking-wider text-muted-foreground/40 font-semibold bg-secondary dark:bg-white/[0.06]">
-            {group.icon}
-            {group.label}
-          </div>
-          {group.items.map((suggestion) => {
-            const currentIdx = idx++;
-            return (
-              <button
-                key={`${suggestion.type}-${suggestion.label}`}
-                type="button"
-                data-index={currentIdx}
-                onMouseDown={() => onSelect(suggestion)}
-                onMouseEnter={() => onHover(currentIdx)}
-                className={`w-full text-left px-3 py-2.5 text-xs transition-colors flex items-center gap-3 ${
-                  selectedIndex === currentIdx
-                    ? "bg-secondary dark:bg-white/[0.12] text-foreground"
-                    : "text-muted-foreground hover:text-foreground hover:bg-secondary/30 dark:hover:bg-white/5"
-                }`}
-              >
-                {suggestion.image_url ? (
-                  <div className="w-8 h-8 rounded shrink-0 overflow-hidden bg-secondary">
-                    <img
-                      src={proxyImageUrl(suggestion.image_url) ?? ""}
-                      alt=""
-                      className="w-full h-full object-cover"
-                      loading="eager"
-                    />
-                  </div>
-                ) : suggestion.type === "performer" ? (
-                  <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
-                    <User className="w-3.5 h-3.5 text-primary/50" />
-                  </div>
-                ) : suggestion.type === "tag" ? (
-                  <div className="w-8 h-8 rounded-full bg-amber-500/10 flex items-center justify-center shrink-0">
-                    <Tag className="w-3.5 h-3.5 text-amber-500/50" />
-                  </div>
-                ) : (
-                  <div className="w-8 h-8 rounded bg-primary/10 flex items-center justify-center shrink-0">
-                    <Clapperboard className="w-3.5 h-3.5 text-primary/50" />
-                  </div>
-                )}
-                <div className="min-w-0 flex-1">
-                  <div className="truncate font-medium">
-                    {suggestion.type === "tag" && (
-                      <span className="text-muted-foreground/50">#</span>
-                    )}
-                    {highlightMatch(suggestion.label, search)}
-                  </div>
-                  {suggestion.subtitle && (
-                    <div className="truncate text-[10px] text-muted-foreground/40 mt-0.5">
-                      {highlightMatch(suggestion.subtitle, search)}
-                    </div>
-                  )}
-                </div>
-                <span className="text-[9px] text-muted-foreground/20 shrink-0">↵</span>
-              </button>
-            );
-          })}
-        </div>
-      ))}
-      <div className="px-3 py-2 text-[9px] text-muted-foreground/20 text-center border-t border-border/30">
-        Press ↵ to search all results
-      </div>
-    </div>
-  );
-}
-
-// ── Recent Searches ─────────────────────────────────────────────
-
-interface RecentSearchesProps {
-  searches: string[];
-  trendingItems: { label: string; href: string; icon: React.ReactNode }[];
-  selectedIndex: number;
-  onSelect: (query: string) => void;
-  onNavigate: (href: string) => void;
-  onHover: (index: number) => void;
-  onClear: () => void;
-}
-
-function renderRecentSearches({
-  searches,
-  trendingItems,
-  selectedIndex,
-  onSelect,
-  onNavigate,
-  onHover,
-  onClear,
-}: RecentSearchesProps) {
-  if (searches.length > 0) {
-    return (
-      <div className="absolute top-full right-0 mt-1.5 w-[calc(100vw-2rem)] sm:w-full min-w-[280px] sm:min-w-[320px] glass-dropdown rounded-lg z-50 overflow-hidden animate-in fade-in zoom-in-95 duration-150">
-        <div className="flex items-center justify-between px-3 py-1.5 text-[10px] uppercase tracking-wider text-muted-foreground/40 font-semibold bg-secondary dark:bg-white/[0.06]">
-          <div className="flex items-center gap-1.5">
-            <Clock className="w-3 h-3" />
-            Recent Searches
-          </div>
-          <button
-            type="button"
-            data-index={searches.length}
-            onMouseDown={(e) => {
-              e.stopPropagation();
-              onClear();
-            }}
-            onMouseEnter={() => onHover(searches.length)}
-            className={`flex items-center gap-1 px-1.5 py-0.5 rounded text-[9px] transition-colors ${
-              selectedIndex === searches.length
-                ? "text-foreground"
-                : "text-muted-foreground/40 hover:text-muted-foreground"
-            }`}
-          >
-            <Trash2 className="w-2.5 h-2.5" />
-            Clear
-          </button>
-        </div>
-        {searches.map((s, i) => (
-          <button
-            key={s}
-            type="button"
-            data-index={i}
-            onMouseDown={() => onSelect(s)}
-            onMouseEnter={() => onHover(i)}
-            className={`w-full text-left px-3 py-2.5 text-xs transition-colors flex items-center gap-2 ${
-              selectedIndex === i
-                ? "bg-secondary/60 dark:bg-white/8 text-foreground"
-                : "text-muted-foreground hover:text-foreground hover:bg-secondary/30 dark:hover:bg-white/5"
-            }`}
-          >
-            <Clock className="w-3 h-3 shrink-0 text-muted-foreground/40" />
-            <span className="truncate flex-1">{s}</span>
-            <span className="text-[9px] text-muted-foreground/20 shrink-0">↵</span>
-          </button>
-        ))}
-      </div>
-    );
-  }
-
-  // Trending suggestions when no recent searches
-  return (
-    <div className="absolute top-full right-0 mt-1.5 w-[calc(100vw-2rem)] sm:w-full min-w-[280px] sm:min-w-[320px] glass-dropdown rounded-lg z-50 overflow-hidden animate-in fade-in zoom-in-95 duration-150">
-      <div className="flex items-center gap-1.5 px-3 py-1.5 text-[10px] uppercase tracking-wider text-muted-foreground/40 font-semibold bg-secondary dark:bg-white/[0.06]">
-        <TrendingUp className="w-3 h-3" />
-        Trending
-      </div>
-      {trendingItems.length > 0 ? (
-        trendingItems.map((item, i) => (
-          <button
-            key={item.label}
-            type="button"
-            data-index={i}
-            onMouseDown={() => onNavigate(item.href)}
-            onMouseEnter={() => onHover(i)}
-            className={`w-full text-left px-3 py-2.5 text-xs transition-colors flex items-center gap-2 ${
-              selectedIndex === i
-                ? "bg-secondary/60 dark:bg-white/8 text-foreground"
-                : "text-muted-foreground hover:text-foreground hover:bg-secondary/30 dark:hover:bg-white/5"
-            }`}
-          >
-            <div className="w-6 h-6 rounded-full bg-primary/5 flex items-center justify-center shrink-0">
-              {item.icon}
-            </div>
-            <span className="truncate flex-1">{item.label}</span>
-          </button>
-        ))
-      ) : (
-        <div className="px-3 py-2 text-[10px] text-muted-foreground/30">
-          Type at least 2 characters to search
-        </div>
-      )}
-      <div className="px-3 py-1.5 border-t border-border/30 text-[9px] text-muted-foreground/20 text-center">
-Popular tags & performers
-      </div>
     </div>
   );
 }
