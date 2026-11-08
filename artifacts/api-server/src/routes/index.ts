@@ -19,6 +19,7 @@ import premiumRouter from "./premium.js";
 import hotRouter from "./hot.js";
 import adminAdsRouter from "./admin-ads.js";
 import stripcashRouter from "./stripcash.js";
+import sitemapRouter from "./sitemap.js";
 
 const router: IRouter = Router();
 
@@ -42,5 +43,6 @@ router.use(premiumRouter);
 router.use(hotRouter);
 router.use(adminAdsRouter);
 router.use(stripcashRouter);
+router.use(sitemapRouter);
 
 export default router;

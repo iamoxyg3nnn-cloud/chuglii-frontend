@@ -18,6 +18,15 @@ import { AlertCircle, ArrowLeft, Heart, LogIn, Users, Film } from "lucide-react"
 import { AdLeaderboard } from "@/components/ads/AdLeaderboard";
 import { toast } from "@/hooks/use-toast";
 import { proxyUrl } from "@/lib/proxy-url";
+import {
+  absoluteUrl,
+  canonicalUrl,
+  organizationNode,
+  SITE_URL,
+  truncate,
+  usePageSeo,
+  websiteNode,
+} from "@/lib/seo";
 
 export default function PerformerProfile() {
   const { username } = useParams<{ username: string }>();
@@ -113,6 +122,93 @@ export default function PerformerProfile() {
     trackActivity("follow", { meta: { username, action: isFollowing ? "unfollow" : "follow" } });
   };
 
+  const latestThumbnail = profile?.recordings?.reduce<string | null>((found, rec) => {
+    if (found) return found;
+    return proxyUrl(rec.thumbnail_url || rec.preview_url || null);
+  }, null) ?? null;
+
+  // Public, indexable performer profile metadata (overrides the generic
+  // RouteSeoMeta fallback once the profile request resolves).
+  const seoConfig = useMemo(() => {
+    if (!profile) return null;
+
+    const username = profile.username;
+    const count = profile.recording_count ?? profile.recordings?.length ?? 0;
+    const canonical = canonicalUrl(`/performers/${encodeURIComponent(username)}`);
+    const image = absoluteUrl(latestThumbnail);
+    const genderLabel = profile.gender
+      ? `${profile.gender.charAt(0).toUpperCase()}${profile.gender.slice(1)} `
+      : "";
+    const title = truncate(
+      count > 0
+        ? `${username} — ${count.toLocaleString()} Adult Cam Recordings`
+        : `${username} — Adult Performer Profile`,
+      68,
+    );
+    const description = truncate(
+      count > 0
+        ? `Explore ${count.toLocaleString()} archived adult cam recording${
+            count === 1 ? "" : "s"
+          } by ${username} on VAULT. Browse the public ${genderLabel}performer profile and watch their latest listings. Adults only (18+).`
+        : `Explore ${username}'s public adult performer profile on VAULT and browse their archived cam recordings. Adults only (18+).`,
+      300,
+    );
+
+    const recordings = (profile.recordings ?? []).slice(0, 20);
+
+    return {
+      title,
+      description,
+      canonical,
+      image,
+      imageAlt: `${username} adult performer profile on VAULT`,
+      type: "profile" as const,
+      jsonLd: {
+        "@context": "https://schema.org",
+        "@graph": [
+          websiteNode(),
+          organizationNode(),
+          {
+            "@type": "ProfilePage",
+            "@id": `${canonical}#profile`,
+            url: canonical,
+            name: `${title} | VAULT`,
+            description,
+            inLanguage: "en",
+            isPartOf: { "@id": `${SITE_URL}/#website` },
+            mainEntity: {
+              "@type": "Person",
+              "@id": `${canonical}#person`,
+              name: username,
+              url: canonical,
+              image: image ?? undefined,
+              description: `Adult performer with ${count.toLocaleString()} archived recording${
+                count === 1 ? "" : "s"
+              } on VAULT.`,
+            },
+          },
+          ...(recordings.length > 0
+            ? [
+                {
+                  "@type": "ItemList",
+                  name: `${username} recordings`,
+                  numberOfItems: count,
+                  itemListElement: recordings.map((rec, index) => ({
+                    "@type": "ListItem",
+                    position: index + 1,
+                    url: `${SITE_URL}/video/${encodeURIComponent(rec.id)}`,
+                    name: rec.room_title || rec.filename || username,
+                  })),
+                },
+              ]
+            : []),
+        ],
+      },
+    };
+  }, [profile, latestThumbnail]);
+
+  usePageSeo(seoConfig);
+
   if (isError) {
     return (
       <Layout>
@@ -130,11 +226,6 @@ export default function PerformerProfile() {
       </Layout>
     );
   }
-
-  const latestThumbnail = profile?.recordings?.reduce<string | null>((found, rec) => {
-    if (found) return found;
-    return proxyUrl(rec.thumbnail_url || rec.preview_url || null);
-  }, null) ?? null;
 
   return (
     <Layout>

@@ -38,6 +38,16 @@ import { PrerollPlayer } from "@/components/ads/PrerollPlayer";
 import { usePremium } from "@/contexts/PremiumContext";
 import { useAds } from "@/contexts/AdsContext";
 import { pickPreroll, type PrerollCreative } from "@/lib/preroll";
+import {
+  absoluteUrl,
+  canonicalUrl,
+  isoDuration,
+  organizationNode,
+  SITE_URL,
+  truncate,
+  usePageSeo,
+  websiteNode,
+} from "@/lib/seo";
 
 import {
   AlertCircle, ArrowLeft, Maximize2, Minimize2,
@@ -535,6 +545,89 @@ export default function VideoDetail() {
   useWatchProgress({ video, durationSeconds: video?.duration, isActive: videoStarted && currentServer?.type === "iframe" });
 
   const posterUrl = video?.sprite_url || video?.thumbnail_url;
+
+  // Public, indexable detail-page metadata. RouteSeoMeta supplies a generic
+  // fallback while the recording request is in flight; this upgrade runs as
+  // soon as the recording data (or a cached copy) is available.
+  const seoConfig = useMemo(() => {
+    if (!video) return null;
+
+    const performer = video.username;
+    const displayTitle =
+      video.room_title && video.room_title !== performer
+        ? `${performer}: ${video.room_title}`
+        : `${performer} — ${video.filename}`;
+    const tags = (video.tags ?? []).filter(Boolean).slice(0, 8);
+    const image = absoluteUrl(
+      proxyUrl(video.thumbnail_url || video.sprite_url || video.preview_url),
+    );
+    const canonical = canonicalUrl(`/video/${encodeURIComponent(video.id)}`);
+    const description = truncate(
+      [
+        `Watch ${performer}'s archived adult cam recording${
+          video.room_title ? ` “${video.room_title}”` : ""
+        } on VAULT.`,
+        video.duration ? `Duration ${formatDuration(video.duration)}.` : "",
+        video.resolution ? `${video.resolution} quality.` : "",
+        video.viewers ? `${video.viewers.toLocaleString()} views.` : "",
+        tags.length ? `Tags: ${tags.join(", ")}.` : "",
+        "Adults only (18+).",
+      ]
+        .filter(Boolean)
+        .join(" "),
+      300,
+    );
+    const pageTitle = truncate(displayTitle, 68);
+
+    const graph: Record<string, unknown>[] = [
+      websiteNode(),
+      organizationNode(),
+    ];
+    if (image) {
+      graph.push({
+        "@type": "VideoObject",
+        "@id": `${canonical}#video`,
+        url: canonical,
+        name: pageTitle,
+        description,
+        thumbnailUrl: [image],
+        uploadDate: video.timestamp,
+        duration: isoDuration(video.duration),
+        embedUrl: video.embed_url ?? undefined,
+        isFamilyFriendly: false,
+        inLanguage: "en",
+        keywords: tags.length ? tags.join(", ") : undefined,
+        actor: {
+          "@type": "Person",
+          name: performer,
+          url: `${SITE_URL}/performers/${encodeURIComponent(performer)}`,
+        },
+      });
+    }
+    graph.push({
+      "@type": "WebPage",
+      "@id": `${canonical}#webpage`,
+      url: canonical,
+      name: `${pageTitle} | VAULT`,
+      description,
+      inLanguage: "en",
+      isPartOf: { "@id": `${SITE_URL}/#website` },
+      about: image ? { "@id": `${canonical}#video` } : undefined,
+      primaryImageOfPage: image ? { "@type": "ImageObject", url: image } : undefined,
+    });
+
+    return {
+      title: pageTitle,
+      description,
+      canonical,
+      image,
+      imageAlt: `${performer} archived adult cam recording on VAULT`,
+      type: "video.other" as const,
+      jsonLd: { "@context": "https://schema.org", "@graph": graph },
+    };
+  }, [video]);
+
+  usePageSeo(seoConfig);
 
   const handleReaction = (type: "like" | "dislike") => {
     if (!id) return;

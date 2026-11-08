@@ -2,6 +2,7 @@ import express, { type Express, type Request, type Response, type NextFunction }
 import cors from "cors";
 import pinoHttp from "pino-http";
 import router from "./routes/index.js";
+import sitemapRouter from "./routes/sitemap.js";
 import { globalRateLimiter, rateLimit } from "./middleware/rate-limit.js";
 import { logger } from "./lib/logger.js";
 
@@ -79,6 +80,10 @@ app.use(express.urlencoded({ extended: true, limit: "1mb" }));
 // This ensures Redis caching and browser caching work together properly.
 
 app.use("/api", router);
+
+// Root-level sitemap. Vercel rewrites /sitemap.xml here with the original
+// path preserved, and long-lived hosts (Render) serve it directly.
+app.use(sitemapRouter);
 
 // ─── Global error handler ──────────────────────────────────────
 // Catches unhandled promise rejections from async route handlers

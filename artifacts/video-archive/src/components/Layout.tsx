@@ -406,7 +406,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
                 </span>
               </Link>
               <p className="text-xs text-muted-foreground/40 max-w-xs leading-relaxed">
-                Private recording archive. For adult audiences only (18+).
+                Public adult cam recording archive and performer directory. For adult audiences only (18+).
               </p>
             </div>
             <nav
@@ -431,7 +431,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
             </nav>
           </div>
           <div className="mt-8 pt-5 border-t border-border/30 text-[11px] text-muted-foreground/30">
-            &copy; {new Date().getFullYear()} VAULT — Private Archive — Adults only (18+)
+            &copy; {new Date().getFullYear()} VAULT — Adult Recording Archive — Adults only (18+)
           </div>
         </div>
       </footer>

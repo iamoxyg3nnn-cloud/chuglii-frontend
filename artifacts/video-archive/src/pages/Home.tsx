@@ -113,13 +113,14 @@ export default function Home() {
           <div className="mb-4 flex items-center gap-3 animate-fade-in-up" style={{ animationDelay: '0ms' }}>
             <div className="h-px flex-1 bg-border/50" />
             <span className="text-[11px] uppercase tracking-[0.3em] text-muted-foreground font-medium">
-              Your Private Recording Archive
+              Public Adult Recording Archive
             </span>
             <div className="h-px flex-1 bg-border/50" />
           </div>
 
           <h1 className="text-[clamp(3.5rem,9vw,7rem)] font-black tracking-tighter leading-none mb-6 animate-fade-in-up" style={{ animationDelay: '80ms' }}>
             VAULT<span className="text-primary">.</span>
+            <span className="sr-only"> — Adult Cam Recording Archive &amp; Performer Directory</span>
           </h1>
 
           <div className="mb-10 text-xs text-muted-foreground animate-fade-in-up" style={{ animationDelay: '160ms' }}>
