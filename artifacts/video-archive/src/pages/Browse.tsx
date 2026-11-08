@@ -444,7 +444,8 @@ export default function Browse() {
                   <div className="w-7 h-7 rounded-lg bg-primary/10 flex items-center justify-center">
                     <Clapperboard className="w-3.5 h-3.5 text-primary" />
                   </div>
-                  <h1 className="text-xl font-bold tracking-tight">Browse</h1>
+                  <h1 className="text-xl font-bold tracking-tight">Browse recordings</h1>
+                <p className="text-xs text-muted-foreground mt-1 max-w-xl">Search public adult cam recording listings by title or performer, narrow results with tags and filters, and sort the catalogue to find relevant entries. 18+ only.</p>
                 </div>
                 {data && data.total != null && (
                   <p className="text-xs text-muted-foreground/70 ml-9.5">
