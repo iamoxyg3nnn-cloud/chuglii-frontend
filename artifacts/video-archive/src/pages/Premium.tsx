@@ -21,7 +21,7 @@ import { useAds } from "@/contexts/AdsContext";
 
 export default function Premium() {
   const { user, loading } = useAuth();
-  const { config, status, isPremium, refreshStatus } = usePremium();
+  const { config, status, isPremium, refreshStatus, adsEnabled } = usePremium();
   const search = useSearch();
   const paid = new URLSearchParams(search).get("paid") === "1";
 
@@ -226,7 +226,8 @@ export default function Premium() {
               )}
             </div>
 
-            {/* Earn Free */}
+            {/* Earn Free — hidden while the site-wide ad switch is off. */}
+            {adsEnabled && (
             <div className="rounded-xl border border-primary/30 bg-primary/[0.03] p-6 relative overflow-hidden">
               <div className="flex items-center justify-between mb-4">
                 <div>
@@ -295,6 +296,7 @@ export default function Premium() {
                 </p>
               )}
             </div>
+            )}
           </div>
         )}
       </div>
