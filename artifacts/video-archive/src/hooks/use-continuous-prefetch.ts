@@ -2,6 +2,7 @@ import { useEffect, useRef, useCallback } from "react";
 import { proxyImageUrl } from "@/lib/proxy-url";
 import { preloadImage, preloadRecordingMedia } from "@/lib/preload-sprite";
 import { isConnectionConstrained } from "@/lib/connection";
+import { scheduleIdle } from "@/lib/schedule-idle";
 import {
   createPrefetchWindow,
   planPages,
@@ -70,20 +71,6 @@ const FAR_EAGER_THUMB_CAP = 16;
  */
 const NEAR_SPRITE_LIMIT = 4;
 const FAR_SPRITE_LIMIT = 2;
-
-/**
- * Defer speculative work until the browser reports it is idle, following the
- * same requestIdleCallback + timeout fallback used by catalog-warmer (Safari
- * <16 has no requestIdleCallback). The timeout is a backstop so warming still
- * happens on a permanently-busy main thread rather than never.
- */
-function scheduleIdle(work: () => void, timeout = 500): void {
-  if (typeof window !== "undefined" && typeof window.requestIdleCallback === "function") {
-    window.requestIdleCallback(() => work(), { timeout });
-  } else {
-    setTimeout(work, 200);
-  }
-}
 
 /**
  * Continuous, scroll-aware background prefetch.
@@ -232,7 +219,7 @@ export function useContinuousPrefetch({
               // pages several scrolls away.
               preloadRecordingMedia(recs, { skipPreviews: true, skipThumbnails: true, spriteLimit: FAR_SPRITE_LIMIT });
             }
-          });
+          }, 500, signal);
         }
       } catch (err: unknown) {
         // Ignore AbortError — that's an expected cancellation, not a real error.
