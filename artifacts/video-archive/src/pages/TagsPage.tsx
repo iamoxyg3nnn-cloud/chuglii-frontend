@@ -34,7 +34,8 @@ export default function TagsPage() {
             <Tags className="w-3.5 h-3.5 text-primary" />
             Tags
           </div>
-          <h1 className="text-2xl sm:text-3xl font-black tracking-tighter">Browse by Tag</h1>
+          <h1 className="text-2xl sm:text-3xl font-black tracking-tighter">Browse recordings by tag</h1>
+          <p className="text-sm text-muted-foreground mt-2 max-w-2xl">Use topic tags to explore the public recording catalogue. Select a tag to open matching listings, then refine your results with the browse filters. Adults 18+ only.</p>
           {tags && (
             <p className="text-sm text-muted-foreground mt-2">
               {sorted.length.toLocaleString()} categories across the archive
