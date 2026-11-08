@@ -27,6 +27,7 @@ import { initCache } from "@/lib/cache";
 import { startCatalogWarmup } from "@/lib/catalog-warmer";
 import { cancelPendingPreviews } from "@/lib/preload-preview";
 import { sanitizeActivityPath, trackActivity } from "@/lib/rum";
+import { RouteSeoMeta } from "@/components/RouteSeoMeta";
 
 // Home is eagerly imported for instant first paint (landing page)
 // All other pages are lazy-loaded — fetched on-demand when navigated to.
@@ -187,6 +188,7 @@ function Router() {
           switches from Admin → Ads → Placements feed showAds below. */}
       <AdsProvider>
       <PremiumProvider>
+      <RouteSeoMeta />
       <TrackPageView />
       <PredictivePrefetch />
       <AdPopunder />
