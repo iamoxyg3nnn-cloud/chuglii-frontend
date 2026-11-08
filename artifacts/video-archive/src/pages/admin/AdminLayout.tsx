@@ -100,37 +100,58 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
       </aside>
 
       <div className="flex-1 flex flex-col min-h-screen">
-        <header className="lg:hidden flex items-center justify-between px-4 h-14 border-b border-border/40 bg-card/20">
-          <Link href="/admin">
-            <div className="flex items-center gap-2">
-              <Shield className="w-4 h-4 text-primary" />
-              <span className="text-sm font-bold">Admin</span>
-            </div>
-          </Link>
-
-          <div className="flex items-center gap-2">
-            {NAV_ITEMS.map(({ href, label, icon: Icon, exact }) => (
-              <Link key={href} href={href}>
-                <div
-                  className={cn(
-                    "p-2 rounded-md transition-colors",
-                    isActive(href, exact)
-                      ? "bg-primary/10 text-primary"
-                      : "text-muted-foreground hover:text-foreground",
-                  )}
-                  title={label}
-                >
-                  <Icon className="w-4 h-4" />
-                </div>
-              </Link>
-            ))}
-            <div className="w-px h-4 bg-border/50 mx-1" />
-            <Link href="/">
-              <div className="p-2 text-muted-foreground hover:text-foreground transition-colors" title="Back to site">
-                <ChevronLeft className="w-4 h-4" />
+        <header className="lg:hidden border-b border-border/40 bg-card/20">
+          <div className="flex items-center justify-between px-4 h-14">
+            <Link href="/admin">
+              <div className="flex items-center gap-2">
+                <Shield className="w-4 h-4 text-primary" />
+                <span className="text-sm font-bold">Admin</span>
               </div>
             </Link>
+            <div className="flex items-center gap-2">
+              <span className="max-w-32 truncate text-[11px] text-muted-foreground">
+                {user?.email ?? "Admin"}
+              </span>
+              <button
+                type="button"
+                onClick={signOut}
+                aria-label="Sign out of admin"
+                className="inline-flex h-9 w-9 items-center justify-center rounded-md text-muted-foreground hover:bg-accent/50 hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+              >
+                <LogOut className="w-4 h-4" />
+              </button>
+            </div>
           </div>
+          <nav
+            aria-label="Admin navigation"
+            className="flex gap-1 overflow-x-auto px-3 pb-3 [scrollbar-width:thin]"
+          >
+            {NAV_ITEMS.map(({ href, label, icon: Icon, exact }) => {
+              const active = isActive(href, exact);
+              return (
+                <Link key={href} href={href}>
+                  <div
+                    aria-current={active ? "page" : undefined}
+                    className={cn(
+                      "inline-flex min-h-9 shrink-0 items-center gap-2 rounded-md border px-3 text-xs font-medium transition-colors",
+                      active
+                        ? "border-primary/20 bg-primary/10 text-primary"
+                        : "border-transparent text-muted-foreground hover:bg-accent/50 hover:text-foreground",
+                    )}
+                  >
+                    <Icon className="h-3.5 w-3.5" />
+                    {label}
+                  </div>
+                </Link>
+              );
+            })}
+            <Link href="/">
+              <div className="inline-flex min-h-9 shrink-0 items-center gap-2 rounded-md border border-transparent px-3 text-xs font-medium text-muted-foreground hover:bg-accent/50 hover:text-foreground">
+                <ChevronLeft className="h-3.5 w-3.5" />
+                Back to site
+              </div>
+            </Link>
+          </nav>
         </header>
 
         <main className="flex-1">
