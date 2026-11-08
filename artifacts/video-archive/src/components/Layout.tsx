@@ -420,6 +420,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
               <Link href="/playlists" className="hover:text-muted-foreground transition-colors" onMouseEnter={() => prefetchFooter("/playlists")} onFocus={() => prefetchFooter("/playlists")}>Playlists</Link>
               <Link href="/collections" className="hover:text-muted-foreground transition-colors" onMouseEnter={() => prefetchFooter("/collections")} onFocus={() => prefetchFooter("/collections")}>Collections</Link>
               <Link href="/request" className="hover:text-muted-foreground transition-colors" onMouseEnter={() => prefetchFooter("/request")} onFocus={() => prefetchFooter("/request")}>Request</Link>
+              <Link href="/content-removal" className="hover:text-muted-foreground transition-colors">Content Removal</Link>
               <Link href="/my-requests" className="hover:text-muted-foreground transition-colors" onMouseEnter={() => prefetchFooter("/my-requests")} onFocus={() => prefetchFooter("/my-requests")}>My Requests</Link>
               <Link href="/bookmarks" className="hover:text-muted-foreground transition-colors" onMouseEnter={() => prefetchFooter("/bookmarks")} onFocus={() => prefetchFooter("/bookmarks")}>Bookmarks</Link>
               <Link href="/watch-later" className="hover:text-muted-foreground transition-colors" onMouseEnter={() => prefetchFooter("/watch-later")} onFocus={() => prefetchFooter("/watch-later")}>Watch Later</Link>

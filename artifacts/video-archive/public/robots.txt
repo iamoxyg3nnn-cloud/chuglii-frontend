@@ -1,12 +1,5 @@
-# VAULT is a public, adults-only archive. Every page is intentionally
-# indexable so visitors can discover recordings, performers and tags.
+# Search engines must be able to crawl pages to see route-level noindex directives.
 User-agent: *
 Allow: /
-
-# Explicitly allow the media proxy and API-backed pages.
-Allow: /api/media
-Allow: /browse
-Allow: /performers
-Allow: /tags
 
 Sitemap: https://chuglii.in/sitemap.xml
