@@ -24,6 +24,7 @@ import {
   stripAdComments,
 } from "@/lib/ad-creatives";
 import { DEFAULT_AD_SETTINGS, mergeAdSettings, type AdSettings } from "@/lib/ad-slots";
+import { areAdsEnabled } from "@/lib/ads-enabled";
 
 export type { AdRow } from "@/lib/ad-creatives";
 
@@ -170,6 +171,10 @@ export function AdsProvider({ children }: { children: ReactNode }) {
   // StripCash smartlink — best-effort like settings: endpoint down or key not
   // configured just means StripCash adds no candidates (never breaks others).
   useEffect(() => {
+    if (!areAdsEnabled()) {
+      setStripCash(null);
+      return;
+    }
     let alive = true;
     fetch(resolveApiPath("/api/ads/stripcash"), { signal: AbortSignal.timeout(5000) })
       .then((r) => (r.ok ? r.json() : null))
