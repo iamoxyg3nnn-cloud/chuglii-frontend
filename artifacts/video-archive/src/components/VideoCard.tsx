@@ -402,7 +402,7 @@ export const VideoCard = memo(function VideoCard({ recording, showRemove, onRemo
             <div className="absolute inset-0 w-full h-full">
               <OptimizedImage
                 src={staticImage!}
-                alt={recording.username}
+                alt={`${recording.username} recording thumbnail`}
                 fetchPriority={fetchPriority}
                 width="card"
                 className="opacity-100"
@@ -435,7 +435,7 @@ export const VideoCard = memo(function VideoCard({ recording, showRemove, onRemo
           {showAnyWebpImg && (previewProgressive.src || animatedImageUrl) && (
             <img
               src={previewProgressive.src || animatedImageUrl!}
-              alt={recording.username}
+              alt={`${recording.username} recording thumbnail`}
               referrerPolicy="no-referrer"
               loading="eager"
               decoding="async"
@@ -498,7 +498,7 @@ export const VideoCard = memo(function VideoCard({ recording, showRemove, onRemo
           {showImgFallback && animatedImageUrl && (
             <img
               src={animatedImageUrl}
-              alt={recording.username}
+              alt={`${recording.username} recording thumbnail`}
               referrerPolicy="no-referrer"
               className="absolute inset-0 w-full h-full object-cover"
               onLoad={() => setPreviewReady(true)}
