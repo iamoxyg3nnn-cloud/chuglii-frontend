@@ -1,4 +1,4 @@
-import { Router } from "express";
+import { Router, type Request, type Response } from "express";
 import { supabase } from "../lib/supabase.js";
 import { requireAuth } from "../middleware/auth.js";
 import { requireRole } from "../middleware/requireRole.js";
@@ -43,7 +43,7 @@ router.post("/content-removal-requests",async(req,res)=>{
  }
 });
 
-router.get("/admin/content-removal-requests",requireAuth,admin,async(_req,res)=>{
+router.get("/admin/content-removal-requests",requireAuth,admin,async(_req: Request,res: Response)=>{
  const {data,error}=await supabase.from("content_removal_requests")
   .select("id,content_url,reason,details,contact_email,status,admin_notes,created_at,reviewed_at,reviewed_by")
   .order("created_at",{ascending:false}).limit(100);
@@ -51,7 +51,7 @@ router.get("/admin/content-removal-requests",requireAuth,admin,async(_req,res)=>
  res.json(data??[]);
 });
 
-router.patch("/admin/content-removal-requests/:id",requireAuth,admin,async(req,res)=>{
+router.patch("/admin/content-removal-requests/:id",requireAuth,admin,async(req: Request,res: Response)=>{
  const id=String(req.params.id??"");
  const status=typeof req.body?.status==="string"?req.body.status:"";
  const adminNotes=typeof req.body?.admin_notes==="string"?req.body.admin_notes.trim():"";
