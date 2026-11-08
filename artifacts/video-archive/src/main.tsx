@@ -4,6 +4,7 @@ import { SpeedInsights } from "@vercel/speed-insights/react";
 import { setBaseUrl } from "@workspace/api-client-react";
 import { getApiBaseUrl } from "./lib/api-base";
 import App from "./App";
+import { ThemeProvider } from "./contexts/ThemeContext";
 import { initRum, trackActivity } from "./lib/rum";
 import "./index.css";
 
@@ -69,7 +70,9 @@ if (import.meta.env.PROD && "serviceWorker" in navigator) {
 
 createRoot(document.getElementById("root")!).render(
   <>
-    <App />
+    <ThemeProvider>
+      <App />
+    </ThemeProvider>
     <Analytics />
     <SpeedInsights />
   </>,

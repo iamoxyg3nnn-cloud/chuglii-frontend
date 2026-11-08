@@ -10,6 +10,7 @@ import { SearchDropdown } from "@/components/nav/SearchDropdown";
 import { markAgeGatePassed } from "@/lib/gating";
 import { PremiumUpsellPopup } from "@/components/ads/PremiumUpsellPopup";
 import { AdLeaderboard } from "@/components/ads/AdLeaderboard";
+import { useTheme } from "@/contexts/ThemeContext";
 
 // Lazy-load components that are heavy or only needed on interaction:
 // - NotificationBell: pulls in notification hooks, only visible for auth users
@@ -25,28 +26,6 @@ import { prefetchRoute } from "@/lib/route-chunks";
 // footer just points at it (connection-constrained guard lives there).
 function prefetchFooter(href: string) {
   prefetchRoute(href);
-}
-
-function useDarkMode() {
-  const [dark, setDark] = useState(() => {
-    if (typeof window === "undefined") return true;
-    const stored = localStorage.getItem("theme");
-    if (stored) return stored === "dark";
-    return true;
-  });
-
-  useEffect(() => {
-    const root = document.documentElement;
-    if (dark) {
-      root.classList.add("dark");
-      localStorage.setItem("theme", "dark");
-    } else {
-      root.classList.remove("dark");
-      localStorage.setItem("theme", "light");
-    }
-  }, [dark]);
-
-  return [dark, setDark] as const;
 }
 
 function Logo() {
@@ -227,7 +206,7 @@ export function Navbar() {
   const [location, setLocation] = useLocation();
   const [searchOpen, setSearchOpen] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
-  const [dark, setDark] = useDarkMode();
+  const { isDark: dark, toggleTheme } = useTheme();
   const [scrolled, setScrolled] = useState(false);
   const [requestOpen, setRequestOpen] = useState(false);
   const { isPremium, loading } = usePremium();
@@ -271,10 +250,12 @@ export function Navbar() {
 
           {!searchOpen && (
             <button
-              onClick={() => setDark((d) => !d)}
+              onClick={toggleTheme}
               className="nav-btn hidden sm:flex"
-              aria-label={dark ? "Switch to light mode" : "Switch to dark mode"}
-              title={dark ? "Light mode" : "Dark mode"}
+              aria-label="Dark mode"
+              title={dark ? "Switch to light mode" : "Switch to dark mode"}
+              aria-pressed={dark}
+              type="button"
             >
               <div className="relative z-10 transition-transform duration-200 hover:scale-105">
                 {dark ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
@@ -327,7 +308,7 @@ export function Navbar() {
           open={mobileOpen}
           location={location}
           dark={dark}
-          onDarkToggle={() => setDark((d) => !d)}
+          onDarkToggle={toggleTheme}
           onClose={() => setMobileOpen(false)}
           onRequestOpen={() => setRequestOpen(true)}
         />

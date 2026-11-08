@@ -142,12 +142,14 @@ export function MobileMenu({
               <span className="text-xs text-muted-foreground font-medium">{dark ? "Dark" : "Light"} mode</span>
             </div>
             <button
+              type="button"
               onClick={onDarkToggle}
               className={`relative inline-flex h-5 w-9 items-center rounded-full transition-all duration-200 ${
                 dark ? "border border-primary/60" : "border border-border/40"
               }`}
               role="switch"
               aria-checked={dark}
+              aria-label="Dark mode"
             >
               <span
                 className={`inline-block h-3.5 w-3.5 transform rounded-full bg-white shadow-sm transition-all duration-200 ${
