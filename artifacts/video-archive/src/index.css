@@ -360,52 +360,24 @@
 
 
 
-”€ Diamond lattice background pattern â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
+  /* Diamond lattice background pattern */
   .pattern-square {
     background:
       repeating-linear-gradient(
-          45deg,
-          #0000 calc(-650% / 13) calc(50% / 13),
-          #100f0f 0 calc(100% / 13),
-          #0000 0 calc(150% / 13),
-          #100f0f 0 calc(200% / 13),
-          #0000 0 calc(250% / 13),
-          #100f0f 0 calc(300% / 13)
-        )
-        0px 0px,
+        45deg,
+        transparent 0 12px,
+        #100f0f 12px 16px,
+        transparent 16px 32px
+      ),
       repeating-linear-gradient(
-          45deg,
-          #0000 calc(-650% / 13) calc(50% / 13),
-          #100f0f 0 calc(100% / 13),
-          #0000 0 calc(150% / 13),
-          #100f0f 0 calc(200% / 13),
-          #0000 0 calc(250% / 13),
-          #100f0f 0 calc(300% / 13)
-        )
-        32px 32px,
-      repeating-linear-gradient(
-          -45deg,
-          #0000 calc(-650% / 13) calc(50% / 13),
-          #100f0f 0 calc(100% / 13),
-          #0000 0 calc(150% / 13),
-          #100f0f 0 calc(200% / 13),
-          #0000 0 calc(250% / 13),
-          #100f0f 0 calc(300% / 13)
-        )
-        0px 0px,
-      repeating-linear-gradient(
-          -45deg,
-          #0000 calc(-650% / 13) calc(50% / 13),
-          #100f0f 0 calc(100% / 13),
-          #0000 0 calc(150% / 13),
-          #100f0f 0 calc(200% / 13),
-          #0000 0 calc(250% / 13),
-          #100f0f 0 calc(300% / 13)
-        )
-        32px 32px #1e1e1e;
+        -45deg,
+        transparent 0 12px,
+        #100f0f 12px 16px,
+        transparent 16px 32px
+      ),
+      #1e1e1e;
     background-size: 64px 64px;
   }
-
   .nav-underline {
     position: relative;
     transition: color 0.2s ease;
