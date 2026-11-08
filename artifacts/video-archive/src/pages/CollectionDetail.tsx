@@ -18,7 +18,7 @@ import { setQueue, shuffleQueueItems, toQueueItem, type QueueItem } from "@/lib/
 import { byPositionThenNewest, moveItem } from "@/lib/list-order";
 import { trackActivity } from "@/lib/rum";
 import { cn } from "@/lib/utils";
-import { ArrowLeft, Film, Pencil, Check, X, Trash2, ListVideo, Play, Shuffle, GripVertical, User } from "lucide-react";
+import { ArrowLeft, ArrowUp, ArrowDown, Film, Pencil, Check, X, Trash2, ListVideo, Play, Shuffle, User } from "lucide-react";
 import { formatRelativeTime } from "@/lib/formatters";
 import { proxyUrl } from "@/lib/proxy-url";
 
@@ -153,6 +153,21 @@ export default function CollectionDetail() {
       setOrder(null);
     },
   });
+
+  // Drag-and-drop remains available on desktop; explicit controls make the
+  // same ordering action usable on touch screens and with a keyboard.
+  const handleMoveItem = (recId: string, direction: "up" | "down") => {
+    if (!isOwner || reorderCloud.isPending) return;
+    const ids = sortedItems.map((it) => it.recording_id);
+    const index = ids.indexOf(recId);
+    const neighbor = ids[index + (direction === "up" ? -1 : 1)];
+    if (!neighbor) return;
+    const next = moveItem(ids, recId, neighbor, direction === "down");
+    if (next !== ids) {
+      commitOrder(next);
+      trackActivity("collection_reorder", { meta: { collection_id: id, count: next.length, method: "controls" } });
+    }
+  };
 
   const handleDragStart = (recId: string) => (e: React.DragEvent) => {
     if (!isOwner) return;
@@ -508,11 +523,28 @@ export default function CollectionDetail() {
                       )}
                     </div>
                     {isOwner && (
-                      <div
-                        className="absolute top-2 right-2 z-10 w-6 h-6 flex items-center justify-center bg-black/40 backdrop-blur-sm ring-1 ring-white/10 text-white/60 rounded-lg cursor-grab active:cursor-grabbing opacity-0 group-hover/card:opacity-100 transition-all pointer-events-none"
-                        title="Drag to reorder"
-                      >
-                        <GripVertical className="w-3.5 h-3.5" />
+                      <div className="absolute top-2 right-2 z-10 flex items-center gap-1">
+                        <button
+                          type="button"
+                          onClick={() => handleMoveItem(rec.id, "up")}
+                          disabled={i === 0 || reorderCloud.isPending}
+                          aria-label={`Move ${rec.username} up`}
+                          title="Move up"
+                          className="w-7 h-7 flex items-center justify-center rounded-lg bg-black/65 backdrop-blur-sm ring-1 ring-white/15 text-white hover:bg-black/85 disabled:opacity-30 disabled:cursor-not-allowed transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+                        >
+                          <ArrowUp className="w-3.5 h-3.5" />
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => handleMoveItem(rec.id, "down")}
+                          disabled={i === items.length - 1 || reorderCloud.isPending}
+                          aria-label={`Move ${rec.username} down`}
+                          title="Move down"
+                          className="w-7 h-7 flex items-center justify-center rounded-lg bg-black/65 backdrop-blur-sm ring-1 ring-white/15 text-white hover:bg-black/85 disabled:opacity-30 disabled:cursor-not-allowed transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+                        >
+                          <ArrowDown className="w-3.5 h-3.5" />
+                        </button>
+                        <span className="sr-only">You can also drag this recording to reorder it.</span>
                       </div>
                     )}
                     {dropHere && (
