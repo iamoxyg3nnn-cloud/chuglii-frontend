@@ -98,6 +98,42 @@
       "destination": "/assets/$1"
     },
     {
+      "source": "/",
+      "destination": "/api/index"
+    },
+    {
+      "source": "/browse",
+      "destination": "/api/index"
+    },
+    {
+      "source": "/performers",
+      "destination": "/api/index"
+    },
+    {
+      "source": "/tags",
+      "destination": "/api/index"
+    },
+    {
+      "source": "/premium",
+      "destination": "/api/index"
+    },
+    {
+      "source": "/playlists",
+      "destination": "/api/index"
+    },
+    {
+      "source": "/content-removal",
+      "destination": "/api/index"
+    },
+    {
+      "source": "/video/:id",
+      "destination": "/api/index"
+    },
+    {
+      "source": "/performers/:username",
+      "destination": "/api/index"
+    },
+    {
       "source": "/(.*)",
       "destination": "/index.html"
     }
