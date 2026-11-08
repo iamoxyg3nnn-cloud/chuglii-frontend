@@ -2,6 +2,7 @@ import { Link } from "wouter";
 import { Sun, Moon, Bookmark, FolderOpen, Clock, History, Heart, Bell, Settings, Send, User } from "lucide-react";
 import { NAV_LINKS } from "./DesktopNav";
 import { prefetchRoute } from "@/lib/route-chunks";
+import { isActiveNavigationRoute } from "@/lib/navigation";
 
 const LIBRARY_LINKS = [
   { href: "/bookmarks", label: "Bookmarks", icon: Bookmark },
@@ -27,10 +28,6 @@ interface MobileMenuProps {
   onRequestOpen?: () => void;
 }
 
-function isActive(href: string, location: string) {
-  return href === "/" ? location === "/" : location.startsWith(href);
-}
-
 export function MobileMenu({
   open,
   location,
@@ -40,7 +37,9 @@ export function MobileMenu({
   onRequestOpen,
 }: MobileMenuProps) {
   return (
-    <div
+    <nav
+      id="mobile-navigation"
+      aria-label="Mobile navigation"
       className={`md:hidden glass-dropdown border-t-0 rounded-b-xl mx-2 mb-2 max-h-[calc(100dvh-4.5rem)] overflow-y-auto overscroll-contain shadow-2xl ${
         open
           ? "animate-in fade-in slide-in-from-top-1 zoom-in-95 duration-200"
@@ -51,10 +50,10 @@ export function MobileMenu({
           {/* Main navigation */}
           <div className="px-3 py-3 space-y-0.5">
             {NAV_LINKS.map(({ href, label, icon: Icon }) => (
-              <Link key={href} href={href}>
+              <Link key={href} href={href} aria-current={isActiveNavigationRoute(href, location) ? "page" : undefined}>
                 <span
                   className={`block px-3 py-2.5 text-sm rounded-lg transition-all duration-150 inline-flex items-center gap-2.5 ${
-                    isActive(href, location)
+                    isActiveNavigationRoute(href, location)
                       ? "text-foreground font-medium bg-secondary/50 dark:bg-white/8"
                       : "text-muted-foreground hover:text-foreground hover:bg-secondary/30 dark:hover:bg-white/5"
                   }`}
@@ -62,7 +61,7 @@ export function MobileMenu({
                   onMouseEnter={() => prefetchRoute(href)}
                   onFocus={() => prefetchRoute(href)}
                 >
-                  <Icon className={`w-4 h-4 ${isActive(href, location) ? "text-primary" : "text-muted-foreground/40"}`} />
+                  <Icon className={`w-4 h-4 ${isActiveNavigationRoute(href, location) ? "text-primary" : "text-muted-foreground/40"}`} />
                   {label}
                 </span>
               </Link>
@@ -86,10 +85,10 @@ export function MobileMenu({
               Library
             </p>
             {LIBRARY_LINKS.map(({ href, label, icon: Icon }) => (
-              <Link key={href} href={href}>
+              <Link key={href} href={href} aria-current={isActiveNavigationRoute(href, location) ? "page" : undefined}>
                 <span
                   className={`block px-3 py-2 text-sm rounded-lg transition-all duration-150 inline-flex items-center gap-2.5 ${
-                    isActive(href, location)
+                    isActiveNavigationRoute(href, location)
                       ? "text-foreground font-medium bg-secondary/50 dark:bg-white/8"
                       : "text-muted-foreground hover:text-foreground hover:bg-secondary/30 dark:hover:bg-white/5"
                   }`}
@@ -97,7 +96,7 @@ export function MobileMenu({
                   onMouseEnter={() => prefetchRoute(href)}
                   onFocus={() => prefetchRoute(href)}
                 >
-                  <Icon className={`w-3.5 h-3.5 ${isActive(href, location) ? "text-primary" : "text-muted-foreground/40"}`} />
+                  <Icon className={`w-3.5 h-3.5 ${isActiveNavigationRoute(href, location) ? "text-primary" : "text-muted-foreground/40"}`} />
                   {label}
                 </span>
               </Link>
@@ -109,10 +108,10 @@ export function MobileMenu({
           {/* Settings + Random */}
           <div className="px-3 py-2 space-y-0.5">
             {SETTINGS_LINKS.map(({ href, label, icon: Icon }) => (
-              <Link key={href} href={href}>
+              <Link key={href} href={href} aria-current={isActiveNavigationRoute(href, location) ? "page" : undefined}>
                 <span
                   className={`block px-3 py-2 text-sm rounded-lg transition-all duration-150 inline-flex items-center gap-2.5 ${
-                    isActive(href, location)
+                    isActiveNavigationRoute(href, location)
                       ? "text-foreground font-medium bg-secondary/50 dark:bg-white/8"
                       : "text-muted-foreground hover:text-foreground hover:bg-secondary/30 dark:hover:bg-white/5"
                   }`}
@@ -120,7 +119,7 @@ export function MobileMenu({
                   onMouseEnter={() => prefetchRoute(href)}
                   onFocus={() => prefetchRoute(href)}
                 >
-                  <Icon className={`w-3.5 h-3.5 ${isActive(href, location) ? "text-primary" : "text-muted-foreground/40"}`} />
+                  <Icon className={`w-3.5 h-3.5 ${isActiveNavigationRoute(href, location) ? "text-primary" : "text-muted-foreground/40"}`} />
                   {label}
                 </span>
               </Link>
@@ -158,6 +157,6 @@ export function MobileMenu({
               />
             </button>
           </div>
-    </div>
+    </nav>
   );
 }

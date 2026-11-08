@@ -2,6 +2,7 @@ import { Link } from "wouter";
 import { useCallback, memo } from "react";
 import { Clapperboard, Users, Tags, ListVideo, Send } from "lucide-react";
 import { prefetchRoute } from "@/lib/route-chunks";
+import { isActiveNavigationRoute } from "@/lib/navigation";
 
 export const NAV_LINKS = [
   { href: "/browse", label: "Browse", icon: Clapperboard },
@@ -15,19 +16,16 @@ interface DesktopNavProps {
   onRequestOpen?: () => void;
 }
 
-function isActive(href: string, location: string) {
-  return href === "/" ? location === "/" : location.startsWith(href);
-}
-
 export const DesktopNav = memo(function DesktopNav({ location, onRequestOpen }: DesktopNavProps) {
   return (
-    <nav className="hidden md:flex items-center gap-0.5 text-sm">
+    <nav aria-label="Primary navigation" className="hidden md:flex items-center gap-0.5 text-sm">
       {NAV_LINKS.map(({ href, label, icon: Icon }) => (
-        <NavLink key={href} href={href} label={label} icon={Icon} isActive={isActive(href, location)} />
+        <NavLink key={href} href={href} label={label} icon={Icon} isActive={isActiveNavigationRoute(href, location)} />
       ))}
       <span className="w-px h-4 bg-border/20 mx-1" />
       <button
         onClick={onRequestOpen}
+        type="button"
         className="nav-underline px-3 py-1.5 rounded-lg inline-flex items-center gap-1.5 transition-all duration-200 text-muted-foreground/70 hover:text-foreground cursor-pointer"
       >
         <Send className="w-3.5 h-3.5 text-muted-foreground/40" />
@@ -50,7 +48,7 @@ const NavLink = memo(function NavLink({ href, label, icon: Icon, isActive: activ
   }, [href]);
 
   return (
-    <Link href={href}>
+    <Link href={href} aria-current={active ? "page" : undefined}>
       <span
         onMouseEnter={prefetch}
         onFocus={prefetch}
