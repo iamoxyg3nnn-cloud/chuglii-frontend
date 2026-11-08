@@ -76,7 +76,7 @@ export function RouteSeoMeta() {
     const path = location.split("?")[0].split("#")[0] || "/";
     const route = describeRoute(path);
     const title = `${route.title} | ${BRAND}`;
-    const canonical = `${SITE}${path === "/" ? "/" : path.replace(/\\/+$/, "")}`;
+    const canonical = `${SITE}${path === "/" ? "/" : path.endsWith("/") ? path.slice(0, -1) : path}`;
 
     document.title = title;
     upsertMeta('meta[name="description"]', "name", "description", route.description);
