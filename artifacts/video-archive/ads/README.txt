@@ -66,7 +66,7 @@ SLOT INVENTORY (14 placeholders — admin panel lists them all)
 
 IMPORTANT NOTES
 ---------------
-  * VITE_ADS_ENABLED: empty/unset = ON. Set to "false" to hide ALL ads.
+  * VITE_ADS_ENABLED: empty/unset or "false" = OFF. Set to "true" and redeploy to enable ALL ads.
   * Ads never show for premium members or before the age gate is passed,
     and never on: login, signup, auth callback, premium, admin, RandomRedirect.
   * All network codes: CrakRevenue (slot codes) + StripCash/Stripchat
