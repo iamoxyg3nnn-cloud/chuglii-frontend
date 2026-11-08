@@ -40,7 +40,9 @@ export function MobileMenu({
   onRequestOpen,
 }: MobileMenuProps) {
   return (
-    <div
+    <nav
+      id="mobile-navigation"
+      aria-label="Mobile navigation"
       className={`md:hidden glass-dropdown border-t-0 rounded-b-xl mx-2 mb-2 max-h-[calc(100dvh-4.5rem)] overflow-y-auto overscroll-contain shadow-2xl ${
         open
           ? "animate-in fade-in slide-in-from-top-1 zoom-in-95 duration-200"
@@ -51,7 +53,7 @@ export function MobileMenu({
           {/* Main navigation */}
           <div className="px-3 py-3 space-y-0.5">
             {NAV_LINKS.map(({ href, label, icon: Icon }) => (
-              <Link key={href} href={href}>
+              <Link key={href} href={href} aria-current={isActive(href, location) ? "page" : undefined}>
                 <span
                   className={`block px-3 py-2.5 text-sm rounded-lg transition-all duration-150 inline-flex items-center gap-2.5 ${
                     isActive(href, location)
@@ -86,7 +88,7 @@ export function MobileMenu({
               Library
             </p>
             {LIBRARY_LINKS.map(({ href, label, icon: Icon }) => (
-              <Link key={href} href={href}>
+              <Link key={href} href={href} aria-current={isActive(href, location) ? "page" : undefined}>
                 <span
                   className={`block px-3 py-2 text-sm rounded-lg transition-all duration-150 inline-flex items-center gap-2.5 ${
                     isActive(href, location)
@@ -109,7 +111,7 @@ export function MobileMenu({
           {/* Settings + Random */}
           <div className="px-3 py-2 space-y-0.5">
             {SETTINGS_LINKS.map(({ href, label, icon: Icon }) => (
-              <Link key={href} href={href}>
+              <Link key={href} href={href} aria-current={isActive(href, location) ? "page" : undefined}>
                 <span
                   className={`block px-3 py-2 text-sm rounded-lg transition-all duration-150 inline-flex items-center gap-2.5 ${
                     isActive(href, location)
@@ -158,6 +160,6 @@ export function MobileMenu({
               />
             </button>
           </div>
-    </div>
+    </nav>
   );
 }
