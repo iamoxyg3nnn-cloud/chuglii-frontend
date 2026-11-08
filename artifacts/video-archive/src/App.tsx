@@ -59,6 +59,7 @@ const Profile = lazyWithSkeleton(() => import("@/pages/Profile"), <SkeletonSimpl
 const Following = lazyWithSkeleton(() => import("@/pages/Following"), <SkeletonGridPage count={8} />, "Following");
 const Notifications = lazyWithSkeleton(() => import("@/pages/Notifications"), <SkeletonSimplePage rows={6} />, "Notifications");
 const RequestPage = lazyWithSkeleton(() => import("@/pages/RequestPage"), <SkeletonSimplePage rows={6} />, "RequestPage");
+const ContentRemoval = lazyWithSkeleton(() => import("@/pages/ContentRemoval"), <SkeletonSimplePage rows={4} />, "ContentRemoval");
 const MyRequests = lazyWithSkeleton(() => import("@/pages/MyRequests"), <SkeletonSimplePage rows={6} />, "MyRequests");
 const Premium = lazyWithSkeleton(() => import("@/pages/Premium"), <SkeletonSimplePage rows={6} />, "Premium");
 
@@ -250,6 +251,7 @@ function Router() {
         <Route path="/my-requests">
           <ProtectedRoute><MyRequests /></ProtectedRoute>
         </Route>
+        <Route path="/content-removal" component={ContentRemoval} />
         <Route path="/request">
           <ProtectedRoute><RequestPage /></ProtectedRoute>
         </Route>
