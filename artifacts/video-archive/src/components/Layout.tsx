@@ -1,4 +1,4 @@
-import { useState, useEffect, lazy, Suspense } from "react";
+import { useState, useEffect, useRef, lazy, Suspense } from "react";
 import * as DialogPrimitive from "@radix-ui/react-dialog";
 import { Link, useLocation } from "wouter";
 import { Menu, X, Film, Sun, Moon, Crown, Check } from "lucide-react";
@@ -206,6 +206,18 @@ export function Navbar() {
   const [location, setLocation] = useLocation();
   const [searchOpen, setSearchOpen] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
+  const mobileMenuButtonRef = useRef<HTMLButtonElement>(null);
+
+  useEffect(() => {
+    if (!mobileOpen) return;
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key !== "Escape") return;
+      setMobileOpen(false);
+      mobileMenuButtonRef.current?.focus();
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [mobileOpen]);
   const { isDark: dark, toggleTheme } = useTheme();
   const [scrolled, setScrolled] = useState(false);
   const [requestOpen, setRequestOpen] = useState(false);
@@ -291,9 +303,12 @@ export function Navbar() {
           <UserMenu />
 
           <button
+            ref={mobileMenuButtonRef}
+            type="button"
             className="flex md:hidden items-center justify-center w-8 h-8 text-muted-foreground hover:text-foreground hover:bg-secondary/50 dark:hover:bg-white/5 rounded-full transition-all relative"
             onClick={() => setMobileOpen((o) => !o)}
-            aria-label="Toggle menu"
+            aria-label={mobileOpen ? "Close navigation menu" : "Open navigation menu"}
+            aria-controls="mobile-navigation"
             aria-expanded={mobileOpen}
           >
             <div className="relative transition-transform duration-200" style={{ transform: mobileOpen ? 'rotate(90deg)' : 'rotate(0deg)' }}>
