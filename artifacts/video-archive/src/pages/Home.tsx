@@ -113,7 +113,7 @@ export default function Home() {
           <div className="mb-4 flex items-center gap-3 animate-fade-in-up" style={{ animationDelay: '0ms' }}>
             <div className="h-px flex-1 bg-border/50" />
             <span className="text-[11px] uppercase tracking-[0.3em] text-muted-foreground font-medium">
-              Cam Recording Archive & Performer Directory
+              Your Private Recording Archive
             </span>
             <div className="h-px flex-1 bg-border/50" />
           </div>
