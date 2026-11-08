@@ -5,16 +5,15 @@ import {
   getGetStatsQueryKey,
   getListRecordingsQueryKey,
   getListTagsQueryKey,
-  type Recording,
 } from "@workspace/api-client-react";
 import { useListPerformers, useListRecommendations } from "@/lib/api";
-import { Link, useLocation } from "wouter";
+import { Link } from "wouter";
 import { Layout } from "@/components/Layout";
 import { VideoCard } from "@/components/VideoCard";
 import { AdGridCard } from "@/components/ads/AdGridCard";
 import { isAdCard } from "@/lib/ad-creatives";
 import { PerformerCard } from "@/components/PerformerCard";
-import { Fragment, useState, useRef, useEffect, useMemo } from "react";
+import { Fragment, useState, useEffect, useMemo } from "react";
 import { useQuery, keepPreviousData } from "@tanstack/react-query";
 import { useAuth } from "@/contexts/AuthContext";
 import { userApi, parseCloudItem, cloudItemToRecording } from "@/lib/user-api";
@@ -28,7 +27,6 @@ import { formatBytes, formatDuration, formatRelativeTime } from "@/lib/formatter
 import { proxyUrl } from "@/lib/proxy-url";
 import { AdLeaderboard } from "@/components/ads/AdLeaderboard";
 import {
-  MagnifyingGlass,
   ArrowRight,
   TrendUp,
   Clock,
@@ -44,9 +42,9 @@ import {
   Lightning,
   Bookmarks,
   SlidersHorizontal,
-  CaretLeft,
-  CaretRight,
+  CheckCircle,
   Eye,
+  FolderSimplePlus,
 } from "@phosphor-icons/react";
 
 type Tab = "popular" | "recent" | "recommended";
@@ -69,28 +67,10 @@ function hasThumbnail(recording: {
 }
 
 export default function Home() {
-  const [_, setLocation] = useLocation();
-  const [search, setSearch] = useState("");
   const [tab, setTab] = useState<Tab>("popular");
   const [activeHero, setActiveHero] = useState(0);
   const [isHeroPaused, setIsHeroPaused] = useState(false);
   const { user } = useAuth();
-  const searchInputRef = useRef<HTMLInputElement>(null);
-
-  // Keyboard shortcut: '/' focuses the hero search input
-  useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === "/" && document.activeElement !== searchInputRef.current) {
-        const target = e.target as HTMLElement;
-        if (target && !["INPUT", "TEXTAREA", "SELECT"].includes(target.tagName)) {
-          e.preventDefault();
-          searchInputRef.current?.focus();
-        }
-      }
-    };
-    window.addEventListener("keydown", handleKeyDown);
-    return () => window.removeEventListener("keydown", handleKeyDown);
-  }, []);
 
   // Connection-aware paging: 12 on slower links, 24 on fast
   const isConstrained = useConnectionConstrained();
@@ -128,28 +108,28 @@ export default function Home() {
   const topPerformers = topPerformersData?.performers ?? [];
   const { data: tags } = useListTags({ query: { queryKey: getListTagsQueryKey(), staleTime: 30_000 } });
 
-  // Top 5 featured spotlight recordings for the hero billboard
-  const spotlightRecordings = useMemo(() => {
+  // Top 4 featured recordings for the marquee stage
+  const marqueeRecordings = useMemo(() => {
     const list = popularData?.data?.filter(hasThumbnail) ?? [];
-    return list.slice(0, 5);
+    return list.slice(0, 4);
   }, [popularData?.data]);
 
-  const currentFeatured = spotlightRecordings[activeHero] ?? spotlightRecordings[0] ?? null;
+  const activeFeatured = marqueeRecordings[activeHero] ?? marqueeRecordings[0] ?? null;
 
-  // Auto-advance hero billboard every 7s when not hovered
+  // Auto-advance marquee every 8s unless user is hovering
   useEffect(() => {
-    if (isHeroPaused || spotlightRecordings.length <= 1) return;
+    if (isHeroPaused || marqueeRecordings.length <= 1) return;
     const timer = setInterval(() => {
-      setActiveHero((prev) => (prev + 1) % spotlightRecordings.length);
-    }, 7000);
+      setActiveHero((prev) => (prev + 1) % marqueeRecordings.length);
+    }, 8000);
     return () => clearInterval(timer);
-  }, [isHeroPaused, spotlightRecordings.length]);
+  }, [isHeroPaused, marqueeRecordings.length]);
 
   // Determine active feed data
   const feedState = useMemo(() => {
     if (tab === "popular") {
       const all = (popularData?.data ?? []).filter(hasThumbnail);
-      const filtered = currentFeatured ? all.filter((r) => r.id !== currentFeatured.id) : all;
+      const filtered = activeFeatured ? all.filter((r) => r.id !== activeFeatured.id) : all;
       return {
         recordings: filtered.slice(0, pageSize),
         loading: popularLoading,
@@ -159,7 +139,7 @@ export default function Home() {
     }
     if (tab === "recent") {
       const all = (recentData?.data ?? []).filter(hasThumbnail);
-      const filtered = currentFeatured ? all.filter((r) => r.id !== currentFeatured.id) : all;
+      const filtered = activeFeatured ? all.filter((r) => r.id !== activeFeatured.id) : all;
       return {
         recordings: filtered.slice(0, pageSize),
         loading: recentLoading,
@@ -180,7 +160,7 @@ export default function Home() {
     popularData?.data,
     recentData?.data,
     recData?.data,
-    currentFeatured,
+    activeFeatured,
     pageSize,
     popularLoading,
     recentLoading,
@@ -197,324 +177,272 @@ export default function Home() {
 
   usePreloadRecordings(feedState.recordings);
 
-  const handleSearch = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (search.trim()) {
-      setLocation(`/browse?search=${encodeURIComponent(search.trim())}`);
-    } else {
-      setLocation("/browse");
-    }
-  };
-
-  const heroBackdrop = currentFeatured
-    ? proxyUrl(currentFeatured.sprite_url || currentFeatured.thumbnail_url || currentFeatured.preview_url)
+  const heroThumb = activeFeatured
+    ? proxyUrl(activeFeatured.sprite_url || activeFeatured.thumbnail_url || activeFeatured.preview_url)
     : null;
 
   return (
     <Layout>
-      {/* ─── Cinematic Hero Billboard ──────────────────────────────── */}
-      <section
-        onMouseEnter={() => setIsHeroPaused(true)}
-        onMouseLeave={() => setIsHeroPaused(false)}
-        className="relative isolate overflow-hidden bg-black border-b border-border/70"
-      >
-        <div className="relative min-h-[480px] sm:min-h-[520px] lg:min-h-[580px] flex items-center">
-          {/* Backdrop Image with Multi-layer Vignette */}
-          {heroBackdrop ? (
-            <div className="absolute inset-0 -z-10 overflow-hidden">
-              <OptimizedImage
-                key={currentFeatured?.id}
-                src={heroBackdrop}
-                alt={currentFeatured?.username || "Featured"}
-                className="w-full h-full object-cover object-center filter brightness-[0.55] contrast-110 transition-opacity duration-700"
-                containerClassName="w-full h-full"
-                width="hero"
-                fetchPriority="high"
-                loading="eager"
-              />
-              {/* Deep Cinema Vignette Overlays */}
-              <div className="absolute inset-0 bg-gradient-to-t from-background via-background/60 to-transparent" />
-              <div className="absolute inset-0 bg-gradient-to-r from-background via-background/85 to-transparent lg:w-3/4" />
-              <div className="absolute inset-0 bg-radial-gradient from-transparent to-black/70 pointer-events-none" />
-            </div>
-          ) : (
-            <div className="absolute inset-0 -z-10 bg-gradient-to-b from-card via-background to-background" />
-          )}
-
-          {/* Billboard Grid */}
-          <div className="container mx-auto px-4 sm:px-6 py-12 lg:py-16 grid grid-cols-1 lg:grid-cols-[1fr_360px] gap-8 items-center w-full">
-            {/* Left Content Column */}
-            <div className="max-w-2xl space-y-4 sm:space-y-5">
-              {/* Top Category Badge Row */}
-              <div className="flex flex-wrap items-center gap-2">
-                <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-primary text-primary-foreground text-xs font-bold tracking-wide uppercase shadow-sm">
-                  <Fire size={14} weight="fill" />
-                  Trending #{activeHero + 1}
-                </span>
-                {currentFeatured?.resolution && (
-                  <span className="px-2.5 py-1 rounded-full bg-black/60 backdrop-blur-md text-[11px] font-mono font-semibold text-white/95 ring-1 ring-white/15">
-                    {currentFeatured.resolution}
-                  </span>
-                )}
-                {currentFeatured?.duration ? (
-                  <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-black/50 backdrop-blur-md text-[11px] font-mono text-zinc-300 ring-1 ring-white/10">
-                    <Clock size={12} />
-                    {formatDuration(currentFeatured.duration)}
-                  </span>
-                ) : null}
-              </div>
-
-              {/* Performer Name & Headline */}
-              <div>
-                <h1 className="text-3xl sm:text-5xl lg:text-6xl font-black tracking-tight text-white leading-[1.05] drop-shadow-md">
-                  {currentFeatured ? (
-                    <Link
-                      href={`/performers/${encodeURIComponent(currentFeatured.username)}`}
-                      className="hover:text-primary transition-colors inline-flex items-center gap-3"
-                    >
-                      <span>{currentFeatured.username}</span>
-                    </Link>
-                  ) : (
-                    "The Recording Vault"
-                  )}
-                </h1>
-                {currentFeatured?.room_title && (
-                  <p className="mt-2.5 text-sm sm:text-base text-zinc-300 font-normal line-clamp-2 max-w-xl leading-relaxed">
-                    {currentFeatured.room_title}
-                  </p>
-                )}
-              </div>
-
-              {/* Metadata Details */}
-              {currentFeatured && (
-                <div className="flex items-center gap-3 text-xs text-zinc-400 font-mono pt-1">
-                  {currentFeatured.viewers ? (
-                    <span className="flex items-center gap-1.5 text-zinc-300">
-                      <Eye size={14} weight="bold" />
-                      {currentFeatured.viewers.toLocaleString()} views
-                    </span>
-                  ) : null}
-                  {currentFeatured.timestamp ? (
-                    <>
-                      <span>•</span>
-                      <span>Recorded {formatRelativeTime(currentFeatured.timestamp)}</span>
-                    </>
-                  ) : null}
-                </div>
-              )}
-
-              {/* Action Buttons */}
-              <div className="pt-2 flex flex-wrap items-center gap-3">
-                {currentFeatured ? (
-                  <>
-                    <Link
-                      href={`/video/${encodeURIComponent(currentFeatured.id)}`}
-                      className="inline-flex items-center justify-center gap-2.5 h-12 px-7 rounded-xl bg-primary text-primary-foreground font-bold text-sm tracking-wide shadow-lg hover:bg-primary/90 hover:scale-[1.02] active:scale-[0.98] transition-all cursor-pointer"
-                    >
-                      <Play size={18} weight="fill" />
-                      Watch Recording
-                    </Link>
-                    <Link
-                      href={`/performers/${encodeURIComponent(currentFeatured.username)}`}
-                      className="inline-flex items-center justify-center gap-2 h-12 px-5 rounded-xl bg-white/10 backdrop-blur-md hover:bg-white/15 text-white font-medium text-sm border border-white/15 transition-all cursor-pointer"
-                    >
-                      <UsersThree size={16} weight="bold" />
-                      Performer Vault
-                    </Link>
-                  </>
+      {/* ─── The Vault Cinema Marquee Hero ──────────────────────────── */}
+      <section className="relative px-4 sm:px-6 pt-5 pb-4">
+        <div className="container mx-auto max-w-7xl">
+          {/* Main Frame Container */}
+          <div
+            onMouseEnter={() => setIsHeroPaused(true)}
+            onMouseLeave={() => setIsHeroPaused(false)}
+            className="relative overflow-hidden rounded-3xl border border-white/[0.08] bg-zinc-950/80 shadow-2xl backdrop-blur-xl"
+          >
+            <div className="grid grid-cols-1 lg:grid-cols-[1fr_380px] min-h-[460px] sm:min-h-[500px]">
+              {/* Left Stage: Grand Showcase Display */}
+              <div className="relative group overflow-hidden flex flex-col justify-end p-6 sm:p-9 lg:p-11 min-h-[360px] sm:min-h-[440px]">
+                {/* Background Hero Media with Ambient Glow */}
+                {heroThumb ? (
+                  <div className="absolute inset-0 -z-10 overflow-hidden bg-black">
+                    <OptimizedImage
+                      key={activeFeatured?.id}
+                      src={heroThumb}
+                      alt={activeFeatured?.username || "Featured"}
+                      className="w-full h-full object-cover object-center filter brightness-[0.52] contrast-105 transition-all duration-700 group-hover:scale-[1.02]"
+                      containerClassName="w-full h-full"
+                      width="hero"
+                      fetchPriority="high"
+                      loading="eager"
+                    />
+                    {/* Multi-angle Cinema Vignette */}
+                    <div className="absolute inset-0 bg-gradient-to-t from-zinc-950 via-zinc-950/50 to-transparent" />
+                    <div className="absolute inset-0 bg-gradient-to-r from-zinc-950/90 via-zinc-950/40 to-transparent" />
+                  </div>
                 ) : (
+                  <div className="absolute inset-0 -z-10 bg-gradient-to-br from-zinc-900 to-zinc-950" />
+                )}
+
+                {/* Ambient Center Glow */}
+                <div className="absolute -top-24 -left-24 w-96 h-96 bg-primary/20 rounded-full blur-3xl pointer-events-none -z-10" />
+
+                {/* Center Hover Play Icon */}
+                {activeFeatured && (
                   <Link
-                    href="/browse"
-                    className="inline-flex items-center justify-center gap-2.5 h-12 px-7 rounded-xl bg-primary text-primary-foreground font-bold text-sm tracking-wide shadow-lg hover:bg-primary/90 transition-all cursor-pointer"
+                    href={`/video/${encodeURIComponent(activeFeatured.id)}`}
+                    className="absolute inset-0 flex items-center justify-center pointer-events-auto"
+                    aria-label={`Play ${activeFeatured.username}'s recording`}
                   >
-                    <Play size={18} weight="fill" />
-                    Browse Catalogue
+                    <div className="w-16 h-16 sm:w-20 sm:h-20 rounded-full bg-primary/90 text-primary-foreground flex items-center justify-center shadow-2xl backdrop-blur-sm transition-transform duration-300 transform group-hover:scale-110 active:scale-95 ring-4 ring-white/10">
+                      <Play size={28} weight="fill" className="ml-1" />
+                    </div>
                   </Link>
                 )}
-              </div>
-            </div>
 
-            {/* Right Shelf Carousel (Desktop) */}
-            {spotlightRecordings.length > 1 && (
-              <div className="hidden lg:flex flex-col justify-center space-y-3 z-10 w-full">
-                <div className="flex items-center justify-between pb-1">
-                  <span className="text-[11px] font-mono uppercase tracking-wider text-zinc-400 flex items-center gap-1.5">
-                    <Sparkle size={13} weight="fill" className="text-primary" />
-                    Trending Spotlights
-                  </span>
-                  <div className="flex items-center gap-1">
-                    <button
-                      type="button"
-                      onClick={() => setActiveHero((prev) => (prev - 1 + spotlightRecordings.length) % spotlightRecordings.length)}
-                      className="w-7 h-7 rounded-lg bg-black/60 hover:bg-black/80 border border-white/10 flex items-center justify-center text-white/80 hover:text-white transition-colors cursor-pointer"
-                      aria-label="Previous spotlight stream"
-                    >
-                      <CaretLeft size={14} weight="bold" />
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setActiveHero((prev) => (prev + 1) % spotlightRecordings.length)}
-                      className="w-7 h-7 rounded-lg bg-black/60 hover:bg-black/80 border border-white/10 flex items-center justify-center text-white/80 hover:text-white transition-colors cursor-pointer"
-                      aria-label="Next spotlight stream"
-                    >
-                      <CaretRight size={14} weight="bold" />
-                    </button>
+                {/* Floating Content Layer (Pinned to Bottom Left) */}
+                <div className="relative z-10 space-y-3 max-w-xl pointer-events-none">
+                  {/* Status Badges */}
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-primary text-primary-foreground text-[11px] font-bold tracking-wide uppercase shadow-sm">
+                      <Fire size={13} weight="fill" />
+                      Featured #{activeHero + 1}
+                    </span>
+                    {activeFeatured?.resolution && (
+                      <span className="px-2.5 py-1 rounded-full bg-black/60 backdrop-blur-md text-[11px] font-mono font-bold text-white/95 ring-1 ring-white/15">
+                        {activeFeatured.resolution}
+                      </span>
+                    )}
+                    {activeFeatured?.duration ? (
+                      <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-black/60 backdrop-blur-md text-[11px] font-mono text-zinc-300 ring-1 ring-white/15">
+                        <Clock size={12} weight="bold" />
+                        {formatDuration(activeFeatured.duration)}
+                      </span>
+                    ) : null}
+                  </div>
+
+                  {/* Title & Performer Header */}
+                  <div>
+                    <h1 className="text-2xl sm:text-4xl lg:text-5xl font-black tracking-tight text-white leading-tight drop-shadow-md">
+                      {activeFeatured ? (
+                        <Link
+                          href={`/performers/${encodeURIComponent(activeFeatured.username)}`}
+                          className="hover:text-primary transition-colors pointer-events-auto inline-flex items-center gap-2"
+                        >
+                          <span>{activeFeatured.username}</span>
+                          <CheckCircle size={22} weight="fill" className="text-primary shrink-0" />
+                        </Link>
+                      ) : (
+                        "Vault Screening Room"
+                      )}
+                    </h1>
+                    {activeFeatured?.room_title && (
+                      <p className="mt-1.5 text-xs sm:text-sm text-zinc-300 font-normal line-clamp-2 leading-relaxed drop-shadow-sm">
+                        {activeFeatured.room_title}
+                      </p>
+                    )}
+                  </div>
+
+                  {/* View Stats & Timestamp */}
+                  {activeFeatured && (
+                    <div className="flex items-center gap-3 text-xs text-zinc-400 font-mono pt-0.5">
+                      {activeFeatured.viewers ? (
+                        <span className="flex items-center gap-1.5 text-zinc-200">
+                          <Eye size={14} weight="bold" />
+                          {activeFeatured.viewers.toLocaleString()} views
+                        </span>
+                      ) : null}
+                      {activeFeatured.timestamp ? (
+                        <>
+                          <span>•</span>
+                          <span>{formatRelativeTime(activeFeatured.timestamp)}</span>
+                        </>
+                      ) : null}
+                    </div>
+                  )}
+
+                  {/* Interactive Button Strip */}
+                  <div className="pt-2 flex flex-wrap items-center gap-2.5 pointer-events-auto">
+                    {activeFeatured ? (
+                      <>
+                        <Link
+                          href={`/video/${encodeURIComponent(activeFeatured.id)}`}
+                          className="inline-flex items-center justify-center gap-2 h-11 px-6 rounded-xl bg-primary text-primary-foreground font-bold text-xs uppercase tracking-wider shadow-lg hover:bg-primary/90 hover:scale-[1.02] active:scale-[0.98] transition-all cursor-pointer"
+                        >
+                          <Play size={15} weight="fill" />
+                          Watch Now
+                        </Link>
+                        <Link
+                          href={`/performers/${encodeURIComponent(activeFeatured.username)}`}
+                          className="inline-flex items-center justify-center gap-2 h-11 px-4 rounded-xl bg-white/10 hover:bg-white/20 text-white font-medium text-xs backdrop-blur-md border border-white/10 transition-all cursor-pointer"
+                        >
+                          <UsersThree size={15} weight="bold" />
+                          Performer Vault
+                        </Link>
+                      </>
+                    ) : null}
+                  </div>
+                </div>
+              </div>
+
+              {/* Right Stage: Top 4 Trending Queue */}
+              <div className="border-t lg:border-t-0 lg:border-l border-white/[0.08] bg-zinc-950/60 p-4 sm:p-5 flex flex-col justify-between">
+                <div>
+                  <div className="flex items-center justify-between pb-3 mb-2 border-b border-white/[0.06]">
+                    <div className="flex items-center gap-2">
+                      <Fire size={15} weight="fill" className="text-primary" />
+                      <span className="text-xs font-mono font-bold uppercase tracking-wider text-zinc-200">
+                        Top Trending Queue
+                      </span>
+                    </div>
+                    <span className="text-[10px] font-mono text-zinc-500">Auto-playing</span>
+                  </div>
+
+                  {/* Queue Items */}
+                  <div className="space-y-2">
+                    {popularLoading ? (
+                      Array.from({ length: 4 }).map((_, i) => (
+                        <div key={i} className="h-16 rounded-xl bg-zinc-900/60 animate-pulse border border-white/[0.04]" />
+                      ))
+                    ) : (
+                      marqueeRecordings.map((rec, idx) => {
+                        const active = idx === activeHero;
+                        const recThumb = proxyUrl(rec.thumbnail_url || rec.preview_url);
+                        return (
+                          <button
+                            key={rec.id}
+                            type="button"
+                            onClick={() => setActiveHero(idx)}
+                            className={`w-full flex items-center gap-3 p-2 rounded-xl transition-all text-left cursor-pointer border ${
+                              active
+                                ? "bg-white/[0.08] border-primary/50 ring-1 ring-primary/30 shadow-md"
+                                : "bg-black/30 border-white/[0.04] hover:bg-white/[0.04] hover:border-white/10 text-zinc-400"
+                            }`}
+                          >
+                            {/* Thumbnail Preview */}
+                            <div className="relative w-20 aspect-video rounded-lg overflow-hidden bg-black/60 shrink-0 border border-white/10">
+                              {recThumb ? (
+                                <OptimizedImage
+                                  src={recThumb}
+                                  alt={rec.username}
+                                  className="w-full h-full object-cover"
+                                  containerClassName="w-full h-full"
+                                  width="card"
+                                />
+                              ) : null}
+                              {active && (
+                                <div className="absolute inset-0 bg-primary/30 flex items-center justify-center">
+                                  <Play size={14} weight="fill" className="text-white" />
+                                </div>
+                              )}
+                            </div>
+
+                            {/* Item Metadata */}
+                            <div className="min-w-0 flex-1">
+                              <div className={`text-xs font-bold truncate ${active ? "text-white" : "text-zinc-200"}`}>
+                                {rec.username}
+                              </div>
+                              <div className="text-[10px] text-zinc-400 font-mono truncate">
+                                {rec.duration ? formatDuration(rec.duration) : "Stream"} • {rec.viewers ? `${rec.viewers.toLocaleString()} views` : "HD"}
+                              </div>
+                            </div>
+
+                            {/* Number Tag */}
+                            <div className={`text-[11px] font-mono pr-1.5 ${active ? "text-primary font-bold" : "text-zinc-600"}`}>
+                              0{idx + 1}
+                            </div>
+                          </button>
+                        );
+                      })
+                    )}
                   </div>
                 </div>
 
-                {/* Thumbnail Cards */}
-                <div className="space-y-2">
-                  {spotlightRecordings.map((rec, idx) => {
-                    const active = idx === activeHero;
-                    const recThumb = proxyUrl(rec.thumbnail_url || rec.preview_url);
-                    return (
-                      <button
-                        key={rec.id}
-                        type="button"
-                        onClick={() => setActiveHero(idx)}
-                        className={`w-full flex items-center gap-3 p-2 rounded-xl transition-all text-left cursor-pointer border ${
-                          active
-                            ? "bg-white/15 border-primary/70 ring-1 ring-primary/40 shadow-lg backdrop-blur-md"
-                            : "bg-black/50 border-white/5 hover:bg-black/70 hover:border-white/15 text-zinc-400"
-                        }`}
-                      >
-                        <div className="relative w-16 aspect-video rounded-lg overflow-hidden bg-black/60 shrink-0 border border-white/10">
-                          {recThumb ? (
-                            <OptimizedImage
-                              src={recThumb}
-                              alt={rec.username}
-                              className="w-full h-full object-cover"
-                              containerClassName="w-full h-full"
-                              width="card"
-                            />
-                          ) : null}
-                          {active && (
-                            <div className="absolute inset-0 bg-primary/30 flex items-center justify-center">
-                              <Play size={14} weight="fill" className="text-white" />
-                            </div>
-                          )}
-                        </div>
-                        <div className="min-w-0 flex-1">
-                          <div className={`text-xs font-bold truncate ${active ? "text-white" : "text-zinc-200"}`}>
-                            {rec.username}
-                          </div>
-                          <div className="text-[10px] text-zinc-400 font-mono truncate">
-                            {rec.duration ? formatDuration(rec.duration) : "Stream"} • {rec.viewers ? `${rec.viewers.toLocaleString()} views` : "HD"}
-                          </div>
-                        </div>
-                        <div className="text-[10px] font-mono text-zinc-500 pr-1">
-                          0{idx + 1}
-                        </div>
-                      </button>
-                    );
-                  })}
+                {/* Direct Catalogue Button */}
+                <div className="pt-3 border-t border-white/[0.06] mt-3">
+                  <Link
+                    href="/browse?sort=popular"
+                    className="flex items-center justify-between text-xs font-medium text-zinc-400 hover:text-white transition-colors group px-1 py-0.5"
+                  >
+                    <span>View all top recordings</span>
+                    <ArrowRight size={13} weight="bold" className="transition-transform group-hover:translate-x-1 text-primary" />
+                  </Link>
                 </div>
               </div>
-            )}
-          </div>
-
-          {/* Mobile Carousel Indicator Dots */}
-          {spotlightRecordings.length > 1 && (
-            <div className="lg:hidden flex items-center justify-center gap-1.5 pb-4 z-10">
-              {spotlightRecordings.map((_, idx) => (
-                <button
-                  key={idx}
-                  type="button"
-                  onClick={() => setActiveHero(idx)}
-                  className={`h-1.5 rounded-full transition-all cursor-pointer ${
-                    idx === activeHero ? "w-6 bg-primary" : "w-1.5 bg-white/30"
-                  }`}
-                  aria-label={`Jump to slide ${idx + 1}`}
-                />
-              ))}
             </div>
-          )}
+
+            {/* Bottom Marquee Control Ribbon: Fast Category Jumps & Telemetry */}
+            <div className="border-t border-white/[0.08] bg-black/40 px-4 sm:px-6 py-3 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+              {/* Category Pills */}
+              <div className="flex items-center gap-1.5 overflow-x-auto scrollbar-none">
+                <span className="text-[11px] font-mono text-zinc-500 uppercase tracking-wider shrink-0 mr-1.5">
+                  Explore:
+                </span>
+                {["Chaturbate", "Stripchat", "1080p 60fps", "Solo", "Couples", "Anal"].map((tag) => (
+                  <Link
+                    key={tag}
+                    href={`/browse?search=${encodeURIComponent(tag)}`}
+                    className="px-2.5 py-1 rounded-lg bg-white/[0.05] hover:bg-white/[0.10] text-xs text-zinc-300 hover:text-white border border-white/[0.06] hover:border-white/20 transition-all shrink-0"
+                  >
+                    {tag}
+                  </Link>
+                ))}
+              </div>
+
+              {/* Real-time Telemetry Counts */}
+              <div className="flex items-center gap-4 text-[11px] font-mono text-zinc-400 tabular-nums shrink-0">
+                <div>
+                  <strong className="text-white">{stats?.total_recordings ? stats.total_recordings.toLocaleString() : "2,000+"}</strong> streams
+                </div>
+                <div>
+                  <strong className="text-white">{stats?.total_performers ? stats.total_performers.toLocaleString() : "1,200+"}</strong> models
+                </div>
+                <div className="hidden md:block">
+                  <strong className="text-white">{stats?.total_size_bytes ? formatBytes(stats.total_size_bytes) : "4.2 TB"}</strong> archive
+                </div>
+              </div>
+            </div>
+          </div>
         </div>
       </section>
 
-      {/* ─── Floating Command Search Bar ────────────────────────────── */}
-      <div className="container mx-auto px-4 sm:px-6 -mt-6 sm:-mt-8 relative z-20">
-        <div className="rounded-2xl border border-border/80 bg-card/95 backdrop-blur-xl p-3 shadow-xl">
-          <div className="flex flex-col md:flex-row md:items-center gap-3">
-            {/* Search Input */}
-            <form onSubmit={handleSearch} role="search" aria-label="Search recordings" className="flex-1 flex items-center">
-              <div className="relative flex-1 flex items-center">
-                <MagnifyingGlass size={18} weight="bold" className="absolute left-3.5 text-muted-foreground/70" />
-                <input
-                  ref={searchInputRef}
-                  type="search"
-                  placeholder="Search 2,000+ performers, titles, categories..."
-                  value={search}
-                  onChange={(e) => setSearch(e.target.value)}
-                  className="h-11 w-full bg-secondary/50 rounded-xl pl-10 pr-20 text-sm text-foreground outline-none border border-border/60 focus:border-primary/50 focus:bg-secondary/80 transition-all placeholder:text-muted-foreground/60"
-                  aria-label="Search recordings input"
-                />
-                <div className="absolute right-2 flex items-center gap-1.5">
-                  <kbd className="hidden sm:inline-flex items-center px-1.5 py-0.5 text-[10px] font-mono text-muted-foreground/60 bg-background/80 border border-border/60 rounded">
-                    /
-                  </kbd>
-                  <button
-                    type="submit"
-                    className="inline-flex h-7 items-center justify-center rounded-lg bg-primary px-3 text-xs font-semibold text-primary-foreground hover:bg-primary/90 transition-colors cursor-pointer"
-                  >
-                    Search
-                  </button>
-                </div>
-              </div>
-            </form>
-
-            {/* Quick Explore Chips */}
-            <div className="flex items-center gap-1.5 overflow-x-auto pb-1 md:pb-0 scrollbar-none">
-              <span className="text-[11px] font-mono text-muted-foreground/60 uppercase tracking-wider shrink-0 mr-1">
-                Explore:
-              </span>
-              {["Chaturbate", "Stripchat", "1080p", "Solo", "Couples", "Anal"].map((tag) => (
-                <Link
-                  key={tag}
-                  href={`/browse?search=${encodeURIComponent(tag)}`}
-                  className="px-2.5 py-1 rounded-lg bg-secondary/50 hover:bg-secondary text-xs text-muted-foreground hover:text-foreground border border-border/40 hover:border-border transition-colors shrink-0"
-                >
-                  {tag}
-                </Link>
-              ))}
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* ─── Live Telemetry Status Strip ────────────────────────────── */}
-      <div className="container mx-auto px-4 sm:px-6 pt-5">
-        <div className="flex flex-wrap items-center justify-between gap-4 py-2.5 px-4 rounded-xl bg-secondary/30 border border-border/50 text-xs text-muted-foreground">
-          <div className="flex items-center gap-2">
-            <span className="relative flex h-2 w-2">
-              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
-              <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500" />
-            </span>
-            <span className="font-mono text-[11px] text-foreground font-medium">MIRROR NETWORK SYNCHRONIZED</span>
-          </div>
-
-          <div className="flex items-center gap-5 font-mono text-[11px] tabular-nums">
-            <div>
-              <strong className="text-foreground">{stats?.total_recordings ? stats.total_recordings.toLocaleString() : "2,000+"}</strong> recordings
-            </div>
-            <div>
-              <strong className="text-foreground">{stats?.total_performers ? stats.total_performers.toLocaleString() : "1,200+"}</strong> performers
-            </div>
-            <div className="hidden sm:block">
-              <strong className="text-foreground">{stats?.total_tags ? stats.total_tags.toLocaleString() : "140+"}</strong> topics
-            </div>
-            <div className="hidden md:block">
-              <strong className="text-foreground">{stats?.total_size_bytes ? formatBytes(stats.total_size_bytes) : "4.2 TB"}</strong> storage
-            </div>
-          </div>
-        </div>
-      </div>
-
       {/* ─── Continue Watching (Logged In Users) ─────────────────────── */}
       {user && continueWithThumbnails.length > 0 && (
-        <section className="px-4 sm:px-6 py-8 border-b border-border/50 mt-4">
-          <div className="container mx-auto">
-            <div className="flex items-center justify-between mb-5">
+        <section className="px-4 sm:px-6 py-6 border-b border-border/50">
+          <div className="container mx-auto max-w-7xl">
+            <div className="flex items-center justify-between mb-4">
               <div className="flex items-center gap-2.5">
                 <div className="w-7 h-7 rounded-lg bg-primary/10 border border-primary/20 flex items-center justify-center text-primary">
                   <Clock size={15} weight="bold" />
@@ -545,9 +473,9 @@ export default function Home() {
         </section>
       )}
 
-      {/* ─── Main Feed (Trending / Recent / Recommended) ─────────────── */}
-      <section className="px-4 sm:px-6 py-10 relative overflow-hidden">
-        <div className="container mx-auto">
+      {/* ─── Main Video Feed (Trending / Fresh Drops / Recommended) ──── */}
+      <section className="px-4 sm:px-6 py-8 relative overflow-hidden">
+        <div className="container mx-auto max-w-7xl">
           {/* Feed Filter Header */}
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
             <div className="flex items-center gap-1.5 p-1 rounded-xl bg-secondary/80 border border-border/70" role="tablist" aria-label="Archive feed tabs">
@@ -659,17 +587,17 @@ export default function Home() {
       </section>
 
       {/* ─── Ad Placement Divider ────────────────────────────────────── */}
-      <section className="px-4 sm:px-6 py-6 border-t border-border/50">
-        <div className="container mx-auto">
+      <section className="px-4 sm:px-6 py-4 border-t border-border/50">
+        <div className="container mx-auto max-w-7xl">
           <AdLeaderboard />
         </div>
       </section>
 
       {/* ─── Top Performers Showcase ─────────────────────────────────── */}
       {(topPerformers.length > 0 || performersLoading) && (
-        <section className="border-t border-border/50 px-4 sm:px-6 py-10 relative overflow-hidden">
-          <div className="container mx-auto">
-            <div className="flex items-center justify-between mb-6">
+        <section className="border-t border-border/50 px-4 sm:px-6 py-8 relative overflow-hidden">
+          <div className="container mx-auto max-w-7xl">
+            <div className="flex items-center justify-between mb-5">
               <div className="flex items-center gap-3">
                 <div className="w-8 h-8 rounded-lg bg-primary/10 border border-primary/20 flex items-center justify-center text-primary">
                   <UsersThree size={18} weight="bold" />
@@ -711,8 +639,8 @@ export default function Home() {
 
       {/* ─── Topic & Tag Matrix ──────────────────────────────────────── */}
       {Array.isArray(tags) && tags.length > 0 && (
-        <section className="border-t border-border/50 px-4 sm:px-6 py-10 relative overflow-hidden">
-          <div className="container mx-auto">
+        <section className="border-t border-border/50 px-4 sm:px-6 py-8 relative overflow-hidden">
+          <div className="container mx-auto max-w-7xl">
             <div className="flex items-center justify-between mb-5">
               <div className="flex items-center gap-3">
                 <div className="w-8 h-8 rounded-lg bg-primary/10 border border-primary/20 flex items-center justify-center text-primary">
