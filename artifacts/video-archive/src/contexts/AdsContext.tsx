@@ -299,6 +299,8 @@ export function AdsProvider({ children }: { children: ReactNode }) {
   }, [dbRows]);
 
   const directLink = useMemo(() => {
+    // Never expose ad or smartlink destinations while global advertising is off.
+    if (!areAdsEnabled()) return null;
     // Reward-CTA zone switched off in Admin → Placements → no link opens.
     if (settings.placements.rewardCta === false) return null;
     const pool: string[] = [];
