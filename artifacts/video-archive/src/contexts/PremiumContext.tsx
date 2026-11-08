@@ -6,6 +6,7 @@ import { useAds } from "@/contexts/AdsContext";
 import { adPageId } from "@/lib/ad-slots";
 import { premiumApi, type PremiumConfig, type PremiumStatus } from "@/lib/premium-client";
 import { isAgeGatePassed, onAgeGatePassed } from "@/lib/gating";
+import { areAdsEnabled } from "@/lib/ads-enabled";
 
 /** Routes that never mount ad slots (auth + payment + admin screens). */
 function isExcludedPage(pathname: string): boolean {
@@ -31,6 +32,8 @@ interface PremiumContextValue {
   /** Once-per-device ad-free grace window (set when the age gate first passes). */
   inGrace: boolean;
   graceRemainingMs: number;
+  /** Global advertising feature switch; independent of per-user eligibility. */
+  adsEnabled: boolean;
   /** Final gating predicate: should ads render on this page for this user? */
   showAds: boolean;
   excludedPage: boolean;
@@ -84,11 +87,8 @@ export function PremiumProvider({ children }: { children: ReactNode }) {
     const inGrace = false;
 
     const excludedPage = isExcludedPage(location);
-    // Master switch VITE_ADS_ENABLED: unset/empty means ON (Vercel ships the
-    // key empty today, and it previously had no effect at all); "false"/"0"/
-    // "no" turns every ad slot off at once.
-    const adsFlag = (import.meta.env.VITE_ADS_ENABLED ?? "").trim().toLowerCase();
-    const adsEnabled = adsFlag !== "false" && adsFlag !== "0" && adsFlag !== "no";
+    // Global kill switch is opt-in: unset/empty keeps all advertising OFF.
+    const adsEnabled = areAdsEnabled();
     // Admin per-page switch (Admin → Ads → Placements): missing key = page ON.
     const pageAdsOn = settings.pages[adPageId(location)] !== false;
     // Ads render when the switch is on, the age gate has passed, the user is
@@ -106,6 +106,7 @@ export function PremiumProvider({ children }: { children: ReactNode }) {
       agePassed,
       inGrace,
       graceRemainingMs: 0,
+      adsEnabled,
       showAds,
       excludedPage,
       refreshStatus,
