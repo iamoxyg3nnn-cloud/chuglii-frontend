@@ -397,34 +397,7 @@ export default function Home() {
         </section>
       )}
 
-      {/* Search-friendly overview with useful links to the public archive sections. */}
-      <section aria-labelledby="archive-overview-title" className="border-t border-border/50 px-4 sm:px-6 py-12">
-        <div className="container mx-auto max-w-4xl">
-          <h2 id="archive-overview-title" className="text-lg font-bold tracking-tight mb-3">
-            Explore the VAULT recording archive
-          </h2>
-          <p className="text-sm text-muted-foreground leading-relaxed max-w-3xl">
-            VAULT is an adults-only (18+) directory for discovering publicly listed cam recording entries.
-            Search by recording title or performer, browse topic tags, and use the available filters and
-            sorting options to narrow the catalogue. Members can sign in to save favorites in a private
-            personal archive.
-          </p>
-          <div className="grid gap-3 sm:grid-cols-3 mt-6">
-            <Link href="/browse" className="rounded-lg border border-border/60 p-4 hover:border-primary/40 transition-colors">
-              <h3 className="text-sm font-semibold mb-1">Browse recordings</h3>
-              <p className="text-xs text-muted-foreground leading-relaxed">Search and filter the public recording catalogue.</p>
-            </Link>
-            <Link href="/performers" className="rounded-lg border border-border/60 p-4 hover:border-primary/40 transition-colors">
-              <h3 className="text-sm font-semibold mb-1">Performer directory</h3>
-              <p className="text-xs text-muted-foreground leading-relaxed">Explore performer listings connected with the archive.</p>
-            </Link>
-            <Link href="/tags" className="rounded-lg border border-border/60 p-4 hover:border-primary/40 transition-colors">
-              <h3 className="text-sm font-semibold mb-1">Browse by tag</h3>
-              <p className="text-xs text-muted-foreground leading-relaxed">Find recordings through topic and category tags.</p>
-            </Link>
-          </div>
-        </div>
-      </section>
+
     </Layout>
   );
 }
