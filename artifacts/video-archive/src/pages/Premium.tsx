@@ -157,8 +157,9 @@ export default function Premium() {
             Watch ad-free, <span className="text-primary">forever clear</span>
           </h1>
           <p className="text-sm text-muted-foreground max-w-md mx-auto leading-relaxed">
-            No banners, no interruptions — plus you can earn premium days free
-            by watching a few sponsored ads.
+            {adsEnabled
+              ? "No banners, no interruptions — plus you can earn premium days free by watching sponsored ads."
+              : "Advertising is temporarily paused across VAULT. Premium account features remain available."}
           </p>
         </div>
 
