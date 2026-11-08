@@ -2,6 +2,7 @@ import { Link } from "wouter";
 import { useCallback, memo } from "react";
 import { Clapperboard, Users, Tags, ListVideo, Send } from "lucide-react";
 import { prefetchRoute } from "@/lib/route-chunks";
+import { isActiveNavigationRoute } from "@/lib/navigation";
 
 export const NAV_LINKS = [
   { href: "/browse", label: "Browse", icon: Clapperboard },
@@ -15,15 +16,11 @@ interface DesktopNavProps {
   onRequestOpen?: () => void;
 }
 
-function isActive(href: string, location: string) {
-  return href === "/" ? location === "/" : location.startsWith(href);
-}
-
 export const DesktopNav = memo(function DesktopNav({ location, onRequestOpen }: DesktopNavProps) {
   return (
     <nav aria-label="Primary navigation" className="hidden md:flex items-center gap-0.5 text-sm">
       {NAV_LINKS.map(({ href, label, icon: Icon }) => (
-        <NavLink key={href} href={href} label={label} icon={Icon} isActive={isActive(href, location)} />
+        <NavLink key={href} href={href} label={label} icon={Icon} isActive={isActiveNavigationRoute(href, location)} />
       ))}
       <span className="w-px h-4 bg-border/20 mx-1" />
       <button
