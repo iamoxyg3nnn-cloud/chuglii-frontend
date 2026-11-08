@@ -113,7 +113,7 @@ export default function Home() {
           <div className="mb-4 flex items-center gap-3 animate-fade-in-up" style={{ animationDelay: '0ms' }}>
             <div className="h-px flex-1 bg-border/50" />
             <span className="text-[11px] uppercase tracking-[0.3em] text-muted-foreground font-medium">
-              Private Recording Archive
+              Cam Recording Archive & Performer Directory
             </span>
             <div className="h-px flex-1 bg-border/50" />
           </div>
@@ -124,7 +124,10 @@ export default function Home() {
 
           <div className="mb-10 text-xs text-muted-foreground animate-fade-in-up" style={{ animationDelay: '160ms' }}>
             <p className="text-[15px] text-muted-foreground/60 font-light italic tracking-wide">
-              Always something to watch.
+              Discover recordings and performers.
+            </p>
+            <p className="mt-3 max-w-2xl mx-auto text-sm text-muted-foreground/60 font-light leading-relaxed">
+              Sign in to save your favorite recordings in your own private archive.
             </p>
           </div>
 
