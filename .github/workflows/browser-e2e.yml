@@ -1,0 +1,74 @@
+name: Browser E2E Smoke
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: browser-e2e-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  smoke:
+    name: Desktop and mobile browser smoke
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10.26.1
+          run_install: false
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Install workspace dependencies
+        run: pnpm install --frozen-lockfile --ignore-scripts
+
+      - name: Build frontend
+        run: pnpm --filter @workspace/video-archive build
+
+      - name: Install pinned browser test runner
+        run: npm install --prefix /tmp/e2e --no-save --ignore-scripts playwright@1.56.1
+
+      - name: Install Chromium
+        run: /tmp/e2e/node_modules/.bin/playwright install --with-deps chromium
+
+      - name: Start frontend preview
+        run: |
+          pnpm --filter @workspace/video-archive exec vite preview --config vite.config.ts --host 127.0.0.1 --port 4173 > /tmp/video-archive-preview.log 2>&1 &
+          echo $! > /tmp/video-archive-preview.pid
+
+      - name: Wait for frontend
+        run: |
+          for attempt in $(seq 1 60); do
+            if curl --fail --silent http://127.0.0.1:4173/ > /dev/null; then
+              exit 0
+            fi
+            sleep 2
+          done
+          cat /tmp/video-archive-preview.log
+          exit 1
+
+      - name: Run desktop and mobile browser flows
+        run: node scripts/e2e/smoke.mjs
+
+      - name: Upload preview logs on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: browser-e2e-preview-logs
+          path: /tmp/video-archive-preview.log
+          if-no-files-found: ignore
