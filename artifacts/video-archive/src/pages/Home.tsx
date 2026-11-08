@@ -105,50 +105,93 @@ export default function Home() {
 
   return (
     <Layout>
-      {/* Hero */}
-      <section className="relative border-b border-border/50 px-4 sm:px-6 py-20 md:py-28 overflow-hidden">
-        {/* Diamond texture */}
-        <div className="pattern-square absolute inset-0 pointer-events-none opacity-20" aria-hidden="true" />
-        <div className="container mx-auto max-w-4xl text-center relative">
-          <div className="mb-4 flex items-center gap-3 animate-fade-in-up" style={{ animationDelay: '0ms' }}>
-            <div className="h-px flex-1 bg-border/50" />
-            <span className="text-[11px] uppercase tracking-[0.3em] text-muted-foreground font-medium">
-              Public Adult Recording Archive
-            </span>
-            <div className="h-px flex-1 bg-border/50" />
-          </div>
+      {/* Editorial discovery hero */}
+      <section className="relative isolate overflow-hidden border-b border-border/60 bg-background px-4 py-14 sm:px-6 sm:py-20 lg:py-24">
+        <div className="pointer-events-none absolute inset-0 -z-10" aria-hidden="true">
+          <div className="absolute -right-24 -top-32 h-[28rem] w-[28rem] rounded-full bg-primary/[0.07] blur-3xl" />
+          <div className="absolute -bottom-40 left-[12%] h-80 w-80 rounded-full bg-primary/[0.045] blur-3xl" />
+          <div className="pattern-square absolute inset-0 opacity-[0.08]" />
+        </div>
 
-          <h1 className="text-[clamp(3.5rem,9vw,7rem)] font-black tracking-tighter leading-none mb-6 animate-fade-in-up" style={{ animationDelay: '80ms' }}>
-            VAULT<span className="text-primary">.</span>
-            <span className="sr-only"> — Adult Cam Recording Archive &amp; Performer Directory</span>
-          </h1>
+        <div className="container mx-auto grid max-w-7xl items-end gap-12 lg:grid-cols-[minmax(0,1.25fr)_minmax(18rem,0.75fr)] lg:gap-16">
+          <div className="max-w-3xl">
+            <div className="mb-7 flex items-center gap-3">
+              <span className="h-px w-8 bg-primary" />
+              <span className="text-[10px] font-semibold uppercase tracking-[0.28em] text-muted-foreground">
+                The public recording index · 18+
+              </span>
+            </div>
 
-          <div className="mb-10 text-xs text-muted-foreground animate-fade-in-up" style={{ animationDelay: '160ms' }}>
-            <p className="text-[15px] text-muted-foreground/60 font-light italic tracking-wide">
-              Browse the adult cam recording archive by performer, title, or topic.
+            <h1 className="max-w-3xl text-[clamp(3.2rem,8vw,6.7rem)] font-black leading-[0.92] tracking-[-0.075em] text-foreground">
+              The moments
+              <br />
+              <span className="text-primary">worth revisiting.</span>
+            </h1>
+
+            <p className="mt-7 max-w-xl text-base leading-7 text-muted-foreground sm:text-lg">
+              Explore a curated index of public recording listings. Find a recording by performer, title, or topic — then keep the ones you want close.
             </p>
-            <p className="mt-3 max-w-2xl mx-auto text-sm text-muted-foreground/60 font-light leading-relaxed">
-              Explore public recording listings, discover performer profiles, and sign in to save favorites to your private archive.
-            </p>
-          </div>
 
-          <form onSubmit={handleSearch} className="max-w-xl mx-auto relative animate-fade-in-up" style={{ animationDelay: '240ms' }}>
-            <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground/60" />
-            <input
-              type="text"
-              placeholder="Search by performer, title, or tag…"
-              className="w-full h-12 bg-background dark:bg-card border border-border/60 hover:border-border focus:border-primary/60 rounded-xl pl-11 pr-28 text-sm outline-none transition-all duration-200 placeholder:text-muted-foreground/40 focus:ring-2 focus:ring-primary/10 focus:border-primary/50"
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              aria-label="Search recordings"
-            />
-            <button
-              type="submit"
-              className="absolute right-1.5 top-1/2 -translate-y-1/2 h-9 px-4 border border-primary/30 text-primary text-xs font-semibold tracking-wide hover:border-primary/60 transition-all duration-200 rounded-lg"
+            <form
+              onSubmit={handleSearch}
+              role="search"
+              aria-label="Search the recording archive"
+              className="mt-9 flex max-w-2xl flex-col gap-2 rounded-2xl border border-border bg-card p-2 shadow-lg shadow-black/[0.04] sm:flex-row sm:items-center"
             >
-              Search
-            </button>
-          </form>
+              <label className="flex min-w-0 flex-1 items-center gap-3 px-3">
+                <Search className="h-5 w-5 shrink-0 text-muted-foreground" aria-hidden="true" />
+                <input
+                  type="search"
+                  placeholder="Search performers, titles, or tags"
+                  className="h-12 min-w-0 w-full bg-transparent text-base text-foreground outline-none placeholder:text-muted-foreground/70"
+                  value={search}
+                  onChange={(e) => setSearch(e.target.value)}
+                  aria-label="Search recordings"
+                />
+              </label>
+              <button
+                type="submit"
+                className="inline-flex h-12 shrink-0 items-center justify-center gap-2 rounded-xl bg-primary px-6 text-sm font-semibold text-primary-foreground transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-card"
+              >
+                Search archive
+                <ArrowRight className="h-4 w-4" aria-hidden="true" />
+              </button>
+            </form>
+
+            <nav aria-label="Explore the archive" className="mt-7 flex flex-wrap gap-x-6 gap-y-3 text-sm">
+              <Link href="/browse" className="inline-flex items-center gap-2 font-medium text-foreground transition-colors hover:text-primary">
+                <Clapperboard className="h-4 w-4 text-primary" aria-hidden="true" />
+                Recordings
+              </Link>
+              <Link href="/performers" className="inline-flex items-center gap-2 font-medium text-foreground transition-colors hover:text-primary">
+                <Users className="h-4 w-4 text-primary" aria-hidden="true" />
+                Performers
+              </Link>
+              <Link href="/tags" className="inline-flex items-center gap-2 font-medium text-foreground transition-colors hover:text-primary">
+                <Tags className="h-4 w-4 text-primary" aria-hidden="true" />
+                Topics
+              </Link>
+            </nav>
+          </div>
+
+          <aside className="relative hidden min-h-[19rem] flex-col justify-between overflow-hidden rounded-2xl border border-border bg-card p-7 lg:flex xl:min-h-[22rem]">
+            <div className="flex items-center justify-between">
+              <span className="text-[10px] font-semibold uppercase tracking-[0.24em] text-muted-foreground">Inside the archive</span>
+              <span className="rounded-full border border-primary/25 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wider text-primary">VAULT</span>
+            </div>
+            <div className="relative">
+              <div className="mb-4 text-[clamp(5rem,9vw,8rem)] font-black leading-none tracking-[-0.09em] text-primary/15" aria-hidden="true">01</div>
+              <h2 className="max-w-xs text-2xl font-bold leading-tight tracking-tight text-foreground">One archive.<br />More ways to explore.</h2>
+              <p className="mt-3 max-w-xs text-sm leading-6 text-muted-foreground">
+                Search the catalogue, browse performer profiles, or follow a topic to discover related listings.
+              </p>
+            </div>
+            <Link href="/browse" className="inline-flex w-fit items-center gap-2 text-sm font-semibold text-primary transition-colors hover:text-primary/80">
+              Explore recordings <ArrowRight className="h-4 w-4" aria-hidden="true" />
+            </Link>
+            <div className="pointer-events-none absolute -bottom-16 -right-10 h-48 w-48 rounded-full border border-primary/10" aria-hidden="true" />
+            <div className="pointer-events-none absolute -bottom-10 -right-4 h-32 w-32 rounded-full border border-primary/10" aria-hidden="true" />
+          </aside>
         </div>
       </section>
 
