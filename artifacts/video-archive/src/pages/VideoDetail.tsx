@@ -55,7 +55,15 @@ import {
   UserCircle, FilmStrip, ThumbsUp, ThumbsDown, BookmarkSimple, ShareNetwork,
   Check, HardDrives, DownloadSimple, Clock, Play, Code, Playlist, Shuffle,
   FolderSimplePlus, Plus, CaretDown, CaretLeft, CaretRight, ArrowSquareOut, SignIn, CheckCircle, ArrowClockwise,
+  Television, Lightbulb, Keyboard, SlidersHorizontal, Sparkle, Info,
 } from "@phosphor-icons/react";
+import { cn } from "@/lib/utils";
+import {
+  DialogRoot,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 
 function useFullscreen(ref: React.RefObject<HTMLDivElement | null>) {
   const [isFullscreen, setIsFullscreen] = useState(false);
@@ -93,6 +101,34 @@ export default function VideoDetail() {
   const recSectionRef = useRef<HTMLDivElement>(null);
   const { isFullscreen, enter: enterFS, exit: exitFS } = useFullscreen(playerRef);
   const { user } = useAuth();
+
+  // â”€â”€â”€ Video Player Enhancements & States â”€â”€â”€
+  const [isTheaterMode, setIsTheaterMode] = useState(false);
+  const [ambientGlow, setAmbientGlow] = useState(() => {
+    if (typeof window === "undefined") return true;
+    return localStorage.getItem("v_ambient_glow") !== "false";
+  });
+  const [aspectRatio, setAspectRatio] = useState<"16:9" | "21:9" | "4:3">(() => {
+    if (typeof window === "undefined") return "16:9";
+    const stored = localStorage.getItem("v_aspect_ratio");
+    return stored === "21:9" || stored === "4:3" ? stored : "16:9";
+  });
+  const [playerReloadKey, setPlayerReloadKey] = useState(0);
+  const [shortcutsOpen, setShortcutsOpen] = useState(false);
+  const [serverToast, setServerToast] = useState<string | null>(null);
+
+  const toggleAmbientGlow = useCallback(() => {
+    setAmbientGlow((prev) => {
+      const next = !prev;
+      localStorage.setItem("v_ambient_glow", String(next));
+      return next;
+    });
+  }, []);
+
+  const handleAspectRatioChange = useCallback((ratio: "16:9" | "21:9" | "4:3") => {
+    setAspectRatio(ratio);
+    localStorage.setItem("v_aspect_ratio", ratio);
+  }, []);
 
   const [activeServer, setActiveServer] = useState(() => {
     if (typeof window === "undefined") return 0;
@@ -386,20 +422,79 @@ export default function VideoDetail() {
     img.src = proxiedUrl;
   }, [video?.thumbnail_url]);
 
+  const safeEmbedSource = safeExternalUrl(video?.embed_url);
+  const servers = deriveServers(video?.embed_url, video?.links);
+  const currentServer = servers[activeServer] ?? servers[0];
+
+  const handleSelectServer = useCallback((index: number) => {
+    setActiveServer(index);
+    sessionStorage.setItem("vserver", String(index));
+    setPlayerReloadKey((k) => k + 1);
+    const target = servers[index];
+    if (target) {
+      setServerToast(`Switched to Server ${index + 1}: ${target.label}`);
+      setTimeout(() => setServerToast(null), 2400);
+    }
+  }, [servers]);
+
+  const handleNextServer = useCallback(() => {
+    if (servers.length <= 1) return;
+    const nextIdx = (activeServer + 1) % servers.length;
+    handleSelectServer(nextIdx);
+  }, [servers.length, activeServer, handleSelectServer]);
+
+  const handleReloadPlayer = useCallback(() => {
+    setPlayerReloadKey((k) => k + 1);
+    setServerToast(`Reloading ${currentServer?.label || "Player"}...`);
+    setTimeout(() => setServerToast(null), 2000);
+  }, [currentServer?.label]);
+
+  const aspectClass = useMemo(() => {
+    if (aspectRatio === "21:9") return "aspect-[21/9]";
+    if (aspectRatio === "4:3") return "aspect-[4/3]";
+    return "aspect-video";
+  }, [aspectRatio]);
+
   useEffect(() => {
     const handleKey = (e: KeyboardEvent) => {
       if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return;
       if (e.key === "f" || e.key === "F") {
+        e.preventDefault();
         isFullscreen ? exitFS() : enterFS();
+      } else if (e.key === "t" || e.key === "T") {
+        e.preventDefault();
+        setIsTheaterMode((prev) => !prev);
+      } else if (e.key === "a" || e.key === "A") {
+        e.preventDefault();
+        toggleAmbientGlow();
+      } else if (e.key === "s" || e.key === "S") {
+        if (servers.length > 1) {
+          e.preventDefault();
+          handleNextServer();
+        }
+      } else if (e.key === "r" || e.key === "R") {
+        e.preventDefault();
+        handleReloadPlayer();
+      } else if (e.key === "?") {
+        e.preventDefault();
+        setShortcutsOpen((prev) => !prev);
+      } else if (e.key === " " || e.key === "k" || e.key === "K") {
+        if (!videoStarted) {
+          e.preventDefault();
+          handlePosterClick();
+        }
+      } else if (e.key === "Escape") {
+        if (isTheaterMode) {
+          setIsTheaterMode(false);
+        }
+        if (shortcutsOpen) {
+          setShortcutsOpen(false);
+        }
       }
     };
     window.addEventListener("keydown", handleKey);
     return () => window.removeEventListener("keydown", handleKey);
-  }, [isFullscreen, enterFS, exitFS]);
-
-  const safeEmbedSource = safeExternalUrl(video?.embed_url);
-  const servers = deriveServers(video?.embed_url, video?.links);
-  const currentServer = servers[activeServer] ?? servers[0];
+  }, [isFullscreen, enterFS, exitFS, isTheaterMode, shortcutsOpen, servers.length, videoStarted, handleNextServer, handleReloadPlayer, toggleAmbientGlow, handlePosterClick]);
   
   // Count estimated watch time only after the in-page player is launched.
   useWatchProgress({ video, durationSeconds: video?.duration, isActive: videoStarted && currentServer?.type === "iframe" });
@@ -746,49 +841,166 @@ export default function VideoDetail() {
           </Link>
         </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-[1fr_300px] gap-8">
-          {/* â”€â”€â”€ Main column â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
-          <div className="space-y-5 min-w-0">
-            {/* Ad above the player â€” 728Ã—90 / 468Ã—60 / 300Ã—100 */}
-            <AdLeaderboard />
+        {/* Theater mode ambient backdrop */}
+        {isTheaterMode && (
+          <div
+            className="fixed inset-0 bg-black/85 z-30 transition-opacity duration-300 backdrop-blur-sm cursor-pointer"
+            onClick={() => setIsTheaterMode(false)}
+            title="Exit theater mode (Esc or T)"
+            aria-label="Exit theater mode"
+          />
+        )}
 
-            {/* Server selector */}
-            {!isLoading && servers.length > 1 && (
-              <div className="flex items-center gap-2">
-                <HardDrives size={15} weight="regular" className="text-muted-foreground/60 shrink-0" />
-                <div className="flex gap-1.5 flex-wrap">
-                  {servers.map((s, i) => (
-                    <button
-                      key={i}
-                      onClick={() => { setActiveServer(i); sessionStorage.setItem("vserver", String(i)); setVideoStarted(false); sessionStorage.removeItem("vplayed"); }}
-                      className={`px-3 py-1 text-xs font-medium rounded-lg border transition-colors cursor-pointer ${
-                        activeServer === i
-                          ? "bg-primary/10 border-primary/50 text-primary"
-                          : "border-border/60 text-muted-foreground hover:border-border hover:text-foreground"
-                      }`}
-                    >
-                      {s.label}
-                    </button>
-                  ))}
+        <div className={cn("grid gap-8 transition-all duration-300", isTheaterMode ? "grid-cols-1" : "grid-cols-1 lg:grid-cols-[1fr_300px]")}>
+          {/* â”€â”€â”€ Main column â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
+          <div className={cn("space-y-4 min-w-0 transition-all duration-300", isTheaterMode && "relative z-40 max-w-6xl mx-auto w-full")}>
+            {/* Ad above the player â€” 728Ã—90 / 468Ã—60 / 300Ã—100 */}
+            {!isTheaterMode && <AdLeaderboard />}
+
+            {/* Unified Player Stage Toolbar */}
+            {!isLoading && video && (
+              <div className="flex flex-wrap items-center justify-between gap-2.5 p-2 rounded-xl bg-card/60 backdrop-blur-sm border border-border/60 text-xs">
+                {/* Left: Server mirror selector */}
+                <div className="flex items-center gap-2 flex-wrap">
+                  <div className="flex items-center gap-1.5 text-muted-foreground/80 font-medium px-1">
+                    <HardDrives size={14} weight="bold" />
+                    <span className="hidden sm:inline">Servers:</span>
+                  </div>
+                  <div className="flex items-center gap-1.5 flex-wrap">
+                    {servers.map((s, i) => (
+                      <button
+                        key={i}
+                        onClick={() => handleSelectServer(i)}
+                        className={cn(
+                          "px-2.5 py-1 text-xs font-medium rounded-lg border transition-all cursor-pointer flex items-center gap-1.5",
+                          activeServer === i
+                            ? "bg-primary/10 border-primary/50 text-primary shadow-xs"
+                            : "border-border/50 text-muted-foreground hover:border-border hover:text-foreground hover:bg-secondary/40"
+                        )}
+                        title={`Switch to ${s.label} (${s.type === 'iframe' ? 'Embed Player' : 'External Link'})`}
+                      >
+                        <span className={cn(
+                          "w-1.5 h-1.5 rounded-full",
+                          activeServer === i ? "bg-emerald-400" : "bg-muted-foreground/40"
+                        )} />
+                        <span>{s.label}</span>
+                        <span className="text-[10px] text-muted-foreground/60 hidden sm:inline">
+                          {s.type === "iframe" ? "embed" : "link"}
+                        </span>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Right: Stage view controls (Aspect, Glow, Theater, Shortcuts) */}
+                <div className="flex items-center gap-1.5 ml-auto">
+                  {/* Aspect Ratio selector */}
+                  <div className="hidden sm:flex items-center bg-secondary/50 rounded-lg p-0.5 border border-border/40">
+                    {(["16:9", "21:9", "4:3"] as const).map((ratio) => (
+                      <button
+                        key={ratio}
+                        onClick={() => handleAspectRatioChange(ratio)}
+                        className={cn(
+                          "px-2 py-0.5 text-[11px] font-medium rounded-md transition-colors cursor-pointer",
+                          aspectRatio === ratio
+                            ? "bg-card text-foreground shadow-xs font-semibold"
+                            : "text-muted-foreground hover:text-foreground"
+                        )}
+                        title={`Aspect ratio: ${ratio}`}
+                      >
+                        {ratio}
+                      </button>
+                    ))}
+                  </div>
+
+                  {/* Ambient Glow toggle */}
+                  <button
+                    onClick={toggleAmbientGlow}
+                    className={cn(
+                      "h-7 px-2.5 flex items-center gap-1.5 rounded-lg border text-xs font-medium transition-all cursor-pointer",
+                      ambientGlow
+                        ? "border-amber-400/40 text-amber-300 bg-amber-400/10"
+                        : "border-border/50 text-muted-foreground hover:text-foreground hover:border-border"
+                    )}
+                    title="Toggle Ambient Glow (A)"
+                    aria-label="Toggle ambient lighting"
+                  >
+                    <Lightbulb size={13} weight={ambientGlow ? "fill" : "regular"} />
+                    <span className="hidden md:inline">Glow</span>
+                  </button>
+
+                  {/* Theater Mode toggle */}
+                  <button
+                    onClick={() => setIsTheaterMode((prev) => !prev)}
+                    className={cn(
+                      "h-7 px-2.5 flex items-center gap-1.5 rounded-lg border text-xs font-medium transition-all cursor-pointer",
+                      isTheaterMode
+                        ? "border-primary/50 text-primary bg-primary/10"
+                        : "border-border/50 text-muted-foreground hover:text-foreground hover:border-border"
+                    )}
+                    title="Theater Mode (T)"
+                    aria-label="Toggle theater mode"
+                  >
+                    <Television size={13} weight={isTheaterMode ? "fill" : "regular"} />
+                    <span className="hidden md:inline">Theater</span>
+                  </button>
+
+                  {/* Keyboard shortcuts */}
+                  <button
+                    onClick={() => setShortcutsOpen(true)}
+                    className="h-7 w-7 flex items-center justify-center rounded-lg border border-border/50 text-muted-foreground hover:text-foreground hover:border-border transition-colors cursor-pointer"
+                    title="Keyboard Shortcuts (?)"
+                    aria-label="Keyboard shortcuts"
+                  >
+                    <Keyboard size={14} weight="regular" />
+                  </button>
                 </div>
               </div>
             )}
 
-            {/* Player — click-to-play */}
+            {/* Player — click-to-play with Ambient glow wrapper */}
             {isLoading ? (
               <Skeleton className="w-full aspect-video rounded-2xl" />
             ) : video ? (
-              <div
-                ref={playerRef}
-                className="relative group aspect-video w-full bg-black overflow-hidden rounded-2xl border border-border/70 shadow-sm"
-              >
+              <div className="relative">
+                {/* Ambient lighting glow */}
+                {ambientGlow && proxyUrl(posterUrl) && (
+                  <div
+                    className={cn(
+                      "pointer-events-none absolute -inset-3 sm:-inset-6 -z-10 rounded-3xl opacity-35 blur-2xl sm:blur-3xl transition-opacity duration-700 bg-cover bg-center overflow-hidden",
+                      isTheaterMode ? "opacity-55 blur-3xl scale-105" : "opacity-35"
+                    )}
+                    style={{
+                      backgroundImage: `url(${proxyUrl(posterUrl)})`,
+                      transform: "translate3d(0, 0, 0)",
+                    }}
+                    aria-hidden="true"
+                  />
+                )}
+
+                <div
+                  ref={playerRef}
+                  className={cn(
+                    "relative group w-full bg-black overflow-hidden rounded-2xl border border-border/70 shadow-sm transition-all duration-300",
+                    aspectClass,
+                    isTheaterMode && "z-40 ring-1 ring-white/20 shadow-2xl scale-[1.01]"
+                  )}
+                >
+                  {/* Transient action feedback toast */}
+                  {serverToast && (
+                    <div className="absolute top-14 left-1/2 -translate-x-1/2 z-40 px-4 py-1.5 rounded-full bg-black/85 backdrop-blur-md border border-white/20 text-white text-xs font-semibold shadow-2xl pointer-events-none flex items-center gap-2 animate-in fade-in zoom-in-95 duration-150">
+                      <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+                      <span>{serverToast}</span>
+                    </div>
+                  )}
+
                   {currentServer?.type === "iframe" && !videoStarted ? (
                     /* Pre-roll first (armed by this click), else poster / click-to-play */
                     prerollPhase === "playing" && prerollOn && activePreroll ? (
                       <PrerollPlayer creative={activePreroll} onDone={finishPreroll} withGesture={prerollWithGesture} />
                     ) : (
                     <button
-                      className="absolute inset-0 w-full h-full cursor-pointer focus:outline-none"
+                      className="absolute inset-0 w-full h-full cursor-pointer focus:outline-none group/poster"
                       onClick={handlePosterClick}
                       aria-label="Play video"
                     >
@@ -796,7 +1008,7 @@ export default function VideoDetail() {
                       <OptimizedImage
                         src={proxyUrl(posterUrl)!}
                         alt={video.username}
-                        className="w-full h-full object-cover"
+                        className="w-full h-full object-cover transition-transform duration-700 group-hover/poster:scale-[1.02]"
                         containerClassName="w-full h-full"
                         width="hero"
                         fetchPriority="high"
@@ -812,17 +1024,70 @@ export default function VideoDetail() {
                         <FilmStrip size={44} weight="duotone" className="text-white/10" />
                       </div>
                     )}
-                    <div className="absolute inset-0 bg-black/30 flex flex-col items-center justify-center gap-3">
-                      <div className="w-16 h-16 rounded-full border-2 border-primary/60 hover:border-primary flex items-center justify-center transition-all hover:scale-105">
-                        <Play size={26} weight="fill" className="text-white ml-0.5" />
+
+                    {/* Cinema Stage Vignette & Overlay */}
+                    <div className="absolute inset-0 bg-gradient-to-t from-black/85 via-black/30 to-black/60 flex flex-col justify-between p-4 sm:p-6 transition-colors group-hover/poster:from-black/80 group-hover/poster:via-black/20">
+                      {/* Top poster bar */}
+                      <div className="flex items-center justify-between gap-2">
+                        <div className="flex items-center gap-2">
+                          <span className="px-2.5 py-1 rounded-md bg-black/60 backdrop-blur-md border border-white/10 text-[11px] font-semibold text-white/95 shadow-xs">
+                            {video.username}
+                          </span>
+                          {video.timestamp && (
+                            <span className="text-[11px] text-white/70 hidden sm:inline">
+                              {new Date(video.timestamp).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' })}
+                            </span>
+                          )}
+                        </div>
+
+                        <div className="flex items-center gap-1.5">
+                          <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-black/60 backdrop-blur-md border border-white/10 text-[11px] font-medium text-white/90 shadow-xs">
+                            <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
+                            <span>{currentServer.label}</span>
+                          </div>
+                        </div>
                       </div>
-                      <span className="text-white/80 text-xs font-medium">Click to play</span>
+
+                      {/* Center Play Button */}
+                      <div className="flex flex-col items-center justify-center gap-3">
+                        <div className="w-18 h-18 sm:w-20 sm:h-20 rounded-full bg-black/50 backdrop-blur-md border border-white/25 group-hover/poster:border-primary/80 group-hover/poster:bg-primary/20 flex items-center justify-center transition-all duration-300 group-hover/poster:scale-105 active:scale-95 shadow-2xl">
+                          <Play size={28} weight="fill" className="text-white ml-1 group-hover/poster:text-primary transition-colors" />
+                        </div>
+                        <div className="flex flex-col items-center gap-0.5">
+                          <span className="text-white font-medium text-xs tracking-wide">
+                            Click or press <kbd className="px-1.5 py-0.5 text-[10px] bg-white/10 border border-white/20 rounded font-mono">Space</kbd> to play
+                          </span>
+                          <span className="text-white/50 text-[11px]">
+                            Streaming via {currentServer.label}
+                          </span>
+                        </div>
+                      </div>
+
+                      {/* Bottom Metadata Badges */}
+                      <div className="flex items-center justify-between text-xs text-white/80">
+                        <div className="flex items-center gap-2">
+                          {video.resolution && (
+                            <span className="px-2 py-0.5 rounded bg-black/60 backdrop-blur-md border border-white/10 text-[10px] font-bold text-white/90">
+                              {video.resolution}
+                            </span>
+                          )}
+                          {video.duration != null && video.duration > 0 && (
+                            <span className="px-2 py-0.5 rounded bg-black/60 backdrop-blur-md border border-white/10 text-[11px] tabular-nums font-mono text-white/80">
+                              {formatDuration(video.duration)}
+                            </span>
+                          )}
+                          {video.filesize ? (
+                            <span className="text-[11px] text-white/60 hidden sm:inline tabular-nums">
+                              {formatBytes(video.filesize)}
+                            </span>
+                          ) : null}
+                        </div>
+
+                        <div className="text-[11px] text-white/60 font-mono hidden sm:inline">
+                          Direct Embed Player
+                        </div>
+                      </div>
                     </div>
-                    {video.resolution && (
-                      <div className="absolute top-3 right-3 text-[10px] font-bold text-white/90 bg-black/60 backdrop-blur-md ring-1 ring-white/10 px-2 py-0.5 rounded-md">
-                        {video.resolution}
-                      </div>
-                    )}
                     </button>
                     )
                 ) : currentServer?.type === "link" ? (
@@ -842,7 +1107,7 @@ export default function VideoDetail() {
                   </div>
                 ) : currentServer?.type === "iframe" ? (
                   <iframe
-                    key={`${currentServer.src}-${activeServer}`}
+                    key={`${currentServer.src}-${activeServer}-${playerReloadKey}`}
                     src={currentServer.src}
                     className="w-full h-full border-0"
                     allow="autoplay; fullscreen; picture-in-picture; encrypted-media"
@@ -878,32 +1143,161 @@ export default function VideoDetail() {
                   />
                 )}
 
+                {/* In-Player Interactive Overlays */}
                 {videoStarted && (
-                  <div className="absolute bottom-3 right-3 z-10 flex items-center gap-1.5 opacity-0 group-hover:opacity-100 transition-all">
-                    {currentServer?.src && (
-                      <a
-                        href={currentServer.src}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="w-8 h-8 flex items-center justify-center bg-black/50 backdrop-blur-sm ring-1 ring-white/10 hover:bg-black/70 hover:ring-white/20 text-white/70 hover:text-white rounded-lg transition-all cursor-pointer"
-                        aria-label="Open in new window"
-                        title={`Open in new window (${currentServer.label})`}
+                  <>
+                    {/* Top Floating HUD (reveals on hover / focus) */}
+                    <div className="absolute top-3 left-3 right-3 z-30 flex items-center justify-between pointer-events-none opacity-0 group-hover:opacity-100 focus-within:opacity-100 transition-opacity duration-200">
+                      {/* Left: Server status & resolution */}
+                      <div className="flex items-center gap-2 pointer-events-auto">
+                        <div className="inline-flex items-center gap-2 px-2.5 py-1 rounded-lg bg-black/70 backdrop-blur-md border border-white/15 text-xs text-white/90 shadow-md">
+                          <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+                          <span className="font-medium">{currentServer.label}</span>
+                          {servers.length > 1 && (
+                            <button
+                              onClick={handleNextServer}
+                              className="text-[11px] text-white/60 hover:text-white transition-colors cursor-pointer pl-1.5 border-l border-white/20"
+                              title="Cycle to next server (S)"
+                            >
+                              Next (S)
+                            </button>
+                          )}
+                        </div>
+                        {video.resolution && (
+                          <div className="px-2 py-1 rounded-lg bg-black/70 backdrop-blur-md border border-white/15 text-[10px] font-bold text-white/90 shadow-md">
+                            {video.resolution}
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Right: Quick actions (Reload, Ambient, Theater, Shortcuts) */}
+                      <div className="flex items-center gap-1.5 pointer-events-auto">
+                        <button
+                          onClick={handleReloadPlayer}
+                          className="h-7 px-2.5 flex items-center gap-1.5 bg-black/70 backdrop-blur-md border border-white/15 hover:bg-black/90 hover:border-white/30 text-white/80 hover:text-white rounded-lg text-xs font-medium transition-all cursor-pointer shadow-md"
+                          title="Reload Player (R)"
+                          aria-label="Reload player"
+                        >
+                          <ArrowClockwise size={13} weight="bold" />
+                          <span className="hidden sm:inline">Reload</span>
+                        </button>
+
+                        <button
+                          onClick={toggleAmbientGlow}
+                          className={cn(
+                            "h-7 px-2.5 flex items-center gap-1.5 bg-black/70 backdrop-blur-md border rounded-lg text-xs font-medium transition-all cursor-pointer shadow-md",
+                            ambientGlow
+                              ? "border-amber-400/50 text-amber-300"
+                              : "border-white/15 text-white/70 hover:text-white hover:border-white/30"
+                          )}
+                          title="Toggle Ambient Glow (A)"
+                          aria-label="Toggle ambient lighting"
+                        >
+                          <Lightbulb size={13} weight={ambientGlow ? "fill" : "regular"} />
+                        </button>
+
+                        <button
+                          onClick={() => setIsTheaterMode((prev) => !prev)}
+                          className={cn(
+                            "h-7 px-2.5 flex items-center gap-1.5 bg-black/70 backdrop-blur-md border rounded-lg text-xs font-medium transition-all cursor-pointer shadow-md",
+                            isTheaterMode
+                              ? "border-primary/50 text-primary bg-primary/20"
+                              : "border-white/15 text-white/80 hover:text-white hover:border-white/30"
+                          )}
+                          title="Theater Mode (T)"
+                          aria-label="Toggle theater mode"
+                        >
+                          <Television size={13} weight={isTheaterMode ? "fill" : "regular"} />
+                        </button>
+
+                        <button
+                          onClick={() => setShortcutsOpen(true)}
+                          className="h-7 w-7 flex items-center justify-center bg-black/70 backdrop-blur-md border border-white/15 hover:bg-black/90 hover:border-white/30 text-white/70 hover:text-white rounded-lg text-xs transition-all cursor-pointer shadow-md"
+                          title="Keyboard Shortcuts (?)"
+                          aria-label="Keyboard shortcuts"
+                        >
+                          <Keyboard size={13} weight="regular" />
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* Bottom-right controls */}
+                    <div className="absolute bottom-3 right-3 z-30 flex items-center gap-1.5 opacity-0 group-hover:opacity-100 focus-within:opacity-100 transition-all">
+                      {currentServer?.src && (
+                        <a
+                          href={currentServer.src}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="w-8 h-8 flex items-center justify-center bg-black/70 backdrop-blur-md border border-white/15 hover:bg-black/90 hover:border-white/30 text-white/80 hover:text-white rounded-lg transition-all cursor-pointer shadow-md"
+                          aria-label="Open in new window"
+                          title={`Open in new window (${currentServer.label})`}
+                        >
+                          <ArrowSquareOut size={16} weight="bold" />
+                        </a>
+                      )}
+                      <button
+                        onClick={isFullscreen ? exitFS : enterFS}
+                        className="w-8 h-8 flex items-center justify-center bg-black/70 backdrop-blur-md border border-white/15 hover:bg-black/90 hover:border-white/30 text-white/80 hover:text-white rounded-lg transition-all cursor-pointer shadow-md"
+                        aria-label={isFullscreen ? "Exit fullscreen" : "Enter fullscreen"}
+                        title="Fullscreen (F)"
                       >
-                        <ArrowSquareOut size={16} weight="bold" />
-                      </a>
-                    )}
-                    <button
-                      onClick={isFullscreen ? exitFS : enterFS}
-                      className="w-8 h-8 flex items-center justify-center bg-black/50 backdrop-blur-sm ring-1 ring-white/10 hover:bg-black/70 hover:ring-white/20 text-white/70 hover:text-white rounded-lg transition-all cursor-pointer"
-                      aria-label={isFullscreen ? "Exit fullscreen" : "Enter fullscreen"}
-                      title="Fullscreen (F)"
-                    >
-                      {isFullscreen ? <CornersIn size={16} weight="bold" /> : <CornersOut size={16} weight="bold" />}
-                    </button>
-                  </div>
+                        {isFullscreen ? <CornersIn size={16} weight="bold" /> : <CornersOut size={16} weight="bold" />}
+                      </button>
+                    </div>
+                  </>
                 )}
+                </div>
               </div>
             ) : null}
+
+            {/* Keyboard Shortcuts Dialog */}
+            <DialogRoot open={shortcutsOpen} onOpenChange={setShortcutsOpen}>
+              <DialogContent className="max-w-md bg-card border-border/70 rounded-2xl p-6">
+                <DialogHeader className="mb-4">
+                  <div className="flex items-center gap-2 text-foreground">
+                    <Keyboard size={20} weight="bold" className="text-primary" />
+                    <DialogTitle className="text-base font-semibold">Player Keyboard Shortcuts</DialogTitle>
+                  </div>
+                  <p className="text-xs text-muted-foreground">
+                    Control the video player directly from your keyboard for an uninterrupted cinema experience.
+                  </p>
+                </DialogHeader>
+
+                <div className="space-y-2.5">
+                  {[
+                    { key: "Space / K", desc: "Start playback from poster", action: "Play" },
+                    { key: "F", desc: "Toggle Fullscreen mode", action: "Fullscreen" },
+                    { key: "T", desc: "Toggle Cinema / Theater mode", action: "Theater" },
+                    { key: "S", desc: "Cycle through mirror servers", action: "Next Server" },
+                    { key: "R", desc: "Reload player & refresh ticket", action: "Reload" },
+                    { key: "A", desc: "Toggle ambient backlight glow", action: "Ambient" },
+                    { key: "Esc", desc: "Exit theater or fullscreen", action: "Exit" },
+                  ].map((item) => (
+                    <div
+                      key={item.key}
+                      className="flex items-center justify-between p-2.5 rounded-lg bg-secondary/40 border border-border/40"
+                    >
+                      <div className="flex flex-col">
+                        <span className="text-xs font-medium text-foreground">{item.action}</span>
+                        <span className="text-[11px] text-muted-foreground">{item.desc}</span>
+                      </div>
+                      <kbd className="px-2 py-1 text-xs font-mono font-semibold bg-card border border-border/70 rounded-md text-foreground shadow-xs">
+                        {item.key}
+                      </kbd>
+                    </div>
+                  ))}
+                </div>
+
+                <div className="mt-4 pt-3 border-t border-border/40 flex justify-end">
+                  <button
+                    onClick={() => setShortcutsOpen(false)}
+                    className="px-4 py-1.5 text-xs font-medium rounded-lg border border-border/60 hover:bg-secondary transition-colors cursor-pointer"
+                  >
+                    Close
+                  </button>
+                </div>
+              </DialogContent>
+            </DialogRoot>
 
             {/* Queue â€” up-next strip (seeded from Playlists / Collections / Watch Later) */}
             {queue && queueIndex >= 0 && (
