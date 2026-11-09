@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   deriveServers,
   detectHostLabel,
+  iframeReferrerPolicy,
   isEmbedUrl,
   normalizeAnonMP4Url,
   normalizeDroploadUrl,
@@ -115,5 +116,34 @@ describe("deriveServers", () => {
     expect(servers.length).toBe(2);
     expect(servers[0].src).toBe("https://anonmp4.to/embed/secret99");
     expect(servers[1].src).toBe("https://dropload.io/e/abc12345");
+  });
+});
+
+describe("iframeReferrerPolicy", () => {
+  it.each([
+    ["https://anonmp4.com/embed/abc1234", "origin"],
+    ["https://anonmp4.to/embed/xyz9876", "origin"],
+    ["https://seeks.cloud/e/abc123", "origin"],
+    ["https://embedseek.com/e/abc123", "origin"],
+    ["https://upns.io/e/abc123", "origin"],
+    ["https://vidara.so/e/abc123", "origin"],
+  ])("%s -> origin (ticket-auth host)", (url, expected) => {
+    expect(iframeReferrerPolicy(url)).toBe(expected);
+  });
+
+  it.each([
+    ["https://dropload.io/e/abc1234", "no-referrer"],
+    ["https://streamtape.com/v/abc", "no-referrer"],
+    ["https://lulustream.com/embed/abc", "no-referrer"],
+    ["https://dood.to/e/abc", "no-referrer"],
+    ["https://mixdrop.ag/e/abc", "no-referrer"],
+    ["https://example.com/player/abc", "no-referrer"],
+  ])("%s -> no-referrer (privacy-first default)", (url, expected) => {
+    expect(iframeReferrerPolicy(url)).toBe(expected);
+  });
+
+  it("returns no-referrer for invalid/empty url", () => {
+    expect(iframeReferrerPolicy("not-a-url")).toBe("no-referrer");
+    expect(iframeReferrerPolicy("")).toBe("no-referrer");
   });
 });

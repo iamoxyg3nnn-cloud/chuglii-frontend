@@ -121,6 +121,40 @@ export function isEmbedUrl(url: string): boolean {
   }
 }
 
+/**
+ * Returns the correct iframe referrerpolicy for a given embed URL.
+ *
+ * Some hosts (AnonMP4, SeekStreaming, UPNshare, Vidara) validate the HTTP
+ * Referer header as part of a one-time playback ticket or session-token
+ * handshake. Using "no-referrer" on those iframes strips the header and
+ * causes "Forbidden: Playback ticket already used or invalid session".
+ *
+ * We send only the origin (no path) for those hosts so the domain check
+ * passes while the full page URL remains private. All other hosts keep
+ * "no-referrer" for user-privacy hardening.
+ */
+export function iframeReferrerPolicy(
+  url: string,
+): "no-referrer" | "origin" | "strict-origin-when-cross-origin" {
+  try {
+    const { hostname } = new URL(url);
+    // Hosts that validate Referer for playback-ticket or session auth
+    if (
+      hostname.includes("anonmp4") ||
+      hostname.includes("seek") ||
+      hostname.includes("embedseek") ||
+      hostname.includes("seeks.cloud") ||
+      hostname.includes("upns") ||
+      hostname.includes("vidara")
+    ) {
+      // "origin" sends only "https://chuglii.in" — domain validated, path hidden
+      return "origin";
+    }
+  } catch { /* ignore */ }
+  // Privacy-first default: strip referrer for all other hosts
+  return "no-referrer";
+}
+
 export function normalizeVideoServerUrl(rawUrl: string): string {
   let url = rawUrl;
   try {

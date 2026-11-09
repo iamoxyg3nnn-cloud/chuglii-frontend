@@ -32,7 +32,7 @@ import { UpNextOverlay } from "@/components/UpNextOverlay";
 import { advanceQueue, nextQueueItem } from "@/lib/play-queue";
 import { proxyUrl } from "@/lib/proxy-url";
 import { safeExternalUrl } from "@/lib/safe-url";
-import { deriveServers, detectHostLabel } from "@/lib/video-hosts";
+import { deriveServers, detectHostLabel, iframeReferrerPolicy } from "@/lib/video-hosts";
 import { AdBanner } from "@/components/ads/AdBanner";
 import { AdLeaderboard } from "@/components/ads/AdLeaderboard";
 import { PrerollPlayer } from "@/components/ads/PrerollPlayer";
@@ -846,7 +846,7 @@ export default function VideoDetail() {
                     src={currentServer.src}
                     className="w-full h-full border-0"
                     allow="autoplay; fullscreen; picture-in-picture; encrypted-media"
-                    referrerPolicy="no-referrer"
+                    referrerPolicy={iframeReferrerPolicy(currentServer.src)}
                     title={video.room_title || video.filename}
                   />
                 ) : proxyUrl(posterUrl) ? (
