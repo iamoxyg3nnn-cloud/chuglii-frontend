@@ -21,7 +21,8 @@ import { getSessionId } from "@/lib/session";
 import { trackView, useListRecommendations } from "@/lib/api";
 import { trackActivity } from "@/lib/rum";
 import { useAuth } from "@/contexts/AuthContext";
-import { userApi, recordingToMeta, type CloudCollection } from "@/lib/user-api";
+import { useTrackedMutation } from "@/contexts/SyncStatusContext";
+import { userApi, recordingToMeta, type CloudCollection, type PerformerFollow } from "@/lib/user-api";
 import { addWatchedId } from "@/lib/watched-storage";
 import { useRecentlyWatched } from "@/hooks/use-recently-watched";
 import { useWatchProgress } from "@/hooks/use-watch-progress";
@@ -55,7 +56,7 @@ import {
   UserCircle, FilmStrip, ThumbsUp, ThumbsDown, BookmarkSimple, ShareNetwork,
   Check, HardDrives, DownloadSimple, Clock, Play, Code, Playlist, Shuffle,
   FolderSimplePlus, Plus, CaretDown, CaretLeft, CaretRight, ArrowSquareOut, SignIn, CheckCircle, ArrowClockwise,
-  Television, Lightbulb, Keyboard, SlidersHorizontal, Sparkle, Info, MonitorPlay,
+  Television, Lightbulb, Keyboard, SlidersHorizontal, Sparkle, Info, MonitorPlay, Heart,
 } from "@phosphor-icons/react";
 import { cn } from "@/lib/utils";
 import {
@@ -115,6 +116,8 @@ export default function VideoDetail() {
   });
   const [playerReloadKey, setPlayerReloadKey] = useState(0);
   const [shortcutsOpen, setShortcutsOpen] = useState(false);
+
+
   const [serverToast, setServerToast] = useState<string | null>(null);
   const [autoplayEnabled, setAutoplayEnabled] = useState(() => {
     if (typeof window === "undefined") return true;
@@ -224,6 +227,42 @@ export default function VideoDetail() {
   const { data: video, isLoading, isError, refetch: retryRecording } = useGetRecording(id || "", {
     query: { enabled: !!id, queryKey: getGetRecordingQueryKey(id || "") },
   });
+
+  // Performer follow state
+  const { data: follows = [] } = useQuery({
+    queryKey: ["user", "follows"],
+    queryFn: () => userApi.getFollows(),
+    enabled: !!user,
+  });
+
+  const isFollowing = useMemo(() => {
+    if (!video?.username) return false;
+    return (follows as PerformerFollow[]).some((f: PerformerFollow) => f.performer_username === video.username);
+  }, [follows, video?.username]);
+
+  const followMutation = useTrackedMutation({
+    mutationFn: () => userApi.addFollow(video!.username),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["user", "follows"] }),
+  });
+
+  const unfollowMutation = useTrackedMutation({
+    mutationFn: () => userApi.removeFollow(video!.username),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["user", "follows"] }),
+  });
+
+  const handleToggleFollow = () => {
+    if (!user) {
+      setLocation("/login");
+      return;
+    }
+    if (!video?.username) return;
+    if (isFollowing) {
+      unfollowMutation.mutate();
+    } else {
+      followMutation.mutate();
+    }
+    trackActivity("follow", { meta: { username: video.username, action: isFollowing ? "unfollow" : "follow" } });
+  };
 
   // Playback queue (Playlists â†’ Play all): position is derived from the route,
   // so deep links, back/forward and manual URL edits all stay in sync.
@@ -941,124 +980,7 @@ export default function VideoDetail() {
             {/* Ad above the player â€” 728Ã—90 / 468Ã—60 / 300Ã—100 */}
             {!isTheaterMode && <AdLeaderboard />}
 
-            {/* Unified Player Stage Toolbar */}
-            {!isLoading && video && (
-              <div className="flex flex-wrap items-center justify-between gap-2.5 p-2 rounded-xl bg-card/60 backdrop-blur-sm border border-border/60 text-xs">
-                {/* Left: Server mirror selector */}
-                <div className="flex items-center gap-2 flex-wrap">
-                  <div className="flex items-center gap-1.5 text-muted-foreground/80 font-medium px-1">
-                    <HardDrives size={14} weight="bold" />
-                    <span className="hidden sm:inline">Servers:</span>
-                  </div>
-                  <div className="flex items-center gap-1.5 flex-wrap">
-                    {servers.map((s, i) => (
-                      <button
-                        key={i}
-                        onClick={() => handleSelectServer(i)}
-                        className={cn(
-                          "px-2.5 py-1 text-xs font-medium rounded-lg border transition-all cursor-pointer flex items-center gap-1.5",
-                          activeServer === i
-                            ? "bg-primary/10 border-primary/50 text-primary shadow-xs"
-                            : "border-border/50 text-muted-foreground hover:border-border hover:text-foreground hover:bg-secondary/40"
-                        )}
-                        title={`Switch to ${s.label} (${s.type === 'iframe' ? 'Embed Player' : 'External Link'})`}
-                      >
-                        <span className={cn(
-                          "w-1.5 h-1.5 rounded-full",
-                          activeServer === i ? "bg-emerald-400" : "bg-muted-foreground/40"
-                        )} />
-                        <span>{s.label}</span>
-                        <span className="text-[10px] text-muted-foreground/60 hidden sm:inline">
-                          {s.type === "iframe" ? "embed" : "link"}
-                        </span>
-                      </button>
-                    ))}
-                  </div>
-                </div>
 
-                {/* Right: Stage view controls (Aspect, Glow, Theater, Shortcuts) */}
-                <div className="flex items-center gap-1.5 ml-auto">
-                  {/* Aspect Ratio selector */}
-                  <div className="hidden sm:flex items-center bg-secondary/50 rounded-lg p-0.5 border border-border/40">
-                    {(["16:9", "21:9", "4:3"] as const).map((ratio) => (
-                      <button
-                        key={ratio}
-                        onClick={() => handleAspectRatioChange(ratio)}
-                        className={cn(
-                          "px-2 py-0.5 text-[11px] font-medium rounded-md transition-colors cursor-pointer",
-                          aspectRatio === ratio
-                            ? "bg-card text-foreground shadow-xs font-semibold"
-                            : "text-muted-foreground hover:text-foreground"
-                        )}
-                        title={`Aspect ratio: ${ratio}`}
-                      >
-                        {ratio}
-                      </button>
-                    ))}
-                  </div>
-
-                  {/* Autoplay toggle */}
-                  <button
-                    onClick={toggleAutoplay}
-                    className={cn(
-                      "h-7 px-2.5 flex items-center gap-1.5 rounded-lg border text-xs font-medium transition-all cursor-pointer",
-                      autoplayEnabled
-                        ? "border-emerald-500/40 text-emerald-400 bg-emerald-500/10 shadow-xs"
-                        : "border-border/50 text-muted-foreground hover:text-foreground hover:border-border"
-                    )}
-                    title={`Autoplay next video: ${autoplayEnabled ? "ON" : "OFF"}`}
-                  >
-                    <span className={cn(
-                      "w-1.5 h-1.5 rounded-full",
-                      autoplayEnabled ? "bg-emerald-400 animate-pulse" : "bg-muted-foreground/40"
-                    )} />
-                    <span className="hidden sm:inline">Autoplay</span>
-                  </button>
-
-                  {/* Ambient Glow toggle */}
-                  <button
-                    onClick={toggleAmbientGlow}
-                    className={cn(
-                      "h-7 px-2.5 flex items-center gap-1.5 rounded-lg border text-xs font-medium transition-all cursor-pointer",
-                      ambientGlow
-                        ? "border-amber-400/40 text-amber-300 bg-amber-400/10"
-                        : "border-border/50 text-muted-foreground hover:text-foreground hover:border-border"
-                    )}
-                    title="Toggle Ambient Glow (A)"
-                    aria-label="Toggle ambient lighting"
-                  >
-                    <Lightbulb size={13} weight={ambientGlow ? "fill" : "regular"} />
-                    <span className="hidden md:inline">Glow</span>
-                  </button>
-
-                  {/* Theater Mode toggle */}
-                  <button
-                    onClick={() => setIsTheaterMode((prev) => !prev)}
-                    className={cn(
-                      "h-7 px-2.5 flex items-center gap-1.5 rounded-lg border text-xs font-medium transition-all cursor-pointer",
-                      isTheaterMode
-                        ? "border-primary/50 text-primary bg-primary/10"
-                        : "border-border/50 text-muted-foreground hover:text-foreground hover:border-border"
-                    )}
-                    title="Theater Mode (T)"
-                    aria-label="Toggle theater mode"
-                  >
-                    <Television size={13} weight={isTheaterMode ? "fill" : "regular"} />
-                    <span className="hidden md:inline">Theater</span>
-                  </button>
-
-                  {/* Keyboard shortcuts */}
-                  <button
-                    onClick={() => setShortcutsOpen(true)}
-                    className="h-7 w-7 flex items-center justify-center rounded-lg border border-border/50 text-muted-foreground hover:text-foreground hover:border-border transition-colors cursor-pointer"
-                    title="Keyboard Shortcuts (?)"
-                    aria-label="Keyboard shortcuts"
-                  >
-                    <Keyboard size={14} weight="regular" />
-                  </button>
-                </div>
-              </div>
-            )}
 
             {/* Player — click-to-play with Ambient glow wrapper */}
             {isLoading ? (
@@ -1308,125 +1230,193 @@ export default function VideoDetail() {
                   />
                 )}
 
-                {/* In-Player Interactive Overlays */}
-                {videoStarted && (
-                  <>
-                    {/* Top Floating HUD (reveals on hover / focus) */}
-                    <div className="absolute top-3 left-3 right-3 z-30 flex items-center justify-between pointer-events-none opacity-0 group-hover:opacity-100 focus-within:opacity-100 transition-opacity duration-200">
-                      {/* Left: Server status & resolution */}
-                      <div className="flex items-center gap-2 pointer-events-auto">
-                        <div className="inline-flex items-center gap-2 px-2.5 py-1 rounded-lg bg-black/70 backdrop-blur-md border border-white/15 text-xs text-white/90 shadow-md">
-                          <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
-                          <span className="font-medium">{currentServer.label}</span>
-                          {servers.length > 1 && (
-                            <button
-                              onClick={handleNextServer}
-                              className="text-[11px] text-white/60 hover:text-white transition-colors cursor-pointer pl-1.5 border-l border-white/20"
-                              title="Cycle to next server (S)"
-                            >
-                              Next (S)
-                            </button>
-                          )}
-                        </div>
-                        {video.resolution && (
-                          <div className="px-2 py-1 rounded-lg bg-black/70 backdrop-blur-md border border-white/15 text-[10px] font-bold text-white/90 shadow-md">
-                            {video.resolution}
-                          </div>
-                        )}
-                      </div>
-
-                      {/* Right: Quick actions (Autoplay, Reload, Ambient, Theater, Shortcuts) */}
-                      <div className="flex items-center gap-1.5 pointer-events-auto">
-                        <button
-                          onClick={toggleAutoplay}
-                          className={cn(
-                            "h-7 px-2 flex items-center gap-1 bg-black/70 backdrop-blur-md border rounded-lg text-xs font-medium transition-all cursor-pointer shadow-md",
-                            autoplayEnabled
-                              ? "border-emerald-500/40 text-emerald-400"
-                              : "border-white/15 text-white/70 hover:text-white"
-                          )}
-                          title={`Autoplay is ${autoplayEnabled ? "ON" : "OFF"}`}
-                          aria-label="Toggle autoplay"
-                        >
-                          <span className={cn("w-1.5 h-1.5 rounded-full", autoplayEnabled ? "bg-emerald-400" : "bg-white/40")} />
-                          <span className="hidden md:inline">Auto</span>
-                        </button>
-
-                        <button
-                          onClick={handleReloadPlayer}
-                          className="h-7 px-2.5 flex items-center gap-1.5 bg-black/70 backdrop-blur-md border border-white/15 hover:bg-black/90 hover:border-white/30 text-white/80 hover:text-white rounded-lg text-xs font-medium transition-all cursor-pointer shadow-md"
-                          title="Reload Player (R)"
-                          aria-label="Reload player"
-                        >
-                          <ArrowClockwise size={13} weight="bold" />
-                          <span className="hidden sm:inline">Reload</span>
-                        </button>
-
-                        <button
-                          onClick={toggleAmbientGlow}
-                          className={cn(
-                            "h-7 px-2.5 flex items-center gap-1.5 bg-black/70 backdrop-blur-md border rounded-lg text-xs font-medium transition-all cursor-pointer shadow-md",
-                            ambientGlow
-                              ? "border-amber-400/50 text-amber-300"
-                              : "border-white/15 text-white/70 hover:text-white hover:border-white/30"
-                          )}
-                          title="Toggle Ambient Glow (A)"
-                          aria-label="Toggle ambient lighting"
-                        >
-                          <Lightbulb size={13} weight={ambientGlow ? "fill" : "regular"} />
-                        </button>
-
-                        <button
-                          onClick={() => setIsTheaterMode((prev) => !prev)}
-                          className={cn(
-                            "h-7 px-2.5 flex items-center gap-1.5 bg-black/70 backdrop-blur-md border rounded-lg text-xs font-medium transition-all cursor-pointer shadow-md",
-                            isTheaterMode
-                              ? "border-primary/50 text-primary bg-primary/20"
-                              : "border-white/15 text-white/80 hover:text-white hover:border-white/30"
-                          )}
-                          title="Theater Mode (T)"
-                          aria-label="Toggle theater mode"
-                        >
-                          <Television size={13} weight={isTheaterMode ? "fill" : "regular"} />
-                        </button>
-
-                        <button
-                          onClick={() => setShortcutsOpen(true)}
-                          className="h-7 w-7 flex items-center justify-center bg-black/70 backdrop-blur-md border border-white/15 hover:bg-black/90 hover:border-white/30 text-white/70 hover:text-white rounded-lg text-xs transition-all cursor-pointer shadow-md"
-                          title="Keyboard Shortcuts (?)"
-                          aria-label="Keyboard shortcuts"
-                        >
-                          <Keyboard size={13} weight="regular" />
-                        </button>
-                      </div>
-                    </div>
-
-                    {/* Bottom-right controls */}
-                    <div className="absolute bottom-3 right-3 z-30 flex items-center gap-1.5 opacity-0 group-hover:opacity-100 focus-within:opacity-100 transition-all">
-                      {currentServer?.src && (
-                        <a
-                          href={currentServer.src}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="w-8 h-8 flex items-center justify-center bg-black/70 backdrop-blur-md border border-white/15 hover:bg-black/90 hover:border-white/30 text-white/80 hover:text-white rounded-lg transition-all cursor-pointer shadow-md"
-                          aria-label="Open in new window"
-                          title={`Open in new window (${currentServer.label})`}
-                        >
-                          <ArrowSquareOut size={16} weight="bold" />
-                        </a>
-                      )}
-                      <button
-                        onClick={isFullscreen ? exitFS : enterFS}
-                        className="w-8 h-8 flex items-center justify-center bg-black/70 backdrop-blur-md border border-white/15 hover:bg-black/90 hover:border-white/30 text-white/80 hover:text-white rounded-lg transition-all cursor-pointer shadow-md"
-                        aria-label={isFullscreen ? "Exit fullscreen" : "Enter fullscreen"}
-                        title="Fullscreen (F)"
-                      >
-                        {isFullscreen ? <CornersIn size={16} weight="bold" /> : <CornersOut size={16} weight="bold" />}
-                      </button>
-                    </div>
-                  </>
+                {/* Fullscreen Floating Exit Button (only shown in native fullscreen) */}
+                {isFullscreen && (
+                  <div className="absolute bottom-4 right-4 z-40 flex items-center gap-2">
+                    <button
+                      onClick={exitFS}
+                      className="h-9 px-3.5 flex items-center gap-2 rounded-xl bg-black/80 backdrop-blur-md border border-white/20 text-white text-xs font-semibold hover:bg-black transition-all cursor-pointer shadow-2xl"
+                      title="Exit fullscreen (F or Esc)"
+                    >
+                      <CornersIn size={16} weight="bold" />
+                      <span>Exit Fullscreen</span>
+                    </button>
+                  </div>
                 )}
                 </div>
+
+                {/* Docked Cinema Deck — Consolidated Pro Toolbar */}
+                {video && servers.length > 0 && (
+                  <div className="w-full mt-2.5 p-2 sm:p-2.5 rounded-2xl bg-neutral-900/90 backdrop-blur-md border border-white/[0.08] shadow-lg flex items-center justify-between gap-3 flex-wrap select-none">
+                    {/* Left: Source Mirrors */}
+                    <div className="flex items-center gap-1.5 flex-wrap">
+                      <div className="flex items-center gap-1 px-1.5 text-[11px] font-semibold text-white/40 uppercase tracking-wider">
+                        <HardDrives size={13} weight="bold" />
+                        <span className="hidden sm:inline">Source</span>
+                      </div>
+
+                      <div className="flex items-center gap-1 bg-black/40 p-0.5 rounded-xl border border-white/5">
+                        {servers.map((s, i) => (
+                          <button
+                            key={i}
+                            onClick={() => handleSelectServer(i)}
+                            className={cn(
+                              "px-2.5 py-1 text-xs font-medium rounded-lg transition-all cursor-pointer flex items-center gap-1.5",
+                              activeServer === i
+                                ? "bg-white/15 text-white font-semibold shadow-xs border border-white/10"
+                                : "text-white/60 hover:text-white hover:bg-white/5"
+                            )}
+                            title={`Switch to ${s.label} (${s.type === "iframe" ? "In-Page Embed" : "External Popout"})`}
+                          >
+                            <span className={cn(
+                              "w-1.5 h-1.5 rounded-full",
+                              activeServer === i ? "bg-emerald-400 animate-pulse" : "bg-white/30"
+                            )} />
+                            <span>{s.label}</span>
+                            <span className="text-[10px] text-white/40 hidden md:inline font-mono">
+                              {s.type === "iframe" ? "embed" : "popout"}
+                            </span>
+                          </button>
+                        ))}
+                      </div>
+
+                      {/* Stream Reload */}
+                      <button
+                        onClick={handleReloadPlayer}
+                        className="h-7 w-7 flex items-center justify-center rounded-lg bg-black/40 border border-white/5 text-white/60 hover:text-white hover:bg-white/10 transition-colors cursor-pointer"
+                        title="Reload mirror stream (R)"
+                        aria-label="Reload stream"
+                      >
+                        <ArrowClockwise size={13} weight="bold" />
+                      </button>
+                    </div>
+
+                    {/* Center Telemetry (Resolution & Duration) */}
+                    <div className="hidden lg:flex items-center gap-2 text-xs text-white/40 font-mono">
+                      {video.resolution && (
+                        <span className="px-1.5 py-0.5 rounded bg-white/5 border border-white/5 text-white/70 font-semibold text-[11px]">
+                          {video.resolution}
+                        </span>
+                      )}
+                      {video.duration != null && video.duration > 0 && (
+                        <span className="tabular-nums">
+                          {formatDuration(video.duration)}
+                        </span>
+                      )}
+                    </div>
+
+                    {/* Right: Stage Controls */}
+                    <div className="flex items-center gap-1.5 ml-auto">
+                      {/* Aspect Ratio */}
+                      <div className="hidden sm:flex items-center bg-black/40 rounded-lg p-0.5 border border-white/5">
+                        {(["16:9", "21:9", "4:3"] as const).map((ratio) => (
+                          <button
+                            key={ratio}
+                            onClick={() => handleAspectRatioChange(ratio)}
+                            className={cn(
+                              "px-2 py-0.5 text-[11px] font-medium rounded-md transition-all cursor-pointer",
+                              aspectRatio === ratio
+                                ? "bg-white/15 text-white font-semibold shadow-xs"
+                                : "text-white/50 hover:text-white"
+                            )}
+                            title={`Aspect ratio: ${ratio}`}
+                          >
+                            {ratio}
+                          </button>
+                        ))}
+                      </div>
+
+                      {/* Autoplay Next */}
+                      <button
+                        onClick={toggleAutoplay}
+                        className={cn(
+                          "h-7 px-2.5 flex items-center gap-1.5 rounded-lg border text-xs font-medium transition-all cursor-pointer",
+                          autoplayEnabled
+                            ? "border-emerald-500/40 text-emerald-400 bg-emerald-500/10 shadow-xs"
+                            : "border-white/5 bg-black/40 text-white/60 hover:text-white hover:border-white/15"
+                        )}
+                        title={`Autoplay next video: ${autoplayEnabled ? "ON" : "OFF"}`}
+                      >
+                        <span className={cn(
+                          "w-1.5 h-1.5 rounded-full",
+                          autoplayEnabled ? "bg-emerald-400 animate-pulse" : "bg-white/30"
+                        )} />
+                        <span className="hidden sm:inline">Autoplay</span>
+                      </button>
+
+                      {/* Ambient Glow */}
+                      <button
+                        onClick={toggleAmbientGlow}
+                        className={cn(
+                          "h-7 px-2.5 flex items-center gap-1.5 rounded-lg border text-xs font-medium transition-all cursor-pointer",
+                          ambientGlow
+                            ? "border-amber-400/40 text-amber-300 bg-amber-400/10"
+                            : "border-white/5 bg-black/40 text-white/60 hover:text-white hover:border-white/15"
+                        )}
+                        title="Toggle Ambient Glow (A)"
+                        aria-label="Toggle ambient lighting"
+                      >
+                        <Lightbulb size={13} weight={ambientGlow ? "fill" : "regular"} />
+                        <span className="hidden md:inline">Glow</span>
+                      </button>
+
+                      {/* Theater Mode */}
+                      <button
+                        onClick={() => setIsTheaterMode((prev) => !prev)}
+                        className={cn(
+                          "h-7 px-2.5 flex items-center gap-1.5 rounded-lg border text-xs font-medium transition-all cursor-pointer",
+                          isTheaterMode
+                            ? "border-primary/50 text-primary bg-primary/10 shadow-xs"
+                            : "border-white/5 bg-black/40 text-white/60 hover:text-white hover:border-white/15"
+                        )}
+                        title="Theater Mode (T)"
+                        aria-label="Toggle theater mode"
+                      >
+                        <Television size={13} weight={isTheaterMode ? "fill" : "regular"} />
+                        <span className="hidden md:inline">Theater</span>
+                      </button>
+
+                      {/* Popout Player */}
+                      {currentServer?.src && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            window.open(
+                              currentServer.src,
+                              "player_popout",
+                              "width=1120,height=680,menubar=no,toolbar=no,location=no,status=no,resizable=yes"
+                            );
+                          }}
+                          className="h-7 w-7 flex items-center justify-center rounded-lg bg-black/40 border border-white/5 text-white/60 hover:text-white hover:bg-white/10 transition-colors cursor-pointer"
+                          title="Open in dedicated popout window"
+                          aria-label="Popout window"
+                        >
+                          <ArrowSquareOut size={14} weight="bold" />
+                        </button>
+                      )}
+
+                      {/* Fullscreen */}
+                      <button
+                        onClick={isFullscreen ? exitFS : enterFS}
+                        className="h-7 w-7 flex items-center justify-center rounded-lg bg-black/40 border border-white/5 text-white/60 hover:text-white hover:bg-white/10 transition-colors cursor-pointer"
+                        title="Fullscreen (F)"
+                        aria-label="Fullscreen"
+                      >
+                        {isFullscreen ? <CornersIn size={14} weight="bold" /> : <CornersOut size={14} weight="bold" />}
+                      </button>
+
+                      {/* Shortcuts */}
+                      <button
+                        onClick={() => setShortcutsOpen(true)}
+                        className="h-7 w-7 flex items-center justify-center rounded-lg bg-black/40 border border-white/5 text-white/60 hover:text-white hover:bg-white/10 transition-colors cursor-pointer"
+                        title="Keyboard Shortcuts (?)"
+                        aria-label="Keyboard shortcuts"
+                      >
+                        <Keyboard size={13} weight="regular" />
+                      </button>
+                    </div>
+                  </div>
+                )}
               </div>
             ) : null}
 
@@ -1485,223 +1475,292 @@ export default function VideoDetail() {
               <QueueBar queue={queue} index={queueIndex} />
             )}
 
-            {/* Video info */}
+            {/* Performer Channel Strip & Action Hub */}
             {isLoading ? (
-              <div className="space-y-3">
-                <Skeleton className="h-6 w-2/3" />
-                <Skeleton className="h-4 w-28" />
-                <Skeleton className="h-px w-full" />
+              <div className="p-4 sm:p-5 rounded-2xl bg-neutral-900/60 border border-white/[0.06] backdrop-blur-md shadow-sm space-y-3">
+                <div className="flex items-center gap-3">
+                  <Skeleton className="w-12 h-12 rounded-full" />
+                  <div className="space-y-1.5 flex-1">
+                    <Skeleton className="h-5 w-48" />
+                    <Skeleton className="h-3 w-32" />
+                  </div>
+                </div>
               </div>
             ) : video ? (
-              <div className="space-y-5">
-                {/* Performer name — large heading */}
-                <div className="min-w-0">
-                  <Link
-                    href={`/performers/${video.username}`}
-                    className="text-xl sm:text-2xl font-bold tracking-tight text-foreground hover:text-primary transition-colors break-words [overflow-wrap:anywhere]"
-                  >
-                    {video.username}
-                  </Link>
-                </div>
-
-                {/* Compact metadata — pipe-separated, no icons */}
-                <div className="flex flex-wrap items-center gap-x-1.5 text-xs text-muted-foreground/70">
-                  {video.timestamp && (
-                    <span>{new Date(video.timestamp).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' })}</span>
-                  )}
-                  {video.viewers != null && video.viewers > 0 && (
-                    <><span className="text-muted-foreground/30">|</span><span>{video.viewers.toLocaleString()} views</span></>
-                  )}
-                  {video.resolution && (
-                    <><span className="text-muted-foreground/30">|</span><span>{video.resolution}</span></>
-                  )}
-                  {video.duration != null && video.duration > 0 && (
-                    <><span className="text-muted-foreground/30">|</span><span>{formatDuration(video.duration)}</span></>
-                  )}
-                  {video.filesize ? (
-                    <><span className="text-muted-foreground/30">|</span><span>{formatBytes(video.filesize)}</span></>
-                  ) : null}
-                </div>
-
-                {/* Room topic (if available) */}
-                {video.room_title && video.room_title !== video.username && (
-                  <p className="text-sm text-muted-foreground/50 italic leading-relaxed break-words [overflow-wrap:anywhere]">
-                    {video.room_title}
-                  </p>
-                )}
-
-                {/* Action bar */}
-                <div className="flex flex-wrap items-center gap-2">
-                  <button
-                    onClick={() => handleReaction("like")}
-                    className={`inline-flex items-center gap-1.5 h-8 px-3 text-xs font-medium rounded-lg border transition-colors cursor-pointer ${
-                      reactions?.user_reaction === "like"
-                        ? "border-primary/50 text-primary bg-primary/10"
-                        : "border-border/60 text-muted-foreground hover:border-border hover:text-foreground"
-                    }`}
-                  >
-                    <ThumbsUp size={15} weight={reactions?.user_reaction === "like" ? "fill" : "regular"} />
-                    {reactions?.likes != null && reactions.likes > 0 && <span className="tabular-nums font-mono">{reactions.likes.toLocaleString()}</span>}
-                    Like
-                  </button>
-
-                  <button
-                    onClick={() => handleReaction("dislike")}
-                    className={`inline-flex items-center gap-1.5 h-8 px-3 text-xs font-medium rounded-lg border transition-colors cursor-pointer ${
-                      reactions?.user_reaction === "dislike"
-                        ? "border-destructive/50 text-destructive bg-destructive/10"
-                        : "border-border/60 text-muted-foreground hover:border-border hover:text-foreground"
-                    }`}
-                  >
-                    <ThumbsDown size={15} weight={reactions?.user_reaction === "dislike" ? "fill" : "regular"} />
-                    {reactions?.dislikes != null && reactions.dislikes > 0 && <span className="tabular-nums font-mono">{reactions.dislikes.toLocaleString()}</span>}
-                    Dislike
-                  </button>
-
-                  {user && (
-                  <button
-                    onClick={handleBookmark}
-                    className={`inline-flex items-center gap-1.5 h-8 px-3 text-xs font-medium rounded-lg border transition-colors cursor-pointer ${
-                      bookmarked
-                        ? "border-amber-500/50 text-amber-500 bg-amber-500/10"
-                        : "border-border/60 text-muted-foreground hover:border-border hover:text-foreground"
-                    }`}
-                  >
-                    <BookmarkSimple size={15} weight={bookmarked ? "fill" : "regular"} className={bookmarked ? "text-amber-500" : ""} />
-                    {bookmarked ? "Saved" : "Save"}
-                  </button>
-                  )}
-
-                  {user && (
-                  <button
-                    onClick={handleWatchLater}
-                    className={`inline-flex items-center gap-1.5 h-8 px-3 text-xs font-medium rounded-lg border transition-colors cursor-pointer ${
-                      watchLater
-                        ? "border-blue-500/50 text-blue-400 bg-blue-500/10"
-                        : "border-border/60 text-muted-foreground hover:border-border hover:text-foreground"
-                    }`}
-                  >
-                    <Clock size={15} weight={watchLater ? "fill" : "regular"} className={watchLater ? "text-blue-400" : ""} />
-                    {watchLater ? "Queued" : "Watch Later"}
-                  </button>
-                  )}
-
-                  <button
-                    onClick={handleShare}
-                    className="inline-flex items-center gap-1.5 h-8 px-3 text-xs font-medium rounded-lg border border-border/60 text-muted-foreground hover:border-border hover:text-foreground transition-colors cursor-pointer"
-                  >
-                    {copied ? (
-                      <><Check size={14} weight="bold" className="text-emerald-400" /> Copied</>
-                    ) : (
-                      <><ShareNetwork size={15} weight="regular" /> Share</>
-                    )}
-                  </button>
-
-                  {currentServer?.src && currentServer.type === "iframe" && (
-                    <button
-                      onClick={handleCopyEmbed}
-                      className="inline-flex items-center gap-1.5 h-8 px-3 text-xs font-medium rounded-lg border border-border/60 text-muted-foreground hover:border-border hover:text-foreground transition-colors cursor-pointer"
-                    >
-                      {embedCopied ? (
-                        <><Check size={14} weight="bold" className="text-emerald-400" /> Copied</>
-                      ) : (
-                        <><Code size={15} weight="bold" /> Embed</>
-                      )}
-                    </button>
-                  )}
-
-                  {safeEmbedSource && (
-                    <a
-                      href={safeEmbedSource}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="inline-flex items-center gap-1.5 h-8 px-3 text-xs font-medium rounded-lg border border-border/60 text-muted-foreground hover:border-border hover:text-foreground transition-colors"
-                    >
-                      <DownloadSimple size={15} weight="regular" />
-                      Source
-                    </a>
-                  )}
-
-                  {/* Add to Collection dropdown */}
-                  {user && (
-                  <div ref={collectionRef} className="relative">
-                    <button
-                      onClick={() => setCollectionOpen((v) => !v)}
-                      className="inline-flex items-center gap-1.5 h-8 px-3 text-xs font-medium rounded-lg border border-border/60 text-muted-foreground hover:border-border hover:text-foreground transition-colors cursor-pointer"
-                    >
-                      <FolderSimplePlus size={15} weight="regular" />
-                      Collection
-                      <CaretDown size={11} weight="bold" className={`transition-transform ${collectionOpen ? "rotate-180" : ""}`} />
-                    </button>
-                    {collectionOpen && (
-                      <div className="absolute right-0 sm:left-0 sm:right-auto top-full mt-1 z-50 w-56 glass-dropdown rounded-xl overflow-hidden shadow-lg border border-border/70">
-                        <div className="p-2 border-b border-border/40">
-                          <div className="flex gap-1">
-                            <input
-                              autoFocus
-                              type="text"
-                              aria-label="New collection name"
-                              placeholder="New collection…"
-                              value={newColName}
-                              onChange={(e) => setNewColName(e.target.value)}
-                              onKeyDown={(e) => { if (e.key === "Enter") handleCreateAndAdd(); }}
-                              maxLength={60}
-                              className="flex-1 h-7 bg-card border border-border/40 focus:border-primary/50 rounded-md px-2 text-xs outline-none"
+              <div className="space-y-4">
+                {/* Unified Channel & Action Strip */}
+                <div className="p-4 sm:p-5 rounded-2xl bg-neutral-900/70 border border-white/[0.08] backdrop-blur-md shadow-sm space-y-4">
+                  <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+                    {/* Performer Profile Identity & Follow Button */}
+                    <div className="flex items-center gap-3 min-w-0">
+                      <Link href={`/performers/${video.username}`} className="relative shrink-0 group/avatar">
+                        <div className="w-12 h-12 rounded-full overflow-hidden bg-neutral-800 border-2 border-white/10 group-hover/avatar:border-primary/60 transition-colors flex items-center justify-center">
+                          {proxyUrl(video.thumbnail_url) ? (
+                            <OptimizedImage
+                              src={proxyUrl(video.thumbnail_url)!}
+                              alt={video.username}
+                              className="w-full h-full object-cover"
+                              containerClassName="w-full h-full"
+                              width="avatar"
                             />
-                            <button
-                              onClick={handleCreateAndAdd}
-                              disabled={!newColName.trim() || creatingCol}
-                              className="w-7 h-7 flex items-center justify-center border border-primary/30 text-primary rounded-md disabled:opacity-40 hover:border-primary/60 transition-opacity cursor-pointer"
-                              title="Create and add"
-                            >
-                              <Plus size={13} weight="bold" />
-                            </button>
-                          </div>
+                          ) : (
+                            <UserCircle size={32} weight="duotone" className="text-white/40" />
+                          )}
                         </div>
-                        {cloudCollections.length === 0 ? (
-                          <div className="px-3 py-4 text-center">
-                            <p className="text-[11px] text-muted-foreground">No collections yet.</p>
-                            <p className="text-[11px] text-muted-foreground/60">Create one above.</p>
-                          </div>
-                        ) : (
-                          <div className="max-h-48 overflow-y-auto">
-                            {cloudCollections.map((col) => (
-                              <button
-                                key={col.id}
-                                onClick={() => handleAddToCollection(col.id)}
-                                disabled={addingColId !== null}
-                                className="w-full text-left px-3 py-2 text-xs flex items-center gap-2 hover:bg-secondary transition-colors disabled:opacity-50 cursor-pointer"
-                              >
-                                {addedToCol === col.id ? (
-                                  <Check size={13} weight="bold" className="text-emerald-400 shrink-0" />
-                                ) : (
-                                  <Playlist size={14} weight="regular" className="text-muted-foreground/50 shrink-0" />
-                                )}
-                                <span className="truncate">{col.name}</span>
-                                <span className="ml-auto text-[10px] text-muted-foreground/40 shrink-0">
-                                  {col.item_count ?? 0}
-                                </span>
-                              </button>
-                            ))}
-                          </div>
-                        )}
-                      </div>
-                    )}
-                  </div>
-                  )}
+                        <span className="absolute bottom-0 right-0 w-3.5 h-3.5 rounded-full bg-emerald-500 border-2 border-neutral-900" title="Archived Performer" />
+                      </Link>
 
-                  {user && (
-                  <Link
-                    href="/history"
-                    className="inline-flex items-center gap-1.5 h-8 px-3 text-xs font-medium rounded-lg border border-border/50 text-muted-foreground hover:border-border hover:text-foreground transition-all"
-                  >
-                    <Clock className="w-3.5 h-3.5" />
-                    History
-                  </Link>
+                      <div className="min-w-0 flex flex-col">
+                        <div className="flex items-center gap-1.5 flex-wrap">
+                          <Link
+                            href={`/performers/${video.username}`}
+                            className="text-lg sm:text-xl font-bold tracking-tight text-white hover:text-primary transition-colors truncate"
+                          >
+                            {video.username}
+                          </Link>
+                          <span title="Verified recording archive" className="inline-flex items-center"><CheckCircle size={15} weight="fill" className="text-primary shrink-0" /></span>
+                        </div>
+
+                        {/* Telemetry line */}
+                        <div className="flex items-center gap-1.5 text-xs text-white/50 flex-wrap">
+                          {video.timestamp && (
+                            <span className="tabular-nums">{new Date(video.timestamp).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' })}</span>
+                          )}
+                          {video.viewers != null && video.viewers > 0 && (
+                            <>
+                              <span className="text-white/20">•</span>
+                              <span className="tabular-nums">{video.viewers.toLocaleString()} views</span>
+                            </>
+                          )}
+                          {video.duration != null && video.duration > 0 && (
+                            <>
+                              <span className="text-white/20">•</span>
+                              <span className="tabular-nums font-mono">{formatDuration(video.duration)}</span>
+                            </>
+                          )}
+                        </div>
+                      </div>
+
+                      {/* Follow Button */}
+                      <button
+                        onClick={handleToggleFollow}
+                        disabled={followMutation.isPending || unfollowMutation.isPending}
+                        className={cn(
+                          "ml-2 sm:ml-4 inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl text-xs font-semibold transition-all cursor-pointer shrink-0 active:scale-95",
+                          user && isFollowing
+                            ? "bg-white/10 hover:bg-white/15 text-white/90 border border-white/15"
+                            : "bg-primary hover:bg-primary/90 text-primary-foreground shadow-sm shadow-primary/20"
+                        )}
+                        title={user && isFollowing ? "Unfollow performer" : "Follow performer for updates"}
+                      >
+                        <Heart size={14} weight={user && isFollowing ? "fill" : "bold"} className={user && isFollowing ? "text-rose-400" : ""} />
+                        <span>{!user ? "Follow" : isFollowing ? "Following" : "Follow"}</span>
+                      </button>
+                    </div>
+
+                    {/* Grouped Actions: Segmented Like/Dislike + Save + Queue + Share + More */}
+                    <div className="flex items-center gap-2 flex-wrap md:ml-auto">
+                      {/* Segmented Like / Dislike Control */}
+                      <div className="inline-flex items-center rounded-xl bg-black/40 border border-white/10 p-0.5 shadow-xs">
+                        <button
+                          onClick={() => handleReaction("like")}
+                          className={cn(
+                            "inline-flex items-center gap-1.5 h-8 px-3 rounded-lg text-xs font-medium transition-colors cursor-pointer",
+                            reactions?.user_reaction === "like"
+                              ? "text-primary bg-primary/15 font-semibold"
+                              : "text-white/70 hover:text-white hover:bg-white/5"
+                          )}
+                          title="Like recording"
+                          aria-label="Like"
+                        >
+                          <ThumbsUp size={15} weight={reactions?.user_reaction === "like" ? "fill" : "regular"} />
+                          {reactions?.likes != null && reactions.likes > 0 && (
+                            <span className="tabular-nums font-mono text-[11px]">{reactions.likes.toLocaleString()}</span>
+                          )}
+                        </button>
+
+                        <div className="w-px h-4 bg-white/10" />
+
+                        <button
+                          onClick={() => handleReaction("dislike")}
+                          className={cn(
+                            "inline-flex items-center gap-1.5 h-8 px-2.5 rounded-lg text-xs font-medium transition-colors cursor-pointer",
+                            reactions?.user_reaction === "dislike"
+                              ? "text-rose-400 bg-rose-500/15 font-semibold"
+                              : "text-white/70 hover:text-white hover:bg-white/5"
+                          )}
+                          title="Dislike recording"
+                          aria-label="Dislike"
+                        >
+                          <ThumbsDown size={15} weight={reactions?.user_reaction === "dislike" ? "fill" : "regular"} />
+                        </button>
+                      </div>
+
+                      {/* Save / Bookmark Button */}
+                      {user && (
+                        <button
+                          onClick={handleBookmark}
+                          className={cn(
+                            "inline-flex items-center gap-1.5 h-8 px-3 rounded-xl border text-xs font-medium transition-all cursor-pointer",
+                            bookmarked
+                              ? "bg-amber-400/10 border-amber-400/40 text-amber-300 font-semibold"
+                              : "bg-black/40 border-white/10 text-white/70 hover:text-white hover:border-white/20"
+                          )}
+                          title={bookmarked ? "Remove bookmark" : "Save to bookmarks"}
+                        >
+                          <BookmarkSimple size={15} weight={bookmarked ? "fill" : "regular"} />
+                          <span>{bookmarked ? "Saved" : "Save"}</span>
+                        </button>
+                      )}
+
+                      {/* Watch Later Queue Button */}
+                      {user && (
+                        <button
+                          onClick={handleWatchLater}
+                          className={cn(
+                            "inline-flex items-center gap-1.5 h-8 px-3 rounded-xl border text-xs font-medium transition-all cursor-pointer",
+                            watchLater
+                              ? "bg-sky-400/10 border-sky-400/40 text-sky-300 font-semibold"
+                              : "bg-black/40 border-white/10 text-white/70 hover:text-white hover:border-white/20"
+                          )}
+                          title={watchLater ? "Remove from Watch Later" : "Add to Watch Later"}
+                        >
+                          <Clock size={15} weight={watchLater ? "fill" : "regular"} />
+                          <span>{watchLater ? "Queued" : "Watch Later"}</span>
+                        </button>
+                      )}
+
+                      {/* Share Button */}
+                      <button
+                        onClick={handleShare}
+                        className="inline-flex items-center gap-1.5 h-8 px-3 rounded-xl bg-black/40 border border-white/10 text-white/70 hover:text-white hover:border-white/20 text-xs font-medium transition-all cursor-pointer"
+                        title="Share recording link"
+                      >
+                        {copied ? (
+                          <>
+                            <Check size={14} weight="bold" className="text-emerald-400" />
+                            <span className="text-emerald-400">Copied</span>
+                          </>
+                        ) : (
+                          <>
+                            <ShareNetwork size={15} weight="regular" />
+                            <span>Share</span>
+                          </>
+                        )}
+                      </button>
+
+                      {/* Embed Code Button (for in-page iframe player) */}
+                      {currentServer?.src && currentServer.type === "iframe" && (
+                        <button
+                          onClick={handleCopyEmbed}
+                          className="inline-flex items-center gap-1.5 h-8 px-3 rounded-xl bg-black/40 border border-white/10 text-white/70 hover:text-white hover:border-white/20 text-xs font-medium transition-all cursor-pointer"
+                          title="Copy iframe embed code"
+                        >
+                          {embedCopied ? (
+                            <>
+                              <Check size={14} weight="bold" className="text-emerald-400" />
+                              <span className="text-emerald-400">Copied</span>
+                            </>
+                          ) : (
+                            <>
+                              <Code size={15} weight="bold" />
+                              <span>Embed</span>
+                            </>
+                          )}
+                        </button>
+                      )}
+
+                      {/* Collection Dropdown */}
+                      {user && (
+                        <div ref={collectionRef} className="relative">
+                          <button
+                            onClick={() => setCollectionOpen((v) => !v)}
+                            className="inline-flex items-center gap-1.5 h-8 px-3 rounded-xl bg-black/40 border border-white/10 text-white/70 hover:text-white hover:border-white/20 text-xs font-medium transition-all cursor-pointer"
+                          >
+                            <FolderSimplePlus size={15} weight="regular" />
+                            <span>Collection</span>
+                            <CaretDown size={11} weight="bold" className={cn("transition-transform", collectionOpen && "rotate-180")} />
+                          </button>
+                          {collectionOpen && (
+                            <div className="absolute right-0 top-full mt-1.5 z-50 w-56 rounded-xl bg-neutral-900 border border-white/15 p-1.5 shadow-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-150">
+                              <div className="p-1.5 border-b border-white/10">
+                                <div className="flex gap-1">
+                                  <input
+                                    autoFocus
+                                    type="text"
+                                    aria-label="New collection name"
+                                    placeholder="New collection…"
+                                    value={newColName}
+                                    onChange={(e) => setNewColName(e.target.value)}
+                                    onKeyDown={(e) => { if (e.key === "Enter") handleCreateAndAdd(); }}
+                                    maxLength={60}
+                                    className="flex-1 h-7 bg-black/50 border border-white/10 focus:border-primary/50 rounded-lg px-2 text-xs text-white outline-none"
+                                  />
+                                  <button
+                                    onClick={handleCreateAndAdd}
+                                    disabled={!newColName.trim() || creatingCol}
+                                    className="w-7 h-7 flex items-center justify-center bg-primary text-primary-foreground rounded-lg disabled:opacity-40 hover:bg-primary/90 transition-opacity cursor-pointer shrink-0"
+                                    title="Create and add"
+                                  >
+                                    <Plus size={13} weight="bold" />
+                                  </button>
+                                </div>
+                              </div>
+                              {cloudCollections.length === 0 ? (
+                                <div className="px-3 py-4 text-center">
+                                  <p className="text-[11px] text-white/60">No collections yet.</p>
+                                  <p className="text-[11px] text-white/40">Create one above.</p>
+                                </div>
+                              ) : (
+                                <div className="max-h-48 overflow-y-auto">
+                                  {cloudCollections.map((col) => (
+                                    <button
+                                      key={col.id}
+                                      onClick={() => handleAddToCollection(col.id)}
+                                      disabled={addingColId !== null}
+                                      className="w-full text-left px-3 py-2 text-xs flex items-center gap-2 rounded-lg text-white/80 hover:text-white hover:bg-white/10 transition-colors disabled:opacity-50 cursor-pointer"
+                                    >
+                                      {addedToCol === col.id ? (
+                                        <Check size={13} weight="bold" className="text-emerald-400 shrink-0" />
+                                      ) : (
+                                        <Playlist size={14} weight="regular" className="text-white/40 shrink-0" />
+                                      )}
+                                      <span className="truncate">{col.name}</span>
+                                      <span className="ml-auto text-[10px] text-white/40 shrink-0 tabular-nums">
+                                        {col.item_count ?? 0}
+                                      </span>
+                                    </button>
+                                  ))}
+                                </div>
+                              )}
+                            </div>
+                          )}
+                        </div>
+                      )}
+
+                      {/* Source Direct Download Link */}
+                      {safeEmbedSource && (
+                        <a
+                          href={safeEmbedSource}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="inline-flex items-center gap-1.5 h-8 px-3 rounded-xl bg-black/40 border border-white/10 text-white/70 hover:text-white hover:border-white/20 text-xs font-medium transition-all"
+                        >
+                          <DownloadSimple size={15} weight="regular" />
+                          <span>Source</span>
+                        </a>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Optional Room Topic */}
+                  {video.room_title && video.room_title !== video.username && (
+                    <p className="text-xs text-white/60 italic leading-relaxed pt-2 border-t border-white/[0.06]">
+                      {video.room_title}
+                    </p>
                   )}
                 </div>
-
-                {/* Tags */}
+            {/* Tags */}
                 {video.tags && video.tags.length > 0 && (
                   <div className="flex flex-wrap gap-1.5">
                     {video.tags.map((tag) => (
