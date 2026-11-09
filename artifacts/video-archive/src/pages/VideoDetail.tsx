@@ -29,7 +29,7 @@ import { usePreloadRecordings } from "@/hooks/use-preload-recordings";
 import { usePlayQueue } from "@/hooks/use-play-queue";
 import { QueueBar } from "@/components/QueueBar";
 import { UpNextOverlay } from "@/components/UpNextOverlay";
-import { advanceQueue, nextQueueItem } from "@/lib/play-queue";
+import { advanceQueue, nextQueueItem, toQueueItem } from "@/lib/play-queue";
 import { proxyUrl } from "@/lib/proxy-url";
 import { safeExternalUrl } from "@/lib/safe-url";
 import { deriveServers, detectHostLabel, iframeReferrerPolicy } from "@/lib/video-hosts";
@@ -116,6 +116,20 @@ export default function VideoDetail() {
   const [playerReloadKey, setPlayerReloadKey] = useState(0);
   const [shortcutsOpen, setShortcutsOpen] = useState(false);
   const [serverToast, setServerToast] = useState<string | null>(null);
+  const [autoplayEnabled, setAutoplayEnabled] = useState(() => {
+    if (typeof window === "undefined") return true;
+    return localStorage.getItem("v_autoplay") !== "false";
+  });
+
+  const toggleAutoplay = useCallback(() => {
+    setAutoplayEnabled((prev) => {
+      const next = !prev;
+      localStorage.setItem("v_autoplay", String(next));
+      setServerToast(`Autoplay ${next ? "Enabled" : "Disabled"}`);
+      setTimeout(() => setServerToast(null), 2000);
+      return next;
+    });
+  }, []);
 
   const toggleAmbientGlow = useCallback(() => {
     setAmbientGlow((prev) => {
@@ -238,6 +252,30 @@ export default function VideoDetail() {
     { enabled: !!id, placeholderData: keepPreviousData, staleTime: 30_000 },
   );
 
+  // Standalone Autoplay recommendation: when not in an explicit playlist queue,
+  // pick the next related recording by the same performer or shared tags,
+  // falling back to top catalogue recommendation.
+  const nextRecommended = useMemo(() => {
+    if (!video) return null;
+    const fromRelated = related?.find((r) => r.id !== id);
+    if (fromRelated) return toQueueItem(fromRelated);
+    const fromRecs = recData?.data?.find((r) => r.id !== id);
+    if (fromRecs) return toQueueItem(fromRecs);
+    return null;
+  }, [video, id, related, recData?.data]);
+
+  const effectiveNext = nextInQueue ?? (autoplayEnabled ? nextRecommended : null);
+
+  const effectiveDuration = useMemo(() => {
+    if (typeof video?.duration === "number" && video.duration > 0) {
+      return video.duration;
+    }
+    if (typeof video?.filesize === "number" && video.filesize > 0) {
+      return Math.max(120, Math.round(video.filesize / 250000));
+    }
+    return 600; // 10 min fallback for unknown duration
+  }, [video?.duration, video?.filesize]);
+
   const { data: reactions, refetch: refetchReactions } = useGetReactions(
     { recording_id: id || "", session_id: sessionId },
     { query: { enabled: !!id, queryKey: getGetReactionsQueryKey({ recording_id: id || "", session_id: sessionId }) } },
@@ -246,14 +284,14 @@ export default function VideoDetail() {
   usePreloadRecordings(related);
   usePreloadRecordings(recData?.data);
 
-  // Warm the next queued recording so queue advances feel instant.
+  // Warm the next recording so auto-advance / manual next feels instant.
   useEffect(() => {
-    if (!nextInQueue) return;
+    if (!effectiveNext) return;
     void queryClient.prefetchQuery({
-      queryKey: getGetRecordingQueryKey(nextInQueue.id),
-      queryFn: ({ signal }) => getRecording(nextInQueue.id, { signal }),
+      queryKey: getGetRecordingQueryKey(effectiveNext.id),
+      queryFn: ({ signal }) => getRecording(effectiveNext.id, { signal }),
     });
-  }, [nextInQueue, queryClient]);
+  }, [effectiveNext, queryClient]);
 
   const toggleReaction = useToggleReaction();
 
@@ -449,6 +487,78 @@ export default function VideoDetail() {
     setTimeout(() => setServerToast(null), 2000);
   }, [currentServer?.label]);
 
+  /**
+   * Universal next-video advance:
+   * Advances through active playlist queue if present, or continuous autoplay to next recommended video.
+   */
+  const handleAdvance = useCallback(() => {
+    // 1. Active playlist queue
+    if (queue && nextInQueue) {
+      if (nextInQueue.id === id) {
+        trackActivity("queue_advance", { meta: { recording_id: nextInQueue.id } });
+        sessionStorage.removeItem("vplayed");
+        setVideoStarted(false);
+        setPrerollPhase("idle");
+        window.scrollTo({ top: 0, behavior: "auto" });
+        return;
+      }
+      sessionStorage.setItem("vauto", nextInQueue.id);
+      advanceQueue(queue, id, {
+        navigate: (href) => setLocation(href),
+        scrollToTop: () => window.scrollTo({ top: 0, behavior: "auto" }),
+        track: (event, meta) => trackActivity(event, { meta }),
+      });
+      return;
+    }
+
+    // 2. Continuous Autoplay for standalone recordings
+    if (effectiveNext && effectiveNext.id !== id) {
+      sessionStorage.setItem("vauto", effectiveNext.id);
+      trackActivity("autoplay_advance", { meta: { from_id: id, to_id: effectiveNext.id } });
+      setLocation(`/video/${encodeURIComponent(effectiveNext.id)}`);
+      window.scrollTo({ top: 0, behavior: "auto" });
+    }
+  }, [queue, nextInQueue, id, effectiveNext, setLocation]);
+
+  // Handle postMessage events from embeds reporting ended playback
+  useEffect(() => {
+    if (!videoStarted || !effectiveNext || !autoplayEnabled) return;
+
+    const handleMessage = (e: MessageEvent) => {
+      try {
+        let data = e.data;
+        if (typeof data === "string") {
+          try {
+            data = JSON.parse(data);
+          } catch {
+            if (data === "ended" || data === "video:ended" || data === "player:ended") {
+              handleAdvance();
+              return;
+            }
+          }
+        }
+        if (data && typeof data === "object") {
+          const event = (data.event || data.type || data.status || "").toString().toLowerCase();
+          if (
+            event === "ended" ||
+            event === "video_ended" ||
+            event === "complete" ||
+            event === "finish" ||
+            data.state === 0 ||
+            (data.event === "onStateChange" && data.info === 0)
+          ) {
+            handleAdvance();
+          }
+        }
+      } catch {
+        // Ignore cross-origin parsing errors
+      }
+    };
+
+    window.addEventListener("message", handleMessage);
+    return () => window.removeEventListener("message", handleMessage);
+  }, [videoStarted, effectiveNext, autoplayEnabled, handleAdvance]);
+
   const aspectClass = useMemo(() => {
     if (aspectRatio === "21:9") return "aspect-[21/9]";
     if (aspectRatio === "4:3") return "aspect-[4/3]";
@@ -475,6 +585,11 @@ export default function VideoDetail() {
       } else if (e.key === "r" || e.key === "R") {
         e.preventDefault();
         handleReloadPlayer();
+      } else if (e.key === "n" || e.key === "N") {
+        if (effectiveNext) {
+          e.preventDefault();
+          handleAdvance();
+        }
       } else if (e.key === "?") {
         e.preventDefault();
         setShortcutsOpen((prev) => !prev);
@@ -494,7 +609,7 @@ export default function VideoDetail() {
     };
     window.addEventListener("keydown", handleKey);
     return () => window.removeEventListener("keydown", handleKey);
-  }, [isFullscreen, enterFS, exitFS, isTheaterMode, shortcutsOpen, servers.length, videoStarted, handleNextServer, handleReloadPlayer, toggleAmbientGlow, handlePosterClick]);
+  }, [isFullscreen, enterFS, exitFS, isTheaterMode, shortcutsOpen, servers.length, videoStarted, effectiveNext, handleNextServer, handleReloadPlayer, toggleAmbientGlow, handlePosterClick, handleAdvance]);
   
   // Count estimated watch time only after the in-page player is launched.
   useWatchProgress({ video, durationSeconds: video?.duration, isActive: videoStarted && currentServer?.type === "iframe" });
@@ -752,38 +867,7 @@ export default function VideoDetail() {
     }
   };
 
-  /**
-   * Queue auto-advance â€” fired by the iframe Up Next countdown (cross-origin
-   * `ended` is unobservable, so that path runs on the metadata-duration
-   * estimate from lib/up-next.ts) and by its "Play now" button. The
-   * report â†’ scroll â†’ navigate sequence lives in lib/play-queue.ts
-   * (advanceQueue) so the ordering and no-op rules stay unit-testable.
-   */
-  const handleQueueAdvance = useCallback(() => {
-    const next = nextQueueItem(queue, id);
-    if (!queue || !next) return;
-    if (next.id === id) {
-      // Loop replay of the current recording: cross-origin players can't be
-      // restarted programmatically and navigating to the same URL remounts
-      // nothing, so drop back to the poster â€” the click is the gesture that
-      // loads a fresh iframe (and re-arms the preroll for the new playback).
-      trackActivity("queue_advance", { meta: { recording_id: next.id } });
-      sessionStorage.removeItem("vplayed");
-      setVideoStarted(false);
-      setPrerollPhase("idle");
-      window.scrollTo({ top: 0, behavior: "auto" });
-      return;
-    }
-    // Mark the arrival as queue-driven: the next page consumes `vauto` and
-    // starts playback itself (continuous playback, no dead poster between
-    // queue items).
-    sessionStorage.setItem("vauto", next.id);
-    advanceQueue(queue, id, {
-      navigate: (href) => setLocation(href),
-      scrollToTop: () => window.scrollTo({ top: 0, behavior: "auto" }),
-      track: (event, meta) => trackActivity(event, { meta }),
-    });
-  }, [queue, id, setLocation]);
+
 
   const totalReactions = (reactions?.likes ?? 0) + (reactions?.dislikes ?? 0);
   const likePercent = totalReactions > 0 ? Math.round(((reactions?.likes ?? 0) / totalReactions) * 100) : null;
@@ -812,7 +896,7 @@ export default function VideoDetail() {
           {deadNext && (
             <div className="mb-6">
               <button
-                onClick={handleQueueAdvance}
+                onClick={handleAdvance}
                 className="inline-flex items-center gap-1.5 h-9 px-4 text-xs font-semibold border border-primary/40 text-primary hover:border-primary/70 transition-colors rounded-lg cursor-pointer"
               >
                 <Play size={14} weight="fill" />
@@ -912,6 +996,24 @@ export default function VideoDetail() {
                       </button>
                     ))}
                   </div>
+
+                  {/* Autoplay toggle */}
+                  <button
+                    onClick={toggleAutoplay}
+                    className={cn(
+                      "h-7 px-2.5 flex items-center gap-1.5 rounded-lg border text-xs font-medium transition-all cursor-pointer",
+                      autoplayEnabled
+                        ? "border-emerald-500/40 text-emerald-400 bg-emerald-500/10 shadow-xs"
+                        : "border-border/50 text-muted-foreground hover:text-foreground hover:border-border"
+                    )}
+                    title={`Autoplay next video: ${autoplayEnabled ? "ON" : "OFF"}`}
+                  >
+                    <span className={cn(
+                      "w-1.5 h-1.5 rounded-full",
+                      autoplayEnabled ? "bg-emerald-400 animate-pulse" : "bg-muted-foreground/40"
+                    )} />
+                    <span className="hidden sm:inline">Autoplay</span>
+                  </button>
 
                   {/* Ambient Glow toggle */}
                   <button
@@ -1133,13 +1235,14 @@ export default function VideoDetail() {
                   </div>
                 )}
 
-                {/* Iframe Up Next countdown */}
-                {currentServer?.type === "iframe" && videoStarted && video && nextInQueue && (
+                {/* Up Next countdown & Autoplay Overlay */}
+                {currentServer?.type === "iframe" && videoStarted && video && effectiveNext && (
                   <UpNextOverlay
-                    key={video.id}
-                    next={nextInQueue}
-                    durationSeconds={video.duration ?? 0}
-                    onPlayNow={handleQueueAdvance}
+                    key={`${video.id}-${effectiveNext.id}`}
+                    next={effectiveNext}
+                    durationSeconds={effectiveDuration}
+                    autoplay={autoplayEnabled}
+                    onPlayNow={handleAdvance}
                   />
                 )}
 
@@ -1170,8 +1273,23 @@ export default function VideoDetail() {
                         )}
                       </div>
 
-                      {/* Right: Quick actions (Reload, Ambient, Theater, Shortcuts) */}
+                      {/* Right: Quick actions (Autoplay, Reload, Ambient, Theater, Shortcuts) */}
                       <div className="flex items-center gap-1.5 pointer-events-auto">
+                        <button
+                          onClick={toggleAutoplay}
+                          className={cn(
+                            "h-7 px-2 flex items-center gap-1 bg-black/70 backdrop-blur-md border rounded-lg text-xs font-medium transition-all cursor-pointer shadow-md",
+                            autoplayEnabled
+                              ? "border-emerald-500/40 text-emerald-400"
+                              : "border-white/15 text-white/70 hover:text-white"
+                          )}
+                          title={`Autoplay is ${autoplayEnabled ? "ON" : "OFF"}`}
+                          aria-label="Toggle autoplay"
+                        >
+                          <span className={cn("w-1.5 h-1.5 rounded-full", autoplayEnabled ? "bg-emerald-400" : "bg-white/40")} />
+                          <span className="hidden md:inline">Auto</span>
+                        </button>
+
                         <button
                           onClick={handleReloadPlayer}
                           className="h-7 px-2.5 flex items-center gap-1.5 bg-black/70 backdrop-blur-md border border-white/15 hover:bg-black/90 hover:border-white/30 text-white/80 hover:text-white rounded-lg text-xs font-medium transition-all cursor-pointer shadow-md"
@@ -1268,6 +1386,7 @@ export default function VideoDetail() {
                     { key: "Space / K", desc: "Start playback from poster", action: "Play" },
                     { key: "F", desc: "Toggle Fullscreen mode", action: "Fullscreen" },
                     { key: "T", desc: "Toggle Cinema / Theater mode", action: "Theater" },
+                    { key: "N", desc: "Advance to next video", action: "Next Video" },
                     { key: "S", desc: "Cycle through mirror servers", action: "Next Server" },
                     { key: "R", desc: "Reload player & refresh ticket", action: "Reload" },
                     { key: "A", desc: "Toggle ambient backlight glow", action: "Ambient" },

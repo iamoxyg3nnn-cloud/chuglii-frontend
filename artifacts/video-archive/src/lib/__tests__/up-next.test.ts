@@ -34,6 +34,14 @@ describe("upNextTiming", () => {
     expect(secondsUntil(t.endsAt, t.showAt)).toBe(6);
   });
 
+  it("handles estimated fallback durations properly", () => {
+    const fallbackDuration = 600; // 10 minutes
+    const t = upNextTiming(fallbackDuration, NOW)!;
+    expect(t.endsAt).toBe(NOW + 600_000);
+    expect(t.showAt).toBe(NOW + 590_000);
+    expect(secondsUntil(t.endsAt, t.showAt)).toBe(10);
+  });
+
   it("exposes sane constants", () => {
     expect(UP_NEXT_LEAD_SECONDS).toBe(10);
     expect(UP_NEXT_TICK_MS).toBeGreaterThan(0);
