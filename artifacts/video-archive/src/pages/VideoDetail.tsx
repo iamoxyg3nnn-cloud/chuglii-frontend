@@ -55,7 +55,7 @@ import {
   UserCircle, FilmStrip, ThumbsUp, ThumbsDown, BookmarkSimple, ShareNetwork,
   Check, HardDrives, DownloadSimple, Clock, Play, Code, Playlist, Shuffle,
   FolderSimplePlus, Plus, CaretDown, CaretLeft, CaretRight, ArrowSquareOut, SignIn, CheckCircle, ArrowClockwise,
-  Television, Lightbulb, Keyboard, SlidersHorizontal, Sparkle, Info,
+  Television, Lightbulb, Keyboard, SlidersHorizontal, Sparkle, Info, MonitorPlay,
 } from "@phosphor-icons/react";
 import { cn } from "@/lib/utils";
 import {
@@ -1193,19 +1193,81 @@ export default function VideoDetail() {
                     </button>
                     )
                 ) : currentServer?.type === "link" ? (
-                  <div className="w-full h-full flex flex-col items-center justify-center gap-4 bg-black/80 p-8">
-                    <p className="text-muted-foreground text-sm text-center">
-                      Open this video on the host site:
-                    </p>
-                    <a
-                      href={currentServer.src}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="inline-flex items-center gap-2 px-5 py-2.5 rounded-lg border border-primary/30 text-primary text-sm font-medium hover:border-primary/60 transition-colors"
-                    >
-                      <ArrowSquareOut size={16} weight="bold" />
-                      Open on {currentServer.label}
-                    </a>
+                  <div className="relative w-full h-full flex flex-col items-center justify-center p-6 text-center overflow-hidden bg-black/90 select-none">
+                    {/* Atmospheric blurred poster backdrop */}
+                    {posterUrl && (
+                      <div
+                        className="absolute inset-0 bg-cover bg-center opacity-15 blur-2xl scale-110 pointer-events-none"
+                        style={{ backgroundImage: `url(${proxyUrl(posterUrl)})` }}
+                      />
+                    )}
+                    <div className="absolute inset-0 bg-radial from-transparent via-black/60 to-black pointer-events-none" />
+
+                    {/* Centered Glassmorphism Launcher Box */}
+                    <div className="relative z-10 max-w-md w-full mx-auto p-6 sm:p-8 rounded-2xl bg-neutral-900/85 backdrop-blur-xl border border-white/10 shadow-2xl flex flex-col items-center gap-4 animate-in fade-in zoom-in-95 duration-200">
+                      <div className="w-14 h-14 rounded-2xl bg-primary/10 border border-primary/25 flex items-center justify-center text-primary shadow-inner">
+                        <MonitorPlay size={30} weight="duotone" />
+                      </div>
+
+                      <div className="flex flex-col items-center gap-1.5">
+                        <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-primary/10 border border-primary/20 text-[11px] font-semibold text-primary">
+                          <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                          <span>{currentServer.label} Dedicated Player</span>
+                        </div>
+                        <h3 className="text-lg font-bold text-white tracking-tight">
+                          {currentServer.label === "AnonMP4"
+                            ? "AnonMP4 Secure Playback"
+                            : `Launch ${currentServer.label}`}
+                        </h3>
+                        <p className="text-xs text-white/60 leading-relaxed max-w-xs">
+                          {currentServer.label === "AnonMP4"
+                            ? "AnonMP4 uses single-session ticket security requiring direct top-level browser access. Launch the dedicated popout player below."
+                            : `This mirror requires direct playback on ${currentServer.label} for optimal streaming performance.`}
+                        </p>
+                      </div>
+
+                      <div className="flex flex-col sm:flex-row items-center gap-2.5 w-full pt-1">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            window.open(
+                              currentServer.src,
+                              "anonmp4_player",
+                              "width=1120,height=680,menubar=no,toolbar=no,location=no,status=no,resizable=yes"
+                            );
+                          }}
+                          className="w-full sm:flex-1 inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-primary hover:bg-primary/90 text-primary-foreground text-xs sm:text-sm font-semibold shadow-lg shadow-primary/20 hover:shadow-primary/30 active:scale-95 transition-all cursor-pointer"
+                        >
+                          <MonitorPlay size={16} weight="bold" />
+                          <span>Launch Popout</span>
+                        </button>
+
+                        <a
+                          href={currentServer.src}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-white/10 hover:bg-white/15 border border-white/10 text-white/90 text-xs sm:text-sm font-medium transition-colors"
+                        >
+                          <ArrowSquareOut size={16} weight="bold" />
+                          <span>New Tab</span>
+                        </a>
+                      </div>
+
+                      {/* Mirror switch shortcut if other in-page servers exist */}
+                      {servers.some((s) => s.type === "iframe") && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const firstIframe = servers.findIndex((s) => s.type === "iframe");
+                            if (firstIframe !== -1) handleSelectServer(firstIframe);
+                          }}
+                          className="inline-flex items-center gap-1.5 text-xs text-white/50 hover:text-white transition-colors pt-1 cursor-pointer"
+                        >
+                          <ArrowClockwise size={13} weight="bold" />
+                          <span>Switch to In-Page Server ({servers.find((s) => s.type === "iframe")?.label})</span>
+                        </button>
+                      )}
+                    </div>
                   </div>
                 ) : currentServer?.type === "iframe" ? (
                   <iframe

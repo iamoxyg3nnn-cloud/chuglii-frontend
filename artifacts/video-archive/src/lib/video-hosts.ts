@@ -97,6 +97,13 @@ export function isEmbedUrl(url: string): boolean {
   if (!safeUrl) return false;
   try {
     const { pathname, hostname } = new URL(safeUrl);
+    // AnonMP4 binds playback tokens to a PHP session cookie that lacks SameSite=None / Partitioned.
+    // In cross-site iframes, modern browsers drop the session cookie, causing AnonMP4's backend to respond
+    // with "Forbidden: Playback ticket already used or invalid session."
+    // It must be launched top-level (popup window or new tab) where cookies are first-party.
+    if (hostname.includes("anonmp4")) {
+      return false;
+    }
     // Path-based detection for common embed patterns
     if (pathname.includes("/e/") || pathname.includes("/embed/") || pathname.includes("/player/") || pathname.includes("/v/")) {
       return true;
@@ -110,8 +117,7 @@ export function isEmbedUrl(url: string): boolean {
       hostname.includes("upns") ||
       hostname.includes("vidara") ||
       hostname.includes("dropload") ||
-      hostname.includes("dr0pstream") ||
-      hostname.includes("anonmp4")
+      hostname.includes("dr0pstream")
     ) {
       return true;
     }
@@ -227,6 +233,13 @@ export function deriveServers(
       seen.add(safeEmbedUrl);
     }
   }
+
+  // Stable sort: prioritize in-page embeddable ("iframe") servers over external ("link") servers
+  // so users immediately get interactive in-page playback when multiple mirrors are available.
+  servers.sort((a, b) => {
+    if (a.type === b.type) return 0;
+    return a.type === "iframe" ? -1 : 1;
+  });
 
   return servers;
 }

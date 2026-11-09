@@ -65,9 +65,9 @@ describe("normalizeLuluStreamUrl", () => {
 });
 
 describe("isEmbedUrl", () => {
-  it("recognizes dropload and anonmp4 as embed-friendly", () => {
+  it("recognizes dropload as embed-friendly and anonmp4 as link-only due to cross-site session auth", () => {
     expect(isEmbedUrl("https://dropload.io/e/12345678")).toBe(true);
-    expect(isEmbedUrl("https://anonmp4.com/embed/12345678")).toBe(true);
+    expect(isEmbedUrl("https://anonmp4.com/embed/12345678")).toBe(false);
     expect(isEmbedUrl("https://dr0pstream.com/e/12345678")).toBe(true);
   });
 
@@ -95,7 +95,7 @@ describe("deriveServers", () => {
     ]);
   });
 
-  it("derives embed iframe server for anonmp4 links", () => {
+  it("derives link server for anonmp4 links due to cross-site cookie ticket auth", () => {
     const servers = deriveServers(null, {
       "AnonMP4": "https://anonmp4.com/v/xyz98765",
     });
@@ -103,19 +103,23 @@ describe("deriveServers", () => {
       {
         label: "AnonMP4",
         src: "https://anonmp4.com/embed/xyz98765",
-        type: "iframe",
+        type: "link",
       },
     ]);
   });
 
-  it("derives both embedUrl and mirror links without duplicates", () => {
+  it("derives both embedUrl and mirror links, prioritizing in-page iframe servers", () => {
     const servers = deriveServers("https://dropload.io/abc12345", {
       "Mirror 1": "https://anonmp4.to/v/secret99",
       "Mirror 2": "https://dropload.io/e/abc12345",
     });
     expect(servers.length).toBe(2);
-    expect(servers[0].src).toBe("https://anonmp4.to/embed/secret99");
-    expect(servers[1].src).toBe("https://dropload.io/e/abc12345");
+    // Dropload (type: iframe) is sorted first!
+    expect(servers[0].src).toBe("https://dropload.io/e/abc12345");
+    expect(servers[0].type).toBe("iframe");
+    // AnonMP4 (type: link) is sorted second!
+    expect(servers[1].src).toBe("https://anonmp4.to/embed/secret99");
+    expect(servers[1].type).toBe("link");
   });
 });
 
