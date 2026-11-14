@@ -46,6 +46,17 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile --ignore-scripts
 
+      # Hobby teams only allow deployments whose commit author is the team
+      # owner. GitHub Actions checks out a detached HEAD, so rewrite the local
+      # commit identity (not the pushed history) to the Vercel owner before
+      # deploying. This keeps every push deployable regardless of who authored
+      # the pushed commit.
+      - name: Align deployment author with Vercel owner
+        run: |
+          git config user.name "lawdachuss"
+          git config user.email "bkd123ja@gmail.com"
+          git commit --amend --no-edit --reset-author
+
       - name: Install Vercel CLI
         run: npm install --global vercel@latest
 
