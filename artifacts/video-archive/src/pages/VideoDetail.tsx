@@ -1198,7 +1198,8 @@ export default function VideoDetail() {
                     key={`${currentServer.src}-${activeServer}-${playerReloadKey}`}
                     src={currentServer.src}
                     className="w-full h-full border-0"
-                    allow="autoplay; fullscreen; picture-in-picture; encrypted-media"
+                    allow="autoplay; fullscreen; picture-in-picture; encrypted-media; accelerometer; gyroscope"
+                    allowFullScreen
                     referrerPolicy={iframeReferrerPolicy(currentServer.src)}
                     title={video.room_title || video.filename}
                   />
@@ -1401,7 +1402,7 @@ export default function VideoDetail() {
                       <button
                         onClick={isFullscreen ? exitFS : enterFS}
                         className="h-7 w-7 flex items-center justify-center rounded-lg bg-black/40 border border-white/5 text-white/60 hover:text-white hover:bg-white/10 transition-colors cursor-pointer"
-                        title="Fullscreen (F)"
+                        title="Cinema Stage Fullscreen (F)"
                         aria-label="Fullscreen"
                       >
                         {isFullscreen ? <CornersIn size={14} weight="bold" /> : <CornersOut size={14} weight="bold" />}
@@ -1416,6 +1417,42 @@ export default function VideoDetail() {
                       >
                         <Keyboard size={13} weight="regular" />
                       </button>
+                    </div>
+                  </div>
+                )}
+
+                {/* Mirror Telemetry & Unstick Helper Strip */}
+                {video && videoStarted && currentServer?.type === "iframe" && (
+                  <div className="w-full mt-1.5 px-3 py-1.5 rounded-xl bg-white/[0.03] border border-white/[0.06] text-[11px] text-white/50 flex items-center justify-between gap-2 flex-wrap">
+                    <div className="flex items-center gap-1.5 min-w-0 truncate">
+                      <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 shrink-0" />
+                      <span className="truncate">
+                        Host: <strong className="text-white/80 font-medium">{currentServer.label}</strong> (controls inside video frame).
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-2 text-white/40 text-[11px] ml-auto">
+                      <span>Controls stuck or ad blocked?</span>
+                      <button
+                        type="button"
+                        onClick={handleReloadPlayer}
+                        className="text-primary hover:text-primary/90 hover:underline font-medium cursor-pointer"
+                        title="Reload embed to unstick player"
+                      >
+                        Reload (R)
+                      </button>
+                      {servers.length > 1 && (
+                        <>
+                          <span>•</span>
+                          <button
+                            type="button"
+                            onClick={handleNextServer}
+                            className="text-white/70 hover:text-white hover:underline cursor-pointer"
+                            title="Switch to next mirror server (S)"
+                          >
+                            Switch Mirror (S)
+                          </button>
+                        </>
+                      )}
                     </div>
                   </div>
                 )}
