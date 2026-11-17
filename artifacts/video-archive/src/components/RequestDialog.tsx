@@ -58,6 +58,7 @@ function RequestDialogInner({ open, onOpenChange }: RequestDialogProps) {
   const [priority, setPriority] = useState<"low" | "normal" | "high">("normal");
   const [submitted, setSubmitted] = useState(false);
   const [submissionId, setSubmissionId] = useState<string | null>(null);
+  const [alreadyTrackedNotice, setAlreadyTrackedNotice] = useState<string | null>(null);
 
   const {
     data: lookupData,
@@ -100,8 +101,19 @@ function RequestDialogInner({ open, onOpenChange }: RequestDialogProps) {
         priority,
       });
       setSubmissionId(result.id);
+      if (result.already_tracked) {
+        setAlreadyTrackedNotice(
+          result.message ||
+            `Good news! @${lookupUsername} is already being tracked by our DVR fleet. You are on the notification list and will be alerted when their next stream is captured!`
+        );
+      } else {
+        setAlreadyTrackedNotice(null);
+      }
       setSubmitted(true);
-      toast({ title: "Success", description: "Request submitted successfully!" });
+      toast({
+        title: result.already_tracked ? "Already Monitored!" : "Success",
+        description: result.message || "Request submitted successfully!",
+      });
     } catch (err) {
       let message = "Failed to submit request. Please try again.";
       if (err instanceof Error) {
@@ -126,6 +138,7 @@ function RequestDialogInner({ open, onOpenChange }: RequestDialogProps) {
     setNotes("");
     setPriority("normal");
     setSubmissionId(null);
+    setAlreadyTrackedNotice(null);
   };
 
   const canNext =
@@ -149,12 +162,21 @@ function RequestDialogInner({ open, onOpenChange }: RequestDialogProps) {
             <div className="animate-fade-in-scale">
               <CheckCircle size={40} weight="fill" className="text-green-500 mx-auto mb-3" />
             </div>
-            <h2 className="text-base font-bold text-foreground mb-1">Request Submitted!</h2>
-            <p className="text-xs text-muted-foreground mb-3">
-              Your request for{" "}
-              <span className="font-semibold text-foreground">@{lookupUsername}</span> on{" "}
-              <span className="font-semibold text-foreground capitalize">{platform}</span> has been submitted.
-            </p>
+            <h2 className="text-base font-bold text-foreground mb-1">
+              {alreadyTrackedNotice ? "Already Monitored in DVR Fleet!" : "Request Submitted!"}
+            </h2>
+            {alreadyTrackedNotice ? (
+              <div className="bg-primary/10 border border-primary/20 text-foreground text-xs p-3 rounded-lg mb-3 max-w-sm mx-auto text-left">
+                <p className="font-semibold text-primary mb-1">Fleet Status: Actively Monitored</p>
+                <p className="text-muted-foreground leading-relaxed">{alreadyTrackedNotice}</p>
+              </div>
+            ) : (
+              <p className="text-xs text-muted-foreground mb-3">
+                Your request for{" "}
+                <span className="font-semibold text-foreground">@{lookupUsername}</span> on{" "}
+                <span className="font-semibold text-foreground capitalize">{platform}</span> has been submitted.
+              </p>
+            )}
             {submissionId && (
               <p className="text-[11px] text-muted-foreground/50 mb-4">
                 Request ID: {submissionId}

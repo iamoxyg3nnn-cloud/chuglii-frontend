@@ -73,23 +73,33 @@ router.post("/requests", requireAuth, async (req, res) => {
     }
   }
 
+  // Normalize inputs to avoid case-sensitivity discrepancies and whitespace bugs
+  const cleanUsername =
+    typeof performer_username === "string" && performer_username.trim().length > 0
+      ? performer_username.trim().toLowerCase()
+      : undefined;
+  const cleanLink =
+    typeof stream_link === "string" && stream_link.trim().length > 0
+      ? stream_link.trim()
+      : undefined;
+
   const validPriority = ["low", "normal", "high"].includes(priority ?? "") ? priority : "normal";
 
-  // If the performer already has recordings in the archive, reject the request
+  // 1. If the performer already has recordings in the archive, reject the request
   // immediately — there's nothing to capture.
-  if (performer_username) {
+  if (cleanUsername) {
     try {
       const { count, error } = await supabase
         .from("recordings_with_links")
         .select("id", { count: "exact", head: true })
-        .ilike("username", performer_username)
+        .ilike("username", cleanUsername)
         .not("links", "is", "null");
 
       if (error) throw error;
       const recordingCount = count ?? 0;
       if (recordingCount > 0) {
         res.status(409).json({
-          error: `@${performer_username} already has ${recordingCount} recording${recordingCount === 1 ? "" : "s"} in the archive.`,
+          error: `@${cleanUsername} already has ${recordingCount} recording${recordingCount === 1 ? "" : "s"} in the archive.`,
           recording_count: recordingCount,
         });
         return;
@@ -101,21 +111,41 @@ router.post("/requests", requireAuth, async (req, res) => {
     }
   }
 
-  // Prevent duplicate requests: a user cannot request the same performer on the
+  // 2. Check if the performer is already claimed / monitored in the DVR fleet pool (channel_assignments).
+  let alreadyTracked = false;
+  if (cleanUsername) {
+    try {
+      const { data: assignment } = await supabase
+        .from("channel_assignments")
+        .select("assigned_node, status")
+        .ilike("username", cleanUsername)
+        .eq("site", platform)
+        .maybeSingle();
+
+      if (assignment && ["claimed", "recording", "unassigned"].includes(assignment.status)) {
+        alreadyTracked = true;
+      }
+    } catch (err) {
+      req.log?.error?.({ err }, "[requests] channel_assignments check failed") ??
+        logger.error({ err }, "[requests] channel_assignments check failed");
+    }
+  }
+
+  // 3. Prevent duplicate requests: a user cannot request the same performer on the
   // same platform more than once. If a duplicate is attempted, return the
   // existing request instead of creating a redundant channel.
-  //
-  // NOTE: The database has a UNIQUE INDEX (not a named CONSTRAINT) on
-  // (user_id, platform, COALESCE(performer_username,''), COALESCE(stream_link,'')),
-  // so we cannot use ON CONFLICT ON CONSTRAINT. We instead rely on the pre-insert
-  // dedupe check + the UNIQUE INDEX to catch race conditions, with a fallback
-  // that looks up the existing row in the error path.
-  const dedupeKey = performer_username ? performer_username : stream_link;
+  const dedupeKey = cleanUsername ? cleanUsername : cleanLink;
   if (dedupeKey) {
     try {
-      const existing = await findDuplicate(req.user!.id, platform, performer_username, stream_link);
+      const existing = await findDuplicate(req.user!.id, platform, cleanUsername, cleanLink);
       if (existing) {
-        res.status(200).json(existing);
+        res.status(200).json({
+          ...existing,
+          already_tracked: alreadyTracked,
+          message: alreadyTracked
+            ? `@${cleanUsername} is already being tracked by our DVR fleet! You are registered for notifications when their next stream is captured.`
+            : undefined,
+        });
         return;
       }
     } catch {
@@ -124,41 +154,56 @@ router.post("/requests", requireAuth, async (req, res) => {
   }
 
   try {
-    // Simple INSERT — the unique index handles duplicate rejection, and we
-    // catch unique-violation errors in the catch block below.
+    // If already tracked by a DVR node, mark approved automatically so user
+    // gets immediate notification when the stream is uploaded.
+    const initialStatus = alreadyTracked ? "approved" : "pending";
+
     const { data: created, error } = await supabase
       .from("requests")
       .insert({
         user_id: req.user!.id,
         platform,
-        performer_username: performer_username ?? null,
-        stream_link: stream_link ?? null,
-        notes: notes ?? null,
+        performer_username: cleanUsername ?? null,
+        stream_link: cleanLink ?? null,
+        notes: notes ? notes.trim() : null,
         priority: validPriority,
-        status: "pending",
+        status: initialStatus,
       })
       .select(REQUEST_COLS)
       .single();
 
     if (error) throw error;
 
-    // Confirmation notification for the requester (respects their prefs;
-    // failures are non-critical and can't fail the request flow).
+    const userMessage = alreadyTracked
+      ? `Good news! @${cleanUsername} is already being tracked by our DVR fleet. We've added you to the alert list and will notify you as soon as their next stream is ready!`
+      : `Your request for @${cleanUsername ?? "a performer"} on ${platform} has been submitted and is pending review.`;
+
+    // Confirmation notification for the requester
     await notifyUser({
       userId: created.user_id,
       type: "request_submitted",
-      message: `Your request for @${created.performer_username ?? "a performer"} on ${created.platform} has been submitted and is pending review.`,
+      message: userMessage,
       relatedId: String(created.id),
     });
 
-    res.status(201).json(created);
+    res.status(201).json({
+      ...created,
+      already_tracked: alreadyTracked,
+      message: userMessage,
+    });
   } catch (err) {
     // Catch: unique-violation from the index, or any other error.
     // Return the existing row if this was a duplicate.
     try {
-      const existing = await findDuplicate(req.user!.id, platform, performer_username, stream_link);
+      const existing = await findDuplicate(req.user!.id, platform, cleanUsername, cleanLink);
       if (existing) {
-        res.status(200).json(existing);
+        res.status(200).json({
+          ...existing,
+          already_tracked: alreadyTracked,
+          message: alreadyTracked
+            ? `@${cleanUsername} is already being tracked by our DVR fleet! You are registered for notifications when their next stream is captured.`
+            : undefined,
+        });
         return;
       }
     } catch (dupErr) {
@@ -184,17 +229,16 @@ async function findDuplicate(
     .eq("user_id", userId)
     .eq("platform", platform);
 
-  // COALESCE(col, '') = COALESCE($param, '') → null matches the empty string.
   if (performerUsername) {
-    query = query.eq("performer_username", performerUsername);
+    query = query.ilike("performer_username", performerUsername);
   } else {
-    query = query.or(`performer_username.is.null,performer_username.eq.`);
+    query = query.or("performer_username.is.null,performer_username.eq.");
   }
 
   if (streamLink) {
     query = query.eq("stream_link", streamLink);
   } else {
-    query = query.or(`stream_link.is.null,stream_link.eq.`);
+    query = query.or("stream_link.is.null,stream_link.eq.");
   }
 
   const { data } = await query.limit(1).maybeSingle();

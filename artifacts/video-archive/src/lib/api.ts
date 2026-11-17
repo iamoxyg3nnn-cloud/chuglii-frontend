@@ -397,7 +397,7 @@ export function useCreateRequest() {
       const sb = await getSupabase();
       const { data: { session } } = await sb.auth.getSession();
       const token = session?.access_token;
-      return fetchApi<{ id: string }>("/api/requests", {
+      return fetchApi<{ id: string; already_tracked?: boolean; message?: string }>("/api/requests", {
         method: "POST",
         body: JSON.stringify(data),
         headers: token ? { Authorization: `Bearer ${token}` } : {},
