@@ -18539,8 +18539,8 @@ var require_escape_html = __commonJS({
   "../../node_modules/.pnpm/escape-html@1.0.3/node_modules/escape-html/index.js"(exports, module) {
     "use strict";
     var matchHtmlRegExp = /["'&<>]/;
-    module.exports = escapeHtml;
-    function escapeHtml(string) {
+    module.exports = escapeHtml2;
+    function escapeHtml2(string) {
       var str = "" + string;
       var match = matchHtmlRegExp.exec(str);
       if (!match) {
@@ -18671,13 +18671,13 @@ var require_finalhandler = __commonJS({
     "use strict";
     var debug = require_src()("finalhandler");
     var encodeUrl = require_encodeurl();
-    var escapeHtml = require_escape_html();
+    var escapeHtml2 = require_escape_html();
     var onFinished = require_on_finished();
     var parseUrl = require_parseurl();
     var statuses = require_statuses();
     var isFinished = onFinished.isFinished;
     function createHtmlDocument(message) {
-      var body = escapeHtml(message).replaceAll("\n", "<br>").replaceAll("  ", " &nbsp;");
+      var body = escapeHtml2(message).replaceAll("\n", "<br>").replaceAll("  ", " &nbsp;");
       return '<!DOCTYPE html>\n<html lang="en">\n<head>\n<meta charset="utf-8">\n<title>Error</title>\n</head>\n<body>\n<pre>' + body + "</pre>\n</body>\n</html>\n";
     }
     module.exports = finalhandler;
@@ -20725,27 +20725,27 @@ var require_router = __commonJS({
     var slice = Array.prototype.slice;
     var flatten = Array.prototype.flat;
     var methods = METHODS.map((method) => method.toLowerCase());
-    module.exports = Router22;
+    module.exports = Router25;
     module.exports.Route = Route;
-    function Router22(options) {
-      if (!(this instanceof Router22)) {
-        return new Router22(options);
+    function Router25(options) {
+      if (!(this instanceof Router25)) {
+        return new Router25(options);
       }
       const opts = options || {};
-      function router22(req, res, next) {
-        router22.handle(req, res, next);
+      function router25(req, res, next) {
+        router25.handle(req, res, next);
       }
-      Object.setPrototypeOf(router22, this);
-      router22.caseSensitive = opts.caseSensitive;
-      router22.mergeParams = opts.mergeParams;
-      router22.params = {};
-      router22.strict = opts.strict;
-      router22.stack = [];
-      return router22;
+      Object.setPrototypeOf(router25, this);
+      router25.caseSensitive = opts.caseSensitive;
+      router25.mergeParams = opts.mergeParams;
+      router25.params = {};
+      router25.strict = opts.strict;
+      router25.stack = [];
+      return router25;
     }
-    Router22.prototype = function() {
+    Router25.prototype = function() {
     };
-    Router22.prototype.param = function param(name, fn) {
+    Router25.prototype.param = function param(name, fn) {
       if (!name) {
         throw new TypeError("argument name is required");
       }
@@ -20765,7 +20765,7 @@ var require_router = __commonJS({
       params.push(fn);
       return this;
     };
-    Router22.prototype.handle = function handle(req, res, callback) {
+    Router25.prototype.handle = function handle(req, res, callback) {
       if (!callback) {
         throw new TypeError("argument callback is required");
       }
@@ -20892,7 +20892,7 @@ var require_router = __commonJS({
         }
       }
     };
-    Router22.prototype.use = function use(handler) {
+    Router25.prototype.use = function use(handler) {
       let offset = 0;
       let path = "/";
       if (typeof handler !== "function") {
@@ -20925,7 +20925,7 @@ var require_router = __commonJS({
       }
       return this;
     };
-    Router22.prototype.route = function route(path) {
+    Router25.prototype.route = function route(path) {
       const route2 = new Route(path);
       const layer = new Layer(path, {
         sensitive: this.caseSensitive,
@@ -20940,7 +20940,7 @@ var require_router = __commonJS({
       return route2;
     };
     methods.concat("all").forEach(function(method) {
-      Router22.prototype[method] = function(path) {
+      Router25.prototype[method] = function(path) {
         const route = this.route(path);
         route[method].apply(route, slice.call(arguments, 1));
         return this;
@@ -21123,13 +21123,13 @@ var require_application = __commonJS({
     var compileTrust = require_utils3().compileTrust;
     var resolve = __require("node:path").resolve;
     var once = require_once();
-    var Router22 = require_router();
+    var Router25 = require_router();
     var slice = Array.prototype.slice;
     var flatten = Array.prototype.flat;
     var app2 = exports = module.exports = {};
     var trustProxyDefaultSymbol = "@@symbol:trust_proxy_default";
     app2.init = function init() {
-      var router22 = null;
+      var router25 = null;
       this.cache = /* @__PURE__ */ Object.create(null);
       this.engines = /* @__PURE__ */ Object.create(null);
       this.settings = /* @__PURE__ */ Object.create(null);
@@ -21138,13 +21138,13 @@ var require_application = __commonJS({
         configurable: true,
         enumerable: true,
         get: function getrouter() {
-          if (router22 === null) {
-            router22 = new Router22({
+          if (router25 === null) {
+            router25 = new Router25({
               caseSensitive: this.enabled("case sensitive routing"),
               strict: this.enabled("strict routing")
             });
           }
-          return router22;
+          return router25;
         }
       });
     };
@@ -21215,15 +21215,15 @@ var require_application = __commonJS({
       if (fns.length === 0) {
         throw new TypeError("app.use() requires a middleware function");
       }
-      var router22 = this.router;
+      var router25 = this.router;
       fns.forEach(function(fn2) {
         if (!fn2 || !fn2.handle || !fn2.set) {
-          return router22.use(path, fn2);
+          return router25.use(path, fn2);
         }
         debug(".use app under %s", path);
         fn2.mountpath = path;
         fn2.parent = this;
-        router22.use(path, function mounted_app(req, res, next) {
+        router25.use(path, function mounted_app(req, res, next) {
           var orig = req.app;
           fn2.handle(req, res, function(err) {
             Object.setPrototypeOf(req, orig.request);
@@ -22759,7 +22759,7 @@ var require_send = __commonJS({
     var createError = require_http_errors();
     var debug = require_src()("send");
     var encodeUrl = require_encodeurl();
-    var escapeHtml = require_escape_html();
+    var escapeHtml2 = require_escape_html();
     var etag = require_etag();
     var fresh = require_fresh();
     var fs = __require("fs");
@@ -22812,7 +22812,7 @@ var require_send = __commonJS({
       }
       var res = this.res;
       var msg = statuses.message[status] || String(status);
-      var doc = createHtmlDocument("Error", escapeHtml(msg));
+      var doc = createHtmlDocument("Error", escapeHtml2(msg));
       clearHeaders(res);
       if (err && err.headers) {
         setHeaders(res, err.headers);
@@ -22912,7 +22912,7 @@ var require_send = __commonJS({
         return;
       }
       var loc = encodeUrl(collapseLeadingSlashes(this.path + "/"));
-      var doc = createHtmlDocument("Redirecting", "Redirecting to " + escapeHtml(loc));
+      var doc = createHtmlDocument("Redirecting", "Redirecting to " + escapeHtml2(loc));
       res.statusCode = 301;
       res.setHeader("Content-Type", "text/html; charset=UTF-8");
       res.setHeader("Content-Length", Buffer.byteLength(doc));
@@ -23316,7 +23316,7 @@ var require_response = __commonJS({
     var createError = require_http_errors();
     var deprecate = require_depd()("express");
     var encodeUrl = require_encodeurl();
-    var escapeHtml = require_escape_html();
+    var escapeHtml2 = require_escape_html();
     var http2 = __require("node:http");
     var onFinished = require_on_finished();
     var mime = require_mime_types();
@@ -23655,7 +23655,7 @@ var require_response = __commonJS({
           body = statuses.message[status] + ". Redirecting to " + address;
         },
         html: function() {
-          var u = escapeHtml(address);
+          var u = escapeHtml2(address);
           body = "<p>" + statuses.message[status] + ". Redirecting to " + u + "</p>";
         },
         default: function() {
@@ -23783,7 +23783,7 @@ var require_serve_static = __commonJS({
   "../../node_modules/.pnpm/serve-static@2.2.1/node_modules/serve-static/index.js"(exports, module) {
     "use strict";
     var encodeUrl = require_encodeurl();
-    var escapeHtml = require_escape_html();
+    var escapeHtml2 = require_escape_html();
     var parseUrl = require_parseurl();
     var resolve = __require("path").resolve;
     var send = require_send();
@@ -23869,7 +23869,7 @@ var require_serve_static = __commonJS({
         originalUrl.path = null;
         originalUrl.pathname = collapseLeadingSlashes(originalUrl.pathname + "/");
         var loc = encodeUrl(url.format(originalUrl));
-        var doc = createHtmlDocument("Redirecting", "Redirecting to " + escapeHtml(loc));
+        var doc = createHtmlDocument("Redirecting", "Redirecting to " + escapeHtml2(loc));
         res.statusCode = 301;
         res.setHeader("Content-Type", "text/html; charset=UTF-8");
         res.setHeader("Content-Length", Buffer.byteLength(doc));
@@ -23890,7 +23890,7 @@ var require_express = __commonJS({
     var EventEmitter = __require("node:events").EventEmitter;
     var mixin = require_merge_descriptors();
     var proto = require_application();
-    var Router22 = require_router();
+    var Router25 = require_router();
     var req = require_request();
     var res = require_response();
     exports = module.exports = createApplication;
@@ -23912,8 +23912,8 @@ var require_express = __commonJS({
     exports.application = proto;
     exports.request = req;
     exports.response = res;
-    exports.Route = Router22.Route;
-    exports.Router = Router22;
+    exports.Route = Router25.Route;
+    exports.Router = Router25;
     exports.json = bodyParser.json;
     exports.raw = bodyParser.raw;
     exports.static = require_serve_static();
@@ -24033,7 +24033,7 @@ var require_lib3 = __commonJS({
         }
       }
       function configureOrigin(options, req) {
-        var requestOrigin = req.headers.origin, headers = [], isAllowed;
+        var requestOrigin2 = req.headers.origin, headers = [], isAllowed;
         if (!options.origin || options.origin === "*") {
           headers.push([{
             key: "Access-Control-Allow-Origin",
@@ -24049,10 +24049,10 @@ var require_lib3 = __commonJS({
             value: "Origin"
           }]);
         } else {
-          isAllowed = isOriginAllowed(requestOrigin, options.origin);
+          isAllowed = isOriginAllowed(requestOrigin2, options.origin);
           headers.push([{
             key: "Access-Control-Allow-Origin",
-            value: isAllowed ? requestOrigin : false
+            value: isAllowed ? requestOrigin2 : false
           }]);
           headers.push([{
             key: "Vary",
@@ -50950,6 +50950,7 @@ var init_dist4 = __esm({
 // src/lib/supabase.ts
 var supabase_exports = {};
 __export(supabase_exports, {
+  createAuthClient: () => createAuthClient,
   createUserClient: () => createUserClient,
   fetchAll: () => fetchAll,
   refreshSupabaseSchema: () => refreshSupabaseSchema,
@@ -50985,6 +50986,17 @@ function getSupabaseSync() {
 function refreshSupabaseSchema() {
   _supabase = null;
   return getSupabaseSync();
+}
+function createAuthClient() {
+  const authKey = process.env.SUPABASE_ANON_KEY?.trim() || requireSupabaseKey();
+  return createClient(supabaseUrl, authKey, {
+    global: { fetch: supabaseFetch },
+    auth: {
+      persistSession: false,
+      autoRefreshToken: false,
+      detectSessionInUrl: false
+    }
+  });
 }
 function createUserClient(token) {
   return createClient(supabaseUrl, requireSupabaseKey(), {
@@ -64261,12 +64273,12 @@ var require_built3 = __commonJS({
 });
 
 // src/app.ts
-var import_express22 = __toESM(require_express2(), 1);
+var import_express25 = __toESM(require_express2(), 1);
 var import_cors = __toESM(require_lib3(), 1);
 var import_pino_http = __toESM(require_logger(), 1);
 
 // src/routes/index.ts
-var import_express21 = __toESM(require_express2(), 1);
+var import_express23 = __toESM(require_express2(), 1);
 
 // src/routes/health.ts
 var import_express = __toESM(require_express2(), 1);
@@ -69454,6 +69466,57 @@ function resolveGenderBucket(value) {
   return [key];
 }
 
+// src/lib/site-resolver.ts
+init_supabase();
+var siteMapCache = null;
+var siteMapExpiry = 0;
+var CACHE_TTL_MS = 5 * 60 * 1e3;
+async function getPerformerSiteMap() {
+  const now = Date.now();
+  if (siteMapCache && now < siteMapExpiry) {
+    return siteMapCache;
+  }
+  try {
+    const { data, error } = await supabaseProxy.from("channel_assignments").select("username, site");
+    if (!error && data) {
+      const map = /* @__PURE__ */ new Map();
+      for (const row of data) {
+        if (row.username && row.site) {
+          map.set(row.username.toLowerCase(), row.site.toLowerCase());
+        }
+      }
+      siteMapCache = map;
+      siteMapExpiry = now + CACHE_TTL_MS;
+      return map;
+    }
+  } catch (err) {
+    console.error("[site-resolver] Error fetching channel_assignments:", err);
+  }
+  return siteMapCache ?? /* @__PURE__ */ new Map();
+}
+async function enrichWithSite(recordings) {
+  if (!recordings || recordings.length === 0) return recordings;
+  const siteMap = await getPerformerSiteMap();
+  for (const rec of recordings) {
+    if (!rec.site && rec.username) {
+      rec.site = siteMap.get(rec.username.toLowerCase()) ?? "chaturbate";
+    } else if (!rec.site) {
+      rec.site = "chaturbate";
+    }
+  }
+  return recordings;
+}
+async function enrichSingleWithSite(recording) {
+  if (!recording) return recording;
+  if (!recording.site && recording.username) {
+    const siteMap = await getPerformerSiteMap();
+    recording.site = siteMap.get(recording.username.toLowerCase()) ?? "chaturbate";
+  } else if (!recording.site) {
+    recording.site = "chaturbate";
+  }
+  return recording;
+}
+
 // src/routes/recordings.ts
 var router2 = (0, import_express2.Router)();
 function escapeLike(input) {
@@ -69505,7 +69568,7 @@ async function fetchMirrors(ids) {
 async function enrichWithMirrors(rows) {
   const ids = rows.map((r) => r.id).filter(Boolean);
   const mirrorMap = await fetchMirrors(ids);
-  return rows.map((r) => {
+  const withMirrors = rows.map((r) => {
     const mirrors = mirrorMap.get(r.id);
     if (!mirrors) return r;
     const merged = { ...r };
@@ -69515,18 +69578,20 @@ async function enrichWithMirrors(rows) {
     }
     return merged;
   });
+  return enrichWithSite(withMirrors);
 }
 async function enrichSingleWithMirrors(row) {
-  if (!row?.id) return row;
+  if (!row?.id) return enrichSingleWithSite(row);
   const mirrorMap = await fetchMirrors([row.id]);
   const mirrors = mirrorMap.get(row.id);
-  if (!mirrors) return row;
   const merged = { ...row };
-  for (const key of MIRROR_KEYS) {
-    const value = mirrors[key];
-    if (value && Object.keys(value).length) merged[key] = value;
+  if (mirrors) {
+    for (const key of MIRROR_KEYS) {
+      const value = mirrors[key];
+      if (value && Object.keys(value).length) merged[key] = value;
+    }
   }
-  return merged;
+  return enrichSingleWithSite(merged);
 }
 router2.get("/recordings", cache({ ttlSeconds: 90, staleSeconds: 300, tags: ["recordings", "search"] }), async (req, res) => {
   try {
@@ -69946,6 +70011,7 @@ var COOKIES = process.env.COOKIES ?? "";
 var CB_AFFILIATE = process.env.CHATURBATE_AFFILIATE_CODE ?? "";
 var UA = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36";
 var CB_UA = "Googlebot/2.1 (+http://www.google.com/bot.html)";
+var KNOWN_CB_STATUSES = /* @__PURE__ */ new Set(["public", "private", "group_show", "away", "offline", "password protected"]);
 async function checkChaturbateApi(username) {
   try {
     const res = await fetch("https://chaturbate.com/get_edge_hls_url_ajax/", {
@@ -69960,11 +70026,63 @@ async function checkChaturbateApi(username) {
     });
     if (!res.ok) return null;
     const data = await res.json();
+    const roomStatus = (data.room_status ?? "").toLowerCase().trim();
+    const exists = !!data.success || KNOWN_CB_STATUSES.has(roomStatus);
+    const is_live = roomStatus === "public" || roomStatus === "group_show" || roomStatus === "private";
     return {
-      exists: !!data.success,
-      is_live: data.room_status === "public" || data.room_status === "group_show" || data.room_status === "private",
-      room_status: data.room_status ?? "unknown"
+      exists,
+      is_live,
+      room_status: roomStatus || "unknown"
     };
+  } catch {
+    return null;
+  }
+}
+async function checkStripchatApi(username) {
+  try {
+    const idRes = await fetch(
+      `https://hu.stripchat.com/api/front/users/user-ids/${encodeURIComponent(username)}`,
+      {
+        headers: {
+          "User-Agent": UA,
+          Accept: "application/json"
+        }
+      }
+    );
+    if (idRes.status === 404) return { exists: false };
+    if (!idRes.ok) return null;
+    const idData = await idRes.json();
+    const modelId = idData?.id;
+    if (!modelId) return null;
+    try {
+      const uniq = Math.random().toString(36).slice(2, 18);
+      const camRes = await fetch(
+        `https://stripchat.com/api/front/v2/models/${modelId}/cam?uniq=${uniq}`,
+        {
+          headers: {
+            "User-Agent": UA,
+            Accept: "application/json, text/plain, */*",
+            "Accept-Language": "en-US,en;q=0.9",
+            "X-Requested-With": "XMLHttpRequest",
+            Origin: "https://stripchat.com",
+            Referer: "https://stripchat.com/"
+          }
+        }
+      );
+      if (camRes.ok) {
+        const camData = await camRes.json();
+        if (camData.error?.code === "NOT_FOUND") return { exists: false };
+        const model = camData.user?.user;
+        return {
+          exists: true,
+          is_online: !!(model?.isOnline || model?.isLive),
+          display_name: model?.username || username,
+          avatar_url: model?.previewUrlThumbBig || void 0
+        };
+      }
+    } catch {
+    }
+    return { exists: true };
   } catch {
     return null;
   }
@@ -70024,44 +70142,6 @@ function parseCount(str) {
   if (s.endsWith("k")) return parseFloat(s) * 1e3;
   return parseFloat(s) || 0;
 }
-function performerExistsOnStripchat(html, username) {
-  const bodyLower = html.toLowerCase();
-  const usernameLower = username.toLowerCase();
-  const expectedUrls = [
-    `https://stripchat.com/${usernameLower}`,
-    `https://www.stripchat.com/${usernameLower}`
-  ];
-  const canonical = extractMetaContent(html, "og:url");
-  if (canonical) {
-    const normalized = canonical.replace(/\/+$/, "").toLowerCase();
-    if (expectedUrls.some((u) => normalized === u)) return true;
-  }
-  const canonicalLink = (html.match(
-    /<link[^>]+rel=["']canonical["'][^>]+href=["']([^"']+)["']/i
-  ) || html.match(
-    /<link[^>]+href=["']([^"']+)["'][^>]+rel=["']canonical["']/i
-  ))?.[1];
-  if (canonicalLink) {
-    const normalized = canonicalLink.replace(/\/+$/, "").toLowerCase();
-    if (expectedUrls.some((u) => normalized === u)) return true;
-  }
-  if (bodyLower.includes(`data-model-username="${usernameLower}"`))
-    return true;
-  if (bodyLower.includes(`data-username="${usernameLower}"`)) return true;
-  if (bodyLower.includes(`data-profile="${usernameLower}"`)) return true;
-  const profileLinkRegex = new RegExp(
-    `href=["']https://stripchat\\.com/${usernameLower}(?:/|"|')`,
-    "i"
-  );
-  if (profileLinkRegex.test(html)) return true;
-  const twitterSite = extractMetaContent(html, "twitter:site");
-  if (twitterSite && twitterSite.toLowerCase().includes(usernameLower)) {
-    const ogImage = extractMetaContent(html, "og:image");
-    if (ogImage && !ogImage.includes("default") && !ogImage.includes("logo"))
-      return true;
-  }
-  return false;
-}
 var router3 = (0, import_express3.Router)();
 var MIRROR_COLS2 = "id,thumbnail_mirrors,sprite_mirrors,preview_mirrors";
 async function fetchMirrors2(ids) {
@@ -70077,11 +70157,12 @@ async function fetchMirrors2(ids) {
 async function enrichWithMirrors2(rows) {
   const ids = rows.map((r) => r.id).filter(Boolean);
   const mirrorMap = await fetchMirrors2(ids);
-  return rows.map((r) => {
+  const withMirrors = rows.map((r) => {
     const mirrors = mirrorMap.get(r.id);
     if (!mirrors) return r;
     return { ...r, ...mirrors };
   });
+  return enrichWithSite(withMirrors);
 }
 router3.get(
   "/performers/lookup",
@@ -70097,6 +70178,12 @@ router3.get(
       if (!["chaturbate", "stripchat"].includes(platform)) {
         res.status(400).json({
           error: 'platform must be "chaturbate" or "stripchat"'
+        });
+        return;
+      }
+      if (!/^[a-zA-Z0-9_.-]{1,100}$/.test(username)) {
+        res.status(400).json({
+          error: "username must be between 1 and 100 characters containing only letters, numbers, underscores, periods, or hyphens"
         });
         return;
       }
@@ -70139,87 +70226,45 @@ router3.get(
         res.json(result);
         return;
       }
-      const html = await fetchStripchatPage(profileUrl);
-      if (!html) {
+      const scApiResult = await checkStripchatApi(username);
+      if (scApiResult === null) {
+        result.platform_check_failed = true;
+        if (result.in_archive) {
+          result.exists = true;
+        }
+        res.json(result);
+        return;
+      }
+      if (!scApiResult.exists) {
         if (result.in_archive) {
           result.exists = true;
           result.platform_check_failed = true;
-        }
-        res.json(result);
-        return;
-      }
-      if (performerExistsOnStripchat(html, username)) {
-        result.exists = true;
-      } else {
-        const titleMatch = html.match(
-          /<title[^>]*>([^<]*)<\/title>/i
-        );
-        const title = titleMatch ? titleMatch[1].toLowerCase() : "";
-        const notFoundTitles = [
-          "page not found",
-          "not found",
-          "404",
-          "error"
-        ];
-        const isNotFound = notFoundTitles.some((p) => title.includes(p));
-        if (isNotFound) {
-          if (result.in_archive) {
-            result.exists = true;
-            result.platform_check_failed = true;
-            res.json(result);
-            return;
-          }
-          result.exists = false;
-          res.json(result);
-          return;
-        }
-        result.exists = false;
-        res.json(result);
-        return;
-      }
-      const bodyLower = html.toLowerCase();
-      result.display_name = extractMetaContent(html, "og:title") || username;
-      result.avatar_url = extractMetaContent(html, "og:image") ?? void 0;
-      const isOnlineMatch = html.match(/"isOnline":(true|false)/i);
-      if (isOnlineMatch) {
-        result.is_online = isOnlineMatch[1] === "true";
-      } else {
-        if (bodyLower.includes("is online") || bodyLower.includes("online now") || bodyLower.includes("live now")) {
-          result.is_online = true;
         } else {
-          result.is_online = false;
-          const lastSeenMatch = html.match(
-            /(?:last\s+(?:online|seen|live)|offline)\s*[:]?\s*([^<]+)/i
-          );
-          if (lastSeenMatch) {
-            result.last_seen = lastSeenMatch[1].trim();
-          }
+          result.exists = false;
         }
+        res.json(result);
+        return;
       }
-      const isLiveMatch = html.match(/"isLive":(true|false)/i);
-      if (isLiveMatch && isLiveMatch[1] === "true") {
-        result.is_online = true;
-      }
-      if (result.is_online) {
-        const viewerMatch = html.match(
-          /(\d[\d,]*)\s*(?:viewers?|watching)/i
-        );
-        if (viewerMatch) {
-          result.viewer_count = parseInt(
-            viewerMatch[1].replace(/,/g, ""),
-            10
-          );
+      result.exists = true;
+      if (scApiResult.is_online !== void 0) result.is_online = scApiResult.is_online;
+      if (scApiResult.display_name) result.display_name = scApiResult.display_name;
+      if (scApiResult.avatar_url) result.avatar_url = scApiResult.avatar_url;
+      const html = await fetchStripchatPage(profileUrl);
+      if (html) {
+        if (!result.display_name) {
+          result.display_name = extractMetaContent(html, "og:title") || username;
         }
-      }
-      const ogDesc = extractMetaContent(html, "og:description");
-      if (ogDesc) {
-        result.room_title = ogDesc;
-      }
-      const followerMatch = html.match(
-        /(\d[\d,.]*[kKmM]?)\s*(?:followers?|fans)/i
-      );
-      if (followerMatch) {
-        result.follower_count = parseCount(followerMatch[1]);
+        if (!result.avatar_url) {
+          result.avatar_url = extractMetaContent(html, "og:image") ?? void 0;
+        }
+        const ogDesc = extractMetaContent(html, "og:description");
+        if (ogDesc) result.room_title = ogDesc;
+        const followerMatch = html.match(/(\d[\d,.]*[kKmM]?)\s*(?:followers?|fans)/i);
+        if (followerMatch) result.follower_count = parseCount(followerMatch[1]);
+        if (result.is_online && !result.viewer_count) {
+          const viewerMatch = html.match(/(\d[\d,]*)\s*(?:viewers?|watching)/i);
+          if (viewerMatch) result.viewer_count = parseInt(viewerMatch[1].replace(/,/g, ""), 10);
+        }
       }
       res.json(result);
     } catch (err) {
@@ -70248,7 +70293,7 @@ async function fetchPerformersViaRpc() {
     const code = error.code;
     const message = error.message ?? "";
     if (code === "PGRST202" || code === "42883" || /function.*(?:not found|does not exist)|Could not find the function/i.test(message)) {
-      logger.warn("get_performer_stats RPC unavailable \u2014 falling back to legacy aggregation");
+      logger.warn("get_performer_stats RPC unavailable \xE2\u20AC\u201D falling back to legacy aggregation");
       return null;
     }
     throw error;
@@ -70590,13 +70635,13 @@ router5.get("/stats", cache({ ttlSeconds: 60, staleSeconds: 300, tags: ["stats",
       }
     } catch (err) {
       req.log.error({ err }, "Stats aggregation error");
-      res.status(500).json({ error: "Failed to fetch stats", details: err?.message ?? String(err) });
+      res.status(500).json({ error: "Failed to fetch stats" });
       return;
     }
     res.json(stats);
   } catch (err) {
     req.log.error({ err }, "GET /stats unexpected error");
-    res.status(500).json({ error: "Failed to fetch stats", details: err?.message ?? String(err) });
+    res.status(500).json({ error: "Failed to fetch stats" });
   }
 });
 var stats_default = router5;
@@ -71121,15 +71166,17 @@ router8.post("/requests", requireAuth, async (req, res) => {
       return;
     }
   }
+  const cleanUsername = typeof performer_username === "string" && performer_username.trim().length > 0 ? performer_username.trim().toLowerCase() : void 0;
+  const cleanLink = typeof stream_link === "string" && stream_link.trim().length > 0 ? stream_link.trim() : void 0;
   const validPriority = ["low", "normal", "high"].includes(priority ?? "") ? priority : "normal";
-  if (performer_username) {
+  if (cleanUsername) {
     try {
-      const { count, error } = await supabaseProxy.from("recordings_with_links").select("id", { count: "exact", head: true }).ilike("username", performer_username).not("links", "is", "null");
+      const { count, error } = await supabaseProxy.from("recordings_with_links").select("id", { count: "exact", head: true }).ilike("username", cleanUsername).not("links", "is", "null");
       if (error) throw error;
       const recordingCount = count ?? 0;
       if (recordingCount > 0) {
         res.status(409).json({
-          error: `@${performer_username} already has ${recordingCount} recording${recordingCount === 1 ? "" : "s"} in the archive.`,
+          error: `@${cleanUsername} already has ${recordingCount} recording${recordingCount === 1 ? "" : "s"} in the archive.`,
           recording_count: recordingCount
         });
         return;
@@ -71138,40 +71185,65 @@ router8.post("/requests", requireAuth, async (req, res) => {
       req.log?.error?.({ err }, "[requests] existing-recordings check failed") ?? logger.error({ err }, "[requests] existing-recordings check failed");
     }
   }
-  const dedupeKey = performer_username ? performer_username : stream_link;
+  let alreadyTracked = false;
+  if (cleanUsername) {
+    try {
+      const { data: assignment } = await supabaseProxy.from("channel_assignments").select("assigned_node, status").ilike("username", cleanUsername).eq("site", platform).maybeSingle();
+      if (assignment && ["claimed", "recording", "unassigned"].includes(assignment.status)) {
+        alreadyTracked = true;
+      }
+    } catch (err) {
+      req.log?.error?.({ err }, "[requests] channel_assignments check failed") ?? logger.error({ err }, "[requests] channel_assignments check failed");
+    }
+  }
+  const dedupeKey = cleanUsername ? cleanUsername : cleanLink;
   if (dedupeKey) {
     try {
-      const existing = await findDuplicate(req.user.id, platform, performer_username, stream_link);
+      const existing = await findDuplicate(req.user.id, platform, cleanUsername, cleanLink);
       if (existing) {
-        res.status(200).json(existing);
+        res.status(200).json({
+          ...existing,
+          already_tracked: alreadyTracked,
+          message: alreadyTracked ? `@${cleanUsername} is already being tracked by our DVR fleet! You are registered for notifications when their next stream is captured.` : void 0
+        });
         return;
       }
     } catch {
     }
   }
   try {
+    const initialStatus = alreadyTracked ? "approved" : "pending";
     const { data: created, error } = await supabaseProxy.from("requests").insert({
       user_id: req.user.id,
       platform,
-      performer_username: performer_username ?? null,
-      stream_link: stream_link ?? null,
-      notes: notes ?? null,
+      performer_username: cleanUsername ?? null,
+      stream_link: cleanLink ?? null,
+      notes: notes ? notes.trim() : null,
       priority: validPriority,
-      status: "pending"
+      status: initialStatus
     }).select(REQUEST_COLS).single();
     if (error) throw error;
+    const userMessage = alreadyTracked ? `Good news! @${cleanUsername} is already being tracked by our DVR fleet. We've added you to the alert list and will notify you as soon as their next stream is ready!` : `Your request for @${cleanUsername ?? "a performer"} on ${platform} has been submitted and is pending review.`;
     await notifyUser({
       userId: created.user_id,
       type: "request_submitted",
-      message: `Your request for @${created.performer_username ?? "a performer"} on ${created.platform} has been submitted and is pending review.`,
+      message: userMessage,
       relatedId: String(created.id)
     });
-    res.status(201).json(created);
+    res.status(201).json({
+      ...created,
+      already_tracked: alreadyTracked,
+      message: userMessage
+    });
   } catch (err) {
     try {
-      const existing = await findDuplicate(req.user.id, platform, performer_username, stream_link);
+      const existing = await findDuplicate(req.user.id, platform, cleanUsername, cleanLink);
       if (existing) {
-        res.status(200).json(existing);
+        res.status(200).json({
+          ...existing,
+          already_tracked: alreadyTracked,
+          message: alreadyTracked ? `@${cleanUsername} is already being tracked by our DVR fleet! You are registered for notifications when their next stream is captured.` : void 0
+        });
         return;
       }
     } catch (dupErr) {
@@ -71184,14 +71256,14 @@ router8.post("/requests", requireAuth, async (req, res) => {
 async function findDuplicate(userId, platform, performerUsername, streamLink) {
   let query = supabaseProxy.from("requests").select(REQUEST_COLS).eq("user_id", userId).eq("platform", platform);
   if (performerUsername) {
-    query = query.eq("performer_username", performerUsername);
+    query = query.ilike("performer_username", performerUsername);
   } else {
-    query = query.or(`performer_username.is.null,performer_username.eq.`);
+    query = query.or("performer_username.is.null,performer_username.eq.");
   }
   if (streamLink) {
     query = query.eq("stream_link", streamLink);
   } else {
-    query = query.or(`stream_link.is.null,stream_link.eq.`);
+    query = query.or("stream_link.is.null,stream_link.eq.");
   }
   const { data } = await query.limit(1).maybeSingle();
   return data;
@@ -71249,38 +71321,224 @@ var requests_default = router8;
 // src/routes/user.ts
 var import_express9 = __toESM(require_express2(), 1);
 init_supabase();
-var router9 = (0, import_express9.Router)();
-router9.get("/user/resolve-username", async (req, res) => {
+
+// src/middleware/rate-limit.ts
+import { createHash as createHash2 } from "node:crypto";
+var ENABLED = (process.env.RATE_LIMIT_ENABLED ?? "true") !== "false";
+var WINDOW_SECONDS = Number.parseInt(process.env.RATE_LIMIT_WINDOW ?? "", 10) || 60;
+var BURST_WINDOW_SECONDS = Number.parseInt(process.env.RATE_LIMIT_BURST_WINDOW ?? "", 10) || 5;
+var LIMITS = {
+  read: Number.parseInt(process.env.RATE_LIMIT_READ ?? "", 10) || 300,
+  // per IP/min
+  write: Number.parseInt(process.env.RATE_LIMIT_WRITE ?? "", 10) || 60,
+  // per IP/min
+  search: Number.parseInt(process.env.RATE_LIMIT_SEARCH ?? "", 10) || 45,
+  // per IP/min
+  user: Number.parseInt(process.env.RATE_LIMIT_USER ?? "", 10) || 600
+  // per auth token/min
+};
+var BURST_LIMITS = {
+  read: Number.parseInt(process.env.RATE_LIMIT_BURST_READ ?? "", 10) || 60,
+  // per IP/5s
+  write: Number.parseInt(process.env.RATE_LIMIT_BURST_WRITE ?? "", 10) || 25,
+  // per IP/5s
+  search: Number.parseInt(process.env.RATE_LIMIT_BURST_SEARCH ?? "", 10) || 25,
+  // per IP/5s
+  user: Number.parseInt(process.env.RATE_LIMIT_BURST_USER ?? "", 10) || 250
+  // per token/5s
+};
+var KEY_PREFIX = "rl:v1";
+var memoryWindows = /* @__PURE__ */ new Map();
+var lastCleanup = Date.now();
+function memoryIncrement(key, windowSeconds = WINDOW_SECONDS) {
+  const now = Date.now();
+  if (now - lastCleanup > 3e4) {
+    lastCleanup = now;
+    for (const [k, w] of memoryWindows) {
+      if (w.resetAt <= now) memoryWindows.delete(k);
+    }
+  }
+  const existing = memoryWindows.get(key);
+  if (existing && existing.resetAt > now) {
+    existing.count += 1;
+    return existing;
+  }
+  const fresh = { count: 1, resetAt: now + windowSeconds * 1e3 };
+  memoryWindows.set(key, fresh);
+  return fresh;
+}
+async function redisIncrementPair(key, windowSeconds, burstKey, burstWindowSeconds) {
+  const redis = getRedis();
+  if (!redis || !isRedisConnected()) return null;
   try {
-    const username = req.query.username?.trim().toLowerCase();
-    if (!username) {
-      res.status(400).json({ error: "username query param required" });
+    const now = Date.now();
+    const window2 = Math.floor(now / (windowSeconds * 1e3));
+    const burstWindow = Math.floor(now / (burstWindowSeconds * 1e3));
+    const redisKey = `${KEY_PREFIX}:${key}:${window2}`;
+    const redisBurstKey = `${KEY_PREFIX}:${burstKey}:${burstWindow}`;
+    const pipeline = redis.pipeline();
+    pipeline.incr(redisKey);
+    pipeline.expire(redisKey, windowSeconds + 5);
+    pipeline.incr(redisBurstKey);
+    pipeline.expire(redisBurstKey, burstWindowSeconds + 5);
+    const replies = await pipeline.exec();
+    if (replies.length !== 4) throw new Error("Unexpected Redis rate-limit pipeline reply count");
+    const failed = replies.find(([err]) => err !== null);
+    if (failed) throw failed[0];
+    const regularCount = Number(replies[0][1]);
+    const burstCount = Number(replies[2][1]);
+    if (!Number.isFinite(regularCount) || !Number.isFinite(burstCount)) {
+      throw new Error("Redis returned a non-numeric rate-limit counter");
+    }
+    return {
+      regular: { count: regularCount, resetAt: (window2 + 1) * windowSeconds * 1e3 },
+      burst: { count: burstCount, resetAt: (burstWindow + 1) * burstWindowSeconds * 1e3 }
+    };
+  } catch (err) {
+    logger.error({ err }, "Rate limiter Redis error (failing open)");
+    return null;
+  }
+}
+function clientIp(req) {
+  try {
+    const vercelIp = req.headers?.["x-vercel-forwarded-for"];
+    if (typeof vercelIp === "string" && vercelIp.length > 0) return vercelIp.trim();
+    const xff = req.headers?.["x-forwarded-for"];
+    if (typeof xff === "string" && xff.length > 0) {
+      const tokens = xff.split(",").map((t) => t.trim()).filter(Boolean);
+      const rightmost = tokens[tokens.length - 1];
+      if (rightmost) return rightmost;
+    }
+    const realIp = req.headers?.["x-real-ip"];
+    if (typeof realIp === "string" && realIp.length > 0) return realIp.trim();
+    if (req.socket?.remoteAddress) return req.socket.remoteAddress;
+    if (req.connection?.remoteAddress) return req.connection.remoteAddress;
+    if (req.ip) return req.ip;
+  } catch {
+  }
+  return "unknown";
+}
+function tokenKey(req) {
+  const auth = req.headers.authorization;
+  if (!auth?.startsWith("Bearer ")) return null;
+  const token = auth.slice(7);
+  if (token.length < 10) return null;
+  const hash = createHash2("sha256").update(token).digest("base64url");
+  return hash.slice(0, 32);
+}
+function sendLimited(res, limit, resetAt, bucket) {
+  const retryAfter = Math.max(1, Math.ceil((resetAt - Date.now()) / 1e3));
+  res.set({
+    "RateLimit-Limit": String(limit),
+    "RateLimit-Remaining": "0",
+    "RateLimit-Reset": String(Math.ceil(resetAt / 1e3)),
+    "Retry-After": String(retryAfter)
+  });
+  res.status(429).json({ error: "Too many requests", bucket });
+}
+function rateLimit(options) {
+  const limit = options.limit ?? LIMITS[options.bucket];
+  const burstLimit = options.burstLimit ?? BURST_LIMITS[options.bucket];
+  return async (req, res, next) => {
+    if (!ENABLED) {
+      next();
+      return;
+    }
+    if (options.skip?.(req)) {
+      next();
+      return;
+    }
+    const keyPart = options.keyFn?.(req) ?? clientIp(req);
+    const key = `${options.bucket}:${keyPart}`;
+    const burstKey = `burst:${key}`;
+    const sharedWindows = await redisIncrementPair(
+      key,
+      WINDOW_SECONDS,
+      burstKey,
+      BURST_WINDOW_SECONDS
+    );
+    const result = sharedWindows?.regular ?? memoryIncrement(key);
+    const burstResult = sharedWindows?.burst ?? memoryIncrement(burstKey, BURST_WINDOW_SECONDS);
+    const trip = result.count > limit ? { limit, resetAt: result.resetAt, bucket: options.bucket, count: result.count } : burstResult.count > burstLimit ? { limit: burstLimit, resetAt: burstResult.resetAt, bucket: `${options.bucket}:burst`, count: burstResult.count } : null;
+    if (trip) {
+      sendLimited(res, trip.limit, trip.resetAt, trip.bucket);
+      return;
+    }
+    res.set("RateLimit-Limit", String(limit));
+    res.set("RateLimit-Remaining", String(Math.max(0, limit - result.count)));
+    res.set("RateLimit-Burst-Limit", String(burstLimit));
+    res.set("RateLimit-Burst-Remaining", String(Math.max(0, burstLimit - burstResult.count)));
+    next();
+  };
+}
+var globalRateLimiter = rateLimit({
+  bucket: "read",
+  skip: (req) => req.path === "/healthz" || req.path === "/cache/warm"
+});
+function authenticatedRateLimit() {
+  return rateLimit({
+    bucket: "user",
+    keyFn: tokenKey
+  });
+}
+
+// src/lib/username-auth.ts
+function normalizeLoginUsername(value) {
+  if (typeof value !== "string") return null;
+  const username = value.trim().toLowerCase();
+  return /^[a-z0-9_-]{3,30}$/.test(username) ? username : null;
+}
+
+// src/routes/user.ts
+var router9 = (0, import_express9.Router)();
+router9.post(
+  "/user/username-login",
+  rateLimit({ bucket: "search", limit: 8, burstLimit: 4 }),
+  async (req, res) => {
+    res.setHeader("Cache-Control", "no-store");
+    const username = normalizeLoginUsername(req.body?.username);
+    const password = typeof req.body?.password === "string" ? req.body.password : "";
+    if (!username || password.length < 1 || password.length > 1024) {
+      res.status(401).json({ error: "Invalid username or password" });
       return;
     }
     try {
-      const { data: profile } = await supabaseProxy.from("user_profiles").select("email").ilike("username", username).limit(1).single();
-      if (profile?.email) {
-        res.json({ email: profile.email });
+      const { data: profile, error: profileError } = await supabaseProxy.from("user_profiles").select("user_id,email").eq("username", username).maybeSingle();
+      if (profileError) {
+        req.log?.error?.({ err: profileError }, "Username sign-in profile lookup failed");
+        res.status(503).json({ error: "Sign-in service temporarily unavailable" });
         return;
       }
-    } catch {
-    }
-    try {
-      const { data: email, error: rpcError } = await supabaseProxy.rpc("resolve_username", {
-        p_username: username
+      if (!profile?.email || !profile.user_id) {
+        res.status(401).json({ error: "Invalid username or password" });
+        return;
+      }
+      const auth = createAuthClient();
+      const { data, error } = await auth.auth.signInWithPassword({
+        email: profile.email,
+        password
       });
-      if (!rpcError && email) {
-        res.json({ email });
+      if (error || !data.session || data.user?.id !== profile.user_id) {
+        if (error && (error.status ?? 0) >= 500) {
+          req.log?.error?.({ status: error.status }, "Username sign-in provider unavailable");
+          res.status(503).json({ error: "Sign-in service temporarily unavailable" });
+          return;
+        }
+        res.status(401).json({ error: "Invalid username or password" });
         return;
       }
-    } catch {
+      res.json({
+        session: {
+          access_token: data.session.access_token,
+          refresh_token: data.session.refresh_token
+        }
+      });
+    } catch (err) {
+      req.log?.error?.({ err }, "POST /user/username-login unexpected error");
+      res.status(503).json({ error: "Sign-in service temporarily unavailable" });
     }
-    res.status(404).json({ error: "Username not found" });
-  } catch (err) {
-    req.log?.error?.({ err }, "GET /user/resolve-username unexpected error");
-    res.status(500).json({ error: "Internal server error" });
   }
-});
+);
 router9.use("/user", requireAuth);
 router9.get("/playlists", async (req, res) => {
   try {
@@ -72190,7 +72448,7 @@ var user_default = router9;
 var import_express10 = __toESM(require_express2(), 1);
 
 // src/lib/media-cache.ts
-import { createHash as createHash2 } from "node:crypto";
+import { createHash as createHash3 } from "node:crypto";
 var MEDIA_REDIS_PREFIX = "media:";
 var IMG_TTL_SECONDS = 5 * 60;
 var TX_TTL_SECONDS = 30 * 60;
@@ -72206,7 +72464,7 @@ function shouldUseSharedMediaCache() {
   return !(process.env.VERCEL === "1" || Boolean(process.env.VERCEL_URL) || process.env.VERCEL_ENV === "production" || process.env.VERCEL_ENV === "preview");
 }
 function hashKey(prefix, value) {
-  return `${prefix}${createHash2("sha1").update(value).digest("hex")}`;
+  return `${prefix}${createHash3("sha1").update(value).digest("hex")}`;
 }
 async function getString(key) {
   if (!shouldUseSharedMediaCache()) return null;
@@ -73673,9 +73931,9 @@ async function fetchImageOnce(urlStr, upstreamHeaders, log) {
   }
 }
 async function getImage(urlStr, upstreamHeaders, log) {
-  const cached = imageMemCache.get(urlStr);
-  if (cached && cached.expires > Date.now()) {
-    return cached;
+  const cached2 = imageMemCache.get(urlStr);
+  if (cached2 && cached2.expires > Date.now()) {
+    return cached2;
   }
   try {
     const shared = await getImageFromRedis(urlStr);
@@ -73686,14 +73944,14 @@ async function getImage(urlStr, upstreamHeaders, log) {
   } catch (err) {
     log?.warn?.({ err, url: urlStr }, "Media proxy Redis image read failed");
   }
-  let inflight = imageInflight.get(urlStr);
-  if (!inflight) {
-    inflight = fetchImageOnce(urlStr, upstreamHeaders, log).finally(() => {
+  let inflight2 = imageInflight.get(urlStr);
+  if (!inflight2) {
+    inflight2 = fetchImageOnce(urlStr, upstreamHeaders, log).finally(() => {
       imageInflight.delete(urlStr);
     });
-    imageInflight.set(urlStr, inflight);
+    imageInflight.set(urlStr, inflight2);
   }
-  return inflight;
+  return inflight2;
 }
 var TRANSFORM_CACHE_TTL_MS = 30 * 6e4;
 var TRANSFORM_CACHE_MAX = 300;
@@ -73735,8 +73993,8 @@ async function transformImage(buffer, contentType, width, fmt, log) {
 }
 async function getTransformedImage(urlStr, img, width, fmt, log) {
   const key = transformCacheKey(urlStr, width, fmt);
-  const cached = transformMemCache.get(key);
-  if (cached && cached.expires > Date.now()) return cached;
+  const cached2 = transformMemCache.get(key);
+  if (cached2 && cached2.expires > Date.now()) return cached2;
   try {
     const shared = await getTransformFromRedis(key);
     if (shared) {
@@ -73749,23 +74007,23 @@ async function getTransformedImage(urlStr, img, width, fmt, log) {
   } catch (err) {
     log?.warn?.({ err, key }, "Media proxy Redis transform read failed");
   }
-  let inflight = transformInflight.get(key);
-  if (!inflight) {
-    inflight = transformImage(img.buffer, img.contentType, width, fmt, log).then((result) => {
+  let inflight2 = transformInflight.get(key);
+  if (!inflight2) {
+    inflight2 = transformImage(img.buffer, img.contentType, width, fmt, log).then((result) => {
       cacheTransform(key, result);
       return result;
     }).finally(() => transformInflight.delete(key));
-    transformInflight.set(key, inflight);
+    transformInflight.set(key, inflight2);
   }
-  return inflight;
+  return inflight2;
 }
 var FAILURE_CACHE_TTL_MS = 10 * 60 * 1e3;
 var FAILURE_CACHE_MAX_SIZE = 500;
 var failureCache = /* @__PURE__ */ new Map();
 async function isCachedFailure(url) {
-  const cached = failureCache.get(url);
-  if (cached) {
-    if (Date.now() - cached > FAILURE_CACHE_TTL_MS) {
+  const cached2 = failureCache.get(url);
+  if (cached2) {
+    if (Date.now() - cached2 > FAILURE_CACHE_TTL_MS) {
       failureCache.delete(url);
     } else {
       return true;
@@ -73824,8 +74082,8 @@ customResolver.setServers(DNS_SERVERS);
 var dnsCache = /* @__PURE__ */ new Map();
 var DNS_CACHE_TTL_MS = 5 * 6e4;
 async function resolveHostname(hostname) {
-  const cached = dnsCache.get(hostname);
-  if (cached && cached.expires > Date.now()) return cached.ip;
+  const cached2 = dnsCache.get(hostname);
+  if (cached2 && cached2.expires > Date.now()) return cached2.ip;
   const shared = await getDnsFromRedis(hostname).catch(() => null);
   if (shared) {
     dnsCache.set(hostname, {
@@ -74668,168 +74926,6 @@ var rum_default = router16;
 var import_express17 = __toESM(require_express2(), 1);
 init_supabase();
 import { createHmac, timingSafeEqual as timingSafeEqual3 } from "node:crypto";
-
-// src/middleware/rate-limit.ts
-import { createHash as createHash3 } from "node:crypto";
-var ENABLED = (process.env.RATE_LIMIT_ENABLED ?? "true") !== "false";
-var WINDOW_SECONDS = Number.parseInt(process.env.RATE_LIMIT_WINDOW ?? "", 10) || 60;
-var BURST_WINDOW_SECONDS = Number.parseInt(process.env.RATE_LIMIT_BURST_WINDOW ?? "", 10) || 5;
-var LIMITS = {
-  read: Number.parseInt(process.env.RATE_LIMIT_READ ?? "", 10) || 300,
-  // per IP/min
-  write: Number.parseInt(process.env.RATE_LIMIT_WRITE ?? "", 10) || 60,
-  // per IP/min
-  search: Number.parseInt(process.env.RATE_LIMIT_SEARCH ?? "", 10) || 45,
-  // per IP/min
-  user: Number.parseInt(process.env.RATE_LIMIT_USER ?? "", 10) || 600
-  // per auth token/min
-};
-var BURST_LIMITS = {
-  read: Number.parseInt(process.env.RATE_LIMIT_BURST_READ ?? "", 10) || 60,
-  // per IP/5s
-  write: Number.parseInt(process.env.RATE_LIMIT_BURST_WRITE ?? "", 10) || 25,
-  // per IP/5s
-  search: Number.parseInt(process.env.RATE_LIMIT_BURST_SEARCH ?? "", 10) || 25,
-  // per IP/5s
-  user: Number.parseInt(process.env.RATE_LIMIT_BURST_USER ?? "", 10) || 250
-  // per token/5s
-};
-var KEY_PREFIX = "rl:v1";
-var memoryWindows = /* @__PURE__ */ new Map();
-var lastCleanup = Date.now();
-function memoryIncrement(key, windowSeconds = WINDOW_SECONDS) {
-  const now = Date.now();
-  if (now - lastCleanup > 3e4) {
-    lastCleanup = now;
-    for (const [k, w] of memoryWindows) {
-      if (w.resetAt <= now) memoryWindows.delete(k);
-    }
-  }
-  const existing = memoryWindows.get(key);
-  if (existing && existing.resetAt > now) {
-    existing.count += 1;
-    return existing;
-  }
-  const fresh = { count: 1, resetAt: now + windowSeconds * 1e3 };
-  memoryWindows.set(key, fresh);
-  return fresh;
-}
-async function redisIncrementPair(key, windowSeconds, burstKey, burstWindowSeconds) {
-  const redis = getRedis();
-  if (!redis || !isRedisConnected()) return null;
-  try {
-    const now = Date.now();
-    const window2 = Math.floor(now / (windowSeconds * 1e3));
-    const burstWindow = Math.floor(now / (burstWindowSeconds * 1e3));
-    const redisKey = `${KEY_PREFIX}:${key}:${window2}`;
-    const redisBurstKey = `${KEY_PREFIX}:${burstKey}:${burstWindow}`;
-    const pipeline = redis.pipeline();
-    pipeline.incr(redisKey);
-    pipeline.expire(redisKey, windowSeconds + 5);
-    pipeline.incr(redisBurstKey);
-    pipeline.expire(redisBurstKey, burstWindowSeconds + 5);
-    const replies = await pipeline.exec();
-    if (replies.length !== 4) throw new Error("Unexpected Redis rate-limit pipeline reply count");
-    const failed = replies.find(([err]) => err !== null);
-    if (failed) throw failed[0];
-    const regularCount = Number(replies[0][1]);
-    const burstCount = Number(replies[2][1]);
-    if (!Number.isFinite(regularCount) || !Number.isFinite(burstCount)) {
-      throw new Error("Redis returned a non-numeric rate-limit counter");
-    }
-    return {
-      regular: { count: regularCount, resetAt: (window2 + 1) * windowSeconds * 1e3 },
-      burst: { count: burstCount, resetAt: (burstWindow + 1) * burstWindowSeconds * 1e3 }
-    };
-  } catch (err) {
-    logger.error({ err }, "Rate limiter Redis error (failing open)");
-    return null;
-  }
-}
-function clientIp(req) {
-  try {
-    const vercelIp = req.headers?.["x-vercel-forwarded-for"];
-    if (typeof vercelIp === "string" && vercelIp.length > 0) return vercelIp.trim();
-    const xff = req.headers?.["x-forwarded-for"];
-    if (typeof xff === "string" && xff.length > 0) {
-      const tokens = xff.split(",").map((t) => t.trim()).filter(Boolean);
-      const rightmost = tokens[tokens.length - 1];
-      if (rightmost) return rightmost;
-    }
-    const realIp = req.headers?.["x-real-ip"];
-    if (typeof realIp === "string" && realIp.length > 0) return realIp.trim();
-    if (req.socket?.remoteAddress) return req.socket.remoteAddress;
-    if (req.connection?.remoteAddress) return req.connection.remoteAddress;
-    if (req.ip) return req.ip;
-  } catch {
-  }
-  return "unknown";
-}
-function tokenKey(req) {
-  const auth = req.headers.authorization;
-  if (!auth?.startsWith("Bearer ")) return null;
-  const token = auth.slice(7);
-  if (token.length < 10) return null;
-  const hash = createHash3("sha256").update(token).digest("base64url");
-  return hash.slice(0, 32);
-}
-function sendLimited(res, limit, resetAt, bucket) {
-  const retryAfter = Math.max(1, Math.ceil((resetAt - Date.now()) / 1e3));
-  res.set({
-    "RateLimit-Limit": String(limit),
-    "RateLimit-Remaining": "0",
-    "RateLimit-Reset": String(Math.ceil(resetAt / 1e3)),
-    "Retry-After": String(retryAfter)
-  });
-  res.status(429).json({ error: "Too many requests", bucket });
-}
-function rateLimit(options) {
-  const limit = options.limit ?? LIMITS[options.bucket];
-  const burstLimit = options.burstLimit ?? BURST_LIMITS[options.bucket];
-  return async (req, res, next) => {
-    if (!ENABLED) {
-      next();
-      return;
-    }
-    if (options.skip?.(req)) {
-      next();
-      return;
-    }
-    const keyPart = options.keyFn?.(req) ?? clientIp(req);
-    const key = `${options.bucket}:${keyPart}`;
-    const burstKey = `burst:${key}`;
-    const sharedWindows = await redisIncrementPair(
-      key,
-      WINDOW_SECONDS,
-      burstKey,
-      BURST_WINDOW_SECONDS
-    );
-    const result = sharedWindows?.regular ?? memoryIncrement(key);
-    const burstResult = sharedWindows?.burst ?? memoryIncrement(burstKey, BURST_WINDOW_SECONDS);
-    const trip = result.count > limit ? { limit, resetAt: result.resetAt, bucket: options.bucket, count: result.count } : burstResult.count > burstLimit ? { limit: burstLimit, resetAt: burstResult.resetAt, bucket: `${options.bucket}:burst`, count: burstResult.count } : null;
-    if (trip) {
-      sendLimited(res, trip.limit, trip.resetAt, trip.bucket);
-      return;
-    }
-    res.set("RateLimit-Limit", String(limit));
-    res.set("RateLimit-Remaining", String(Math.max(0, limit - result.count)));
-    res.set("RateLimit-Burst-Limit", String(burstLimit));
-    res.set("RateLimit-Burst-Remaining", String(Math.max(0, burstLimit - burstResult.count)));
-    next();
-  };
-}
-var globalRateLimiter = rateLimit({
-  bucket: "read",
-  skip: (req) => req.path === "/healthz" || req.path === "/cache/warm"
-});
-function authenticatedRateLimit() {
-  return rateLimit({
-    bucket: "user",
-    keyFn: tokenKey
-  });
-}
-
-// src/routes/premium.ts
 var router17 = (0, import_express17.Router)();
 var admin4 = requireRole("admin");
 var DEFAULT_SETTINGS = {
@@ -75612,67 +75708,552 @@ router20.get("/ads/stripcash", async (_req, res) => {
 });
 var stripcash_default = router20;
 
-// src/routes/index.ts
+// src/routes/sitemap.ts
+var import_express21 = __toESM(require_express2(), 1);
+init_supabase();
 var router21 = (0, import_express21.Router)();
-router21.use(health_default);
-router21.use(recordings_default);
-router21.use(performers_default);
-router21.use(tags_default);
-router21.use(stats_default);
-router21.use(reactions_default);
-router21.use(comments_default);
-router21.use(requests_default);
-router21.use(user_default);
-router21.use(cache_admin_default);
-router21.use(admin_default);
-router21.use(search_default);
-router21.use(media_proxy_default);
-router21.use(cache_warm_default);
-router21.use(views_default);
-router21.use(rum_default);
-router21.use(premium_default);
-router21.use(hot_default);
-router21.use(admin_ads_default);
-router21.use(stripcash_default);
-var routes_default = router21;
+var SITE = "https://chuglii.in";
+var DETAIL_INDEXING_ENABLED = process.env.SEO_INDEX_DETAIL_PAGES !== "false";
+var MAX_RECORDINGS2 = 1e4;
+var MAX_PERFORMERS2 = 5e3;
+var MAX_TAGS2 = 2500;
+var MIN_TAG_RECORDINGS = 1;
+var PAGE_SIZE = 1e3;
+var CACHE_TTL_MS2 = 6 * 60 * 60 * 1e3;
+function escapeXml(value) {
+  return value.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&apos;");
+}
+function toLastmod(value) {
+  if (!value) return null;
+  const date = new Date(value);
+  return Number.isNaN(date.getTime()) ? null : date.toISOString().slice(0, 10);
+}
+function renderEntry(entry) {
+  const parts = ["    <loc>" + escapeXml(entry.loc) + "</loc>"];
+  if (entry.lastmod) parts.push("    <lastmod>" + entry.lastmod + "</lastmod>");
+  return "  <url>\n" + parts.join("\n") + "\n  </url>";
+}
+function buildSitemap(entries) {
+  return ['<?xml version="1.0" encoding="UTF-8"?>', '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">', ...entries.map(renderEntry), "</urlset>", ""].join("\n");
+}
+function coreEntries() {
+  return [{ loc: SITE + "/" }, { loc: SITE + "/browse" }, { loc: SITE + "/performers" }, { loc: SITE + "/tags" }, { loc: SITE + "/premium" }, { loc: SITE + "/playlists" }];
+}
+async function fetchRecordings() {
+  const rows = [];
+  for (let start = 0; start < MAX_RECORDINGS2; start += PAGE_SIZE) {
+    const end = Math.min(start + PAGE_SIZE - 1, MAX_RECORDINGS2 - 1);
+    const { data, error } = await supabaseProxy.from("linked_recordings").select("id,username,updated_at,timestamp").order("timestamp", { ascending: false, nullsFirst: false }).order("id", { ascending: false }).range(start, end);
+    if (error) throw error;
+    rows.push(...data ?? []);
+    if (!data || data.length < PAGE_SIZE) break;
+  }
+  return rows;
+}
+async function fetchPerformers2(fallback) {
+  try {
+    const { data, error } = await supabaseProxy.rpc("get_performer_stats");
+    if (!error && Array.isArray(data)) return data.slice(0, MAX_PERFORMERS2);
+    if (error) logger.warn({ err: error }, "sitemap: performer RPC unavailable");
+  } catch (err) {
+    logger.warn({ err }, "sitemap: performer RPC unavailable, using recording usernames");
+  }
+  return fallback.slice(0, MAX_PERFORMERS2).map((username) => ({ username }));
+}
+async function fetchTags() {
+  try {
+    const { data, error } = await supabaseProxy.rpc("get_tag_counts");
+    if (!error && Array.isArray(data)) return data.slice(0, MAX_TAGS2);
+    if (error) logger.warn({ err: error }, "sitemap: tag RPC unavailable");
+  } catch (err) {
+    logger.warn({ err }, "sitemap: tag RPC unavailable");
+  }
+  return [];
+}
+async function generateSitemap() {
+  const entries = coreEntries();
+  if (DETAIL_INDEXING_ENABLED) {
+    const recordings = await fetchRecordings();
+    for (const row of recordings) {
+      if (row.id == null || row.id === "") continue;
+      entries.push({ loc: SITE + "/video/" + encodeURIComponent(String(row.id)), lastmod: toLastmod(row.updated_at ?? row.timestamp) ?? void 0 });
+    }
+    const names = [...new Set(recordings.map((row) => row.username?.trim()).filter((name) => Boolean(name)))];
+    for (const row of await fetchPerformers2(names)) {
+      const username = row.username?.trim();
+      if (!username) continue;
+      entries.push({ loc: SITE + "/performers/" + encodeURIComponent(username), lastmod: toLastmod(row.latest_timestamp) ?? void 0 });
+    }
+  }
+  for (const row of await fetchTags()) {
+    const tag = row.tag?.trim(), count = Number(row.count ?? 0);
+    if (!tag || !Number.isFinite(count) || count < MIN_TAG_RECORDINGS) continue;
+    entries.push({ loc: SITE + "/browse?tags=" + encodeURIComponent(tag) });
+  }
+  return buildSitemap(entries);
+}
+var cached = null;
+var inflight = null;
+async function getSitemap() {
+  if (cached && cached.expiresAt > Date.now()) return cached.body;
+  if (inflight) return inflight;
+  inflight = generateSitemap().then((body) => {
+    cached = { body, expiresAt: Date.now() + CACHE_TTL_MS2 };
+    return body;
+  }).finally(() => {
+    inflight = null;
+  });
+  return inflight;
+}
+router21.get(["/sitemap", "/sitemap.xml"], async (_req, res) => {
+  try {
+    res.set("Content-Type", "application/xml; charset=utf-8");
+    res.set("Cache-Control", "public, max-age=3600, s-maxage=21600, stale-while-revalidate=86400, stale-if-error=86400");
+    res.send(await getSitemap());
+  } catch (err) {
+    logger.error({ err }, "sitemap: generation failed");
+    res.status(503).type("application/xml").send(buildSitemap(coreEntries()));
+  }
+});
+var sitemap_default = router21;
+
+// src/routes/content-removal.ts
+var import_express22 = __toESM(require_express2(), 1);
+init_supabase();
+var router22 = (0, import_express22.Router)();
+var admin6 = requireRole("admin");
+var REASONS = /* @__PURE__ */ new Set(["privacy", "consent", "copyright", "impersonation", "other"]);
+var STATUSES = /* @__PURE__ */ new Set(["pending", "reviewing", "resolved", "rejected"]);
+var EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+function safeContentUrl(value) {
+  if (typeof value !== "string" || value.length > 2048) return null;
+  try {
+    const url = new URL(value.trim());
+    if (url.protocol !== "https:" || !["chuglii.in", "www.chuglii.in"].includes(url.hostname)) return null;
+    return url.toString();
+  } catch {
+    return null;
+  }
+}
+router22.post("/content-removal-requests", async (req, res) => {
+  const body = req.body ?? {};
+  if (typeof body.company_website === "string" && body.company_website.trim()) {
+    res.status(202).json({ accepted: true });
+    return;
+  }
+  const contentUrl = safeContentUrl(body.content_url);
+  const reason = typeof body.reason === "string" ? body.reason.trim() : "";
+  const details = typeof body.details === "string" ? body.details.trim() : "";
+  const email = typeof body.contact_email === "string" ? body.contact_email.trim() : "";
+  if (!contentUrl) {
+    res.status(400).json({ error: "Enter a valid https://chuglii.in page URL." });
+    return;
+  }
+  if (!REASONS.has(reason)) {
+    res.status(400).json({ error: "Choose a valid report reason." });
+    return;
+  }
+  if (details.length < 20 || details.length > 3e3) {
+    res.status(400).json({ error: "Details must be between 20 and 3,000 characters." });
+    return;
+  }
+  if (email && (email.length > 254 || !EMAIL_RE.test(email))) {
+    res.status(400).json({ error: "Enter a valid contact email or leave it blank." });
+    return;
+  }
+  try {
+    const { data, error } = await supabaseProxy.from("content_removal_requests").insert({
+      content_url: contentUrl,
+      reason,
+      details,
+      contact_email: email || null,
+      status: "pending"
+    }).select("id,status,created_at").single();
+    if (error) throw error;
+    res.status(201).json({ accepted: true, request_id: data.id, status: data.status, created_at: data.created_at });
+  } catch (err) {
+    req.log?.error?.({ err }, "Content removal request could not be saved");
+    logger.error({ err }, "Content removal request could not be saved");
+    res.status(503).json({ error: "The report could not be saved right now. Please try again later." });
+  }
+});
+router22.get("/admin/content-removal-requests", requireAuth, admin6, async (_req, res) => {
+  const { data, error } = await supabaseProxy.from("content_removal_requests").select("id,content_url,reason,details,contact_email,status,admin_notes,created_at,reviewed_at,reviewed_by").order("created_at", { ascending: false }).limit(100);
+  if (error) {
+    logger.error({ err: error }, "Admin content removal queue query failed");
+    res.status(503).json({ error: "Could not load the content removal queue." });
+    return;
+  }
+  res.json(data ?? []);
+});
+router22.patch("/admin/content-removal-requests/:id", requireAuth, admin6, async (req, res) => {
+  const id = String(req.params.id ?? "");
+  const status = typeof req.body?.status === "string" ? req.body.status : "";
+  const adminNotes = typeof req.body?.admin_notes === "string" ? req.body.admin_notes.trim() : "";
+  if (!/^[0-9a-f-]{36}$/i.test(id) || !STATUSES.has(status) || adminNotes.length > 3e3) {
+    res.status(400).json({ error: "Invalid request id, status or admin notes." });
+    return;
+  }
+  const { data, error } = await supabaseProxy.from("content_removal_requests").update({
+    status,
+    admin_notes: adminNotes || null,
+    reviewed_at: (/* @__PURE__ */ new Date()).toISOString(),
+    reviewed_by: req.user.id
+  }).eq("id", id).select("id,status,admin_notes,reviewed_at,reviewed_by").maybeSingle();
+  if (error) {
+    logger.error({ err: error }, "Admin content removal request update failed");
+    res.status(503).json({ error: "Could not update the content removal request." });
+    return;
+  }
+  if (!data) {
+    res.status(404).json({ error: "Content removal request not found." });
+    return;
+  }
+  res.json(data);
+});
+var content_removal_default = router22;
+
+// src/routes/index.ts
+var router23 = (0, import_express23.Router)();
+router23.use(health_default);
+router23.use(recordings_default);
+router23.use(performers_default);
+router23.use(tags_default);
+router23.use(stats_default);
+router23.use(reactions_default);
+router23.use(comments_default);
+router23.use(requests_default);
+router23.use(user_default);
+router23.use(cache_admin_default);
+router23.use(admin_default);
+router23.use(search_default);
+router23.use(media_proxy_default);
+router23.use(cache_warm_default);
+router23.use(views_default);
+router23.use(rum_default);
+router23.use(premium_default);
+router23.use(hot_default);
+router23.use(admin_ads_default);
+router23.use(stripcash_default);
+router23.use(sitemap_default);
+router23.use(content_removal_default);
+var routes_default = router23;
+
+// src/routes/seo-pages.ts
+var import_express24 = __toESM(require_express2(), 1);
+init_supabase();
+var router24 = (0, import_express24.Router)();
+var SITE_URL = "https://chuglii.in";
+var DETAIL_INDEXING_ENABLED2 = process.env.SEO_INDEX_DETAIL_PAGES !== "false";
+var DEPLOY_ID = process.env.VERCEL_DEPLOYMENT_ID ?? null;
+var TEMPLATE_TTL_MS = DEPLOY_ID ? 3e5 : 1e4;
+var templateCache = /* @__PURE__ */ new Map();
+var INDEX_ROBOTS = "index, follow, max-image-preview:large, max-video-preview:-1, max-snippet:-1";
+var NOINDEX_ROBOTS = "noindex, follow";
+function escapeHtml(value) {
+  return value.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#39;");
+}
+function safeImageUrl(value) {
+  if (!value) return void 0;
+  try {
+    const parsed = new URL(value);
+    return parsed.protocol === "https:" ? parsed.toString() : void 0;
+  } catch {
+    return void 0;
+  }
+}
+function setMeta(html, attribute, key, value) {
+  const pattern = new RegExp("<meta\\b(?=[^>]*\\b" + attribute + `=["']` + key + `["'])[^>]*>`, "i");
+  const tag = "<meta " + attribute + '="' + escapeHtml(key) + '" content="' + escapeHtml(value) + '" />';
+  return pattern.test(html) ? html.replace(pattern, tag) : html.replace(/<\/head>/i, "  " + tag + "\n</head>");
+}
+function setCanonical(html, canonical) {
+  const pattern = /<link\b(?=[^>]*\brel=["']canonical["'])[^>]*>/i;
+  const tag = '<link rel="canonical" href="' + escapeHtml(canonical) + '" />';
+  return pattern.test(html) ? html.replace(pattern, tag) : html.replace(/<\/head>/i, "  " + tag + "\n</head>");
+}
+function renderSeoDocument(template, page) {
+  const title = page.title.includes("VAULT") ? page.title : page.title + " | VAULT";
+  const robots = page.indexable ? INDEX_ROBOTS : NOINDEX_ROBOTS;
+  const image = page.image ?? SITE_URL + "/opengraph.jpg";
+  const schema = {
+    "@context": "https://schema.org",
+    "@type": "WebPage",
+    "@id": page.canonical + "#webpage",
+    url: page.canonical,
+    name: title,
+    description: page.description,
+    inLanguage: "en",
+    isPartOf: { "@id": SITE_URL + "/#website" }
+  };
+  const jsonLd = JSON.stringify(schema).replace(/</g, "\\u003c");
+  let html = template.replace(/<title>[\s\S]*?<\/title>/i, "<title>" + escapeHtml(title) + "</title>");
+  html = setMeta(html, "name", "description", page.description);
+  html = setMeta(html, "name", "robots", robots);
+  html = setMeta(html, "name", "googlebot", robots);
+  html = setMeta(html, "property", "og:title", title);
+  html = setMeta(html, "property", "og:description", page.description);
+  html = setMeta(html, "property", "og:url", page.canonical);
+  html = setMeta(html, "property", "og:type", page.type ?? "website");
+  html = setMeta(html, "property", "og:image", image);
+  html = setMeta(html, "name", "twitter:title", title);
+  html = setMeta(html, "name", "twitter:description", page.description);
+  html = setMeta(html, "name", "twitter:image", image);
+  html = setCanonical(html, page.canonical);
+  const schemaTag = '<script type="application/ld+json" id="vault-server-seo">' + jsonLd + "</script>";
+  const schemaPattern = /<script[^>]+type=["']application\/ld\+json["'][^>]*>[\s\S]*?<\/script>/i;
+  if (schemaPattern.test(html)) {
+    html = html.replace(schemaPattern, schemaTag);
+  } else {
+    html = html.replace(/<\/head>/i, "  " + schemaTag + "\n</head>");
+  }
+  const fallback = '<main style="max-width:960px;margin:0 auto;padding:40px 20px;font:16px/1.6 system-ui,sans-serif;color:#e5e7eb"><h1>' + escapeHtml(page.heading) + "</h1><p>" + escapeHtml(page.intro) + '</p><nav aria-label="Main links"><a href="/browse">Browse</a> \xC2\xB7 <a href="/performers">Performers</a> \xC2\xB7 <a href="/tags">Tags</a> \xC2\xB7 <a href="/content-removal">Report content / request removal</a></nav><p>Adults only (18+).</p></main>';
+  html = html.replace(/<div\s+id=["']root["']\s*>\s*<\/div>/i, '<div id="root">' + fallback + "</div>");
+  return html;
+}
+function requestOrigin(req) {
+  const host = String(req.headers["x-forwarded-host"] ?? req.headers.host ?? "").split(",")[0].trim().toLowerCase();
+  const allowed = host === "chuglii.in" || host === "www.chuglii.in" || host.endsWith(".vercel.app");
+  return allowed ? "https://" + host : SITE_URL;
+}
+async function getHtmlTemplate(origin) {
+  const cached2 = templateCache.get(origin);
+  if (cached2 && cached2.deployId === DEPLOY_ID && cached2.expiresAt > Date.now()) {
+    return cached2.html;
+  }
+  const response = await fetch(new URL("/index.html", origin), {
+    headers: { Accept: "text/html", "Cache-Control": "no-cache" },
+    signal: AbortSignal.timeout(5e3)
+  });
+  if (!response.ok) throw new Error("Could not load frontend HTML template (" + response.status + ")");
+  const html = await response.text();
+  if (!html.includes('id="root"')) throw new Error("Frontend HTML template is missing #root");
+  templateCache.set(origin, { html, deployId: DEPLOY_ID, expiresAt: Date.now() + TEMPLATE_TTL_MS });
+  return html;
+}
+function basePage(title, description, canonical, heading, intro, indexable = true) {
+  return { title, description, canonical, heading, intro, indexable };
+}
+async function describePage(req) {
+  const requestUrl = new URL(req.originalUrl || req.url, SITE_URL);
+  const path = requestUrl.pathname.replace(/\/+$/, "") || "/";
+  const params = requestUrl.searchParams;
+  if (path === "/") {
+    return basePage(
+      "Adult Cam Recording Archive & Performer Directory",
+      "Search VAULT's public adult cam recording archive by performer, title and tag. Explore public listings and performer profiles. Adults only (18+).",
+      SITE_URL + "/",
+      "VAULT \xE2\u20AC\u201D Adult Cam Recording Archive & Performer Directory",
+      "Discover public archive listings by performer, recording title and topic tag. Browse the catalogue, explore the performer directory, and find relevant listings. Adults only (18+)."
+    );
+  }
+  if (path === "/browse") {
+    const tags = (params.get("tags") ?? "").split(",").map((tag) => tag.trim()).filter(Boolean);
+    const functionalKeys = ["search", "gender", "resolution", "sort", "page"];
+    const hasOtherFilters = functionalKeys.some((key) => Boolean(params.get(key)));
+    const isSingleTagLanding = tags.length === 1 && !hasOtherFilters;
+    const canonical = isSingleTagLanding ? SITE_URL + "/browse?tags=" + encodeURIComponent(tags[0]) : SITE_URL + "/browse";
+    if (isSingleTagLanding) {
+      const tag = tags[0];
+      return basePage(
+        "#" + tag + " Adult Cam Recordings",
+        "Browse public adult cam recording listings tagged #" + tag + " in the VAULT archive. Explore matching entries and related topics. Adults only (18+).",
+        canonical,
+        "Adult Cam Recordings tagged #" + tag,
+        "Explore public recordings associated with the " + tag + " topic tag. You can refine the catalogue by performer, resolution and other available filters."
+      );
+    }
+    const filtered = functionalKeys.some((key) => Boolean(params.get(key))) || tags.length > 1;
+    return basePage(
+      "Browse Adult Cam Recordings",
+      "Search public VAULT recording listings by title, performer or tag. Filter and sort the catalogue to find relevant entries. Adults only (18+).",
+      canonical,
+      "Browse Adult Cam Recordings",
+      "Search the public recording catalogue by title, performer or tag. Use filters to narrow the catalogue and explore related listings.",
+      !filtered
+    );
+  }
+  if (path === "/performers") {
+    return basePage(
+      "Adult Performer Directory",
+      "Browse the VAULT performer directory and discover public profile listings connected with the recording archive. Adults only (18+).",
+      SITE_URL + "/performers",
+      "Performer Directory",
+      "Explore the performer directory and discover public profiles connected with the archive catalogue. Adults only (18+)."
+    );
+  }
+  if (path === "/tags") {
+    return basePage(
+      "Browse Recording Tags",
+      "Explore the VAULT archive by topic tags and use each tag to find matching public recording listings. Adults only (18+).",
+      SITE_URL + "/tags",
+      "Browse Recording Tags",
+      "Discover catalogue categories and open a tag to view matching public listings. Adults only (18+)."
+    );
+  }
+  if (path === "/premium") {
+    return basePage(
+      "VAULT Premium \xE2\u20AC\u201D Ad-Free Archive Access",
+      "Learn about VAULT Premium and account benefits across the archive. Adults only (18+).",
+      SITE_URL + "/premium",
+      "VAULT Premium",
+      "Learn about account benefits and premium access."
+    );
+  }
+  if (path === "/playlists") {
+    return basePage(
+      "Public Playlists",
+      "Explore public VAULT playlists and curated collections of archive listings. Adults only (18+).",
+      SITE_URL + "/playlists",
+      "Public Playlists",
+      "Explore playlists and curated collections available in the public catalogue."
+    );
+  }
+  if (path === "/content-removal") {
+    return basePage(
+      "Report Content or Request Removal",
+      "Report a recording or performer listing that may violate privacy, consent, copyright or applicable law.",
+      SITE_URL + "/content-removal",
+      "Report Content or Request Removal",
+      "Use this form to report a listing or request a review for privacy, consent, copyright or other legal concerns.",
+      false
+    );
+  }
+  const videoMatch = path.match(/^\/video\/([^/]+)$/);
+  if (videoMatch) {
+    const id = decodeURIComponent(videoMatch[1]);
+    if (!DETAIL_INDEXING_ENABLED2) {
+      return basePage(
+        "Archived Recording",
+        "View an archived recording listing with related public catalogue details. Adults only (18+).",
+        SITE_URL + "/video/" + encodeURIComponent(id),
+        "Archived Recording",
+        "This recording page is available in the VAULT catalogue. Adults only (18+).",
+        false
+      );
+    }
+    const { data, error } = await supabaseProxy.from("linked_recordings").select("id,username,room_title,filename,tags,timestamp,thumbnail_url,preview_url,duration").eq("id", id).maybeSingle();
+    if (error) throw error;
+    if (!data) return basePage("Recording Not Found", "The requested recording listing was not found.", SITE_URL + "/video/" + encodeURIComponent(id), "Recording Not Found", "This listing may have been removed.", false);
+    const row = data;
+    const name = row.room_title?.trim() || row.filename?.trim() || "Archived Recording";
+    const performer = row.username?.trim() || "Performer";
+    const tags = (row.tags ?? []).slice(0, 5).map((tag) => "#" + tag).join(", ");
+    return {
+      ...basePage(
+        name + " \xE2\u20AC\u201D " + performer,
+        "View a public archive listing for " + performer + ". " + (tags ? "Topics: " + tags + ". " : "") + "Adults only (18+).",
+        SITE_URL + "/video/" + encodeURIComponent(id),
+        name,
+        "Performer: " + performer + ". " + (tags ? "Topics: " + tags + ". " : "") + "This is a catalogue listing; playback availability can vary. Adults only (18+).",
+        true
+      ),
+      image: safeImageUrl(row.thumbnail_url || row.preview_url),
+      type: "video.other"
+    };
+  }
+  const performerMatch = path.match(/^\/performers\/([^/]+)$/);
+  if (performerMatch) {
+    const username = decodeURIComponent(performerMatch[1]);
+    if (!DETAIL_INDEXING_ENABLED2) {
+      return basePage(
+        "Adult Performer Profile",
+        "Explore a public performer profile and related catalogue listings. Adults only (18+).",
+        SITE_URL + "/performers/" + encodeURIComponent(username),
+        "Adult Performer Profile",
+        "This profile page is available in the VAULT performer directory. Adults only (18+).",
+        false
+      );
+    }
+    const { data, count, error } = await supabaseProxy.from("linked_recordings").select("id,username,room_title,filename,timestamp,thumbnail_url,preview_url", { count: "exact" }).eq("username", username).order("timestamp", { ascending: false, nullsFirst: false }).limit(1).maybeSingle();
+    if (error) throw error;
+    if (!data) return basePage("Performer Not Found", "The requested performer profile was not found.", SITE_URL + "/performers/" + encodeURIComponent(username), "Performer Not Found", "This profile may have been removed.", false);
+    const row = data;
+    const total = count ?? 1;
+    return {
+      ...basePage(
+        username + " \xE2\u20AC\u201D " + total.toLocaleString() + " Archive Listings",
+        "Explore the public VAULT catalogue for " + username + ", with " + total.toLocaleString() + " linked recording listings. Adults only (18+).",
+        SITE_URL + "/performers/" + encodeURIComponent(username),
+        username,
+        "The VAULT catalogue currently contains " + total.toLocaleString() + " linked recording listings for this performer. Adults only (18+).",
+        true
+      ),
+      image: safeImageUrl(row.thumbnail_url || row.preview_url),
+      type: "profile"
+    };
+  }
+  return null;
+}
+router24.get(
+  ["/", "/browse", "/performers", "/tags", "/premium", "/playlists", "/content-removal", "/video/:id", "/performers/:username"],
+  async (req, res, next) => {
+    try {
+      const page = await describePage(req);
+      if (!page) {
+        next();
+        return;
+      }
+      const template = await getHtmlTemplate(requestOrigin(req));
+      const html = renderSeoDocument(template, page);
+      res.status(200);
+      res.set("Content-Type", "text/html; charset=utf-8");
+      const cacheControl = DEPLOY_ID ? `public, max-age=0, s-maxage=60, no-cache` : "public, max-age=0, must-revalidate";
+      res.set("Cache-Control", cacheControl);
+      if (DEPLOY_ID) res.set("ETag", `"${DEPLOY_ID}"`);
+      res.set("X-Robots-Tag", page.indexable ? "index, follow" : "noindex, follow");
+      res.send(html);
+    } catch (err) {
+      logger.error({ err, path: req.path }, "SEO page render failed");
+      res.status(503).type("text/plain").send("Page temporarily unavailable");
+    }
+  }
+);
+var seo_pages_default = router24;
 
 // src/app.ts
-var app = (0, import_express22.default)();
-app.use(
-  (0, import_pino_http.default)({
-    logger,
-    serializers: {
-      req(req) {
-        return {
-          id: req.id,
-          method: req.method,
-          url: req.url?.split("?")[0]
-        };
-      },
-      res(res) {
-        return {
-          statusCode: res.statusCode
-        };
-      }
+var app = (0, import_express25.default)();
+app.disable("x-powered-by");
+app.use((_req, res, next) => {
+  res.setHeader("X-Content-Type-Options", "nosniff");
+  res.setHeader("X-Frame-Options", "DENY");
+  res.setHeader("Referrer-Policy", "strict-origin-when-cross-origin");
+  res.setHeader("X-XSS-Protection", "0");
+  res.setHeader("Permissions-Policy", "camera=(), microphone=(), geolocation=()");
+  next();
+});
+app.use((0, import_pino_http.default)({
+  logger,
+  serializers: {
+    req(req) {
+      return { id: req.id, method: req.method, url: req.url?.split("?")[0] };
+    },
+    res(res) {
+      return { statusCode: res.statusCode };
     }
-  })
-);
-var ALLOWED_ORIGIN_PATTERNS = [
-  /^https:\/\/([\w-]+\.)*chuglii\.in$/,
-  /^https:\/\/.+\.vercel\.app$/,
-  /^https?:\/\/localhost(:\d+)?$/,
-  /^http:\/\/127\.0\.0\.1(:\d+)?$/
-];
+  }
+}));
+var DEFAULT_ALLOWED_ORIGINS = /* @__PURE__ */ new Set(["https://chuglii.in", "https://www.chuglii.in"]);
+var CONFIGURED_ALLOWED_ORIGINS = new Set((process.env.CORS_ALLOWED_ORIGINS ?? "").split(",").map((v) => v.trim()).filter(Boolean));
+var deploymentHost = process.env.VERCEL_URL?.trim();
+if (deploymentHost) {
+  try {
+    const url = new URL(deploymentHost.startsWith("http") ? deploymentHost : "https://" + deploymentHost);
+    if (url.protocol === "https:") CONFIGURED_ALLOWED_ORIGINS.add(url.origin);
+  } catch {
+  }
+}
 function isAllowedOrigin(origin) {
   if (!origin) return true;
-  return ALLOWED_ORIGIN_PATTERNS.some((pattern) => pattern.test(origin));
+  if (DEFAULT_ALLOWED_ORIGINS.has(origin) || CONFIGURED_ALLOWED_ORIGINS.has(origin)) return true;
+  try {
+    const url = new URL(origin);
+    return url.protocol === "http:" && (url.hostname === "localhost" || url.hostname === "127.0.0.1");
+  } catch {
+    return false;
+  }
 }
-app.use(
-  (0, import_cors.default)({
-    origin: (origin, callback) => callback(null, isAllowedOrigin(origin)),
-    credentials: true
-  })
-);
+app.use((0, import_cors.default)({ origin: (origin, callback) => callback(null, isAllowedOrigin(origin)), credentials: true }));
 app.use("/api", globalRateLimiter);
 var writeLimiter = rateLimit({ bucket: "write" });
 app.use("/api", (req, res, next) => {
@@ -75682,10 +76263,12 @@ app.use("/api", (req, res, next) => {
   }
   next();
 });
-app.use("/api/premium/webhook", import_express22.default.raw({ type: "*/*", limit: "1mb" }));
-app.use(import_express22.default.json({ limit: "1mb" }));
-app.use(import_express22.default.urlencoded({ extended: true, limit: "1mb" }));
+app.use("/api/premium/webhook", import_express25.default.raw({ type: "*/*", limit: "1mb" }));
+app.use(import_express25.default.json({ limit: "1mb" }));
+app.use(import_express25.default.urlencoded({ extended: true, limit: "1mb" }));
 app.use("/api", routes_default);
+app.use(seo_pages_default);
+app.use(sitemap_default);
 app.use((err, _req, res, _next) => {
   const status = err?.status ?? err?.statusCode ?? 500;
   if (status >= 400 && status < 500) {
