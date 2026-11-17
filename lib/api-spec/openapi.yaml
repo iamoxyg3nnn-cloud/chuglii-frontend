@@ -443,6 +443,9 @@ components:
           description: JSON object mapping host names to preview URL mirrors for fallback
           additionalProperties:
             type: string
+        site:
+          type: ["string", "null"]
+          description: Origin platform of the recording (chaturbate or stripchat)
 
     RecordingListResponse:
       type: object

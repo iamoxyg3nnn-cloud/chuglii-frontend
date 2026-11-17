@@ -4,6 +4,7 @@ import { supabase, fetchAll } from "../lib/supabase.js";
 import { cache } from "../middleware/cache.js";
 import { logger } from "../lib/logger.js";
 import { resolveGenderBucket } from "../lib/genders.js";
+import { enrichWithSite } from "../lib/site-resolver.js";
 
 const COOKIES = process.env.COOKIES ?? "";
 const CB_AFFILIATE = process.env.CHATURBATE_AFFILIATE_CODE ?? "";
@@ -271,11 +272,12 @@ async function fetchMirrors(ids: string[]): Promise<Map<string, any>> {
 async function enrichWithMirrors(rows: any[]): Promise<any[]> {
   const ids = rows.map(r => r.id).filter(Boolean);
   const mirrorMap = await fetchMirrors(ids);
-  return rows.map(r => {
+  const withMirrors = rows.map(r => {
     const mirrors = mirrorMap.get(r.id);
     if (!mirrors) return r;
     return { ...r, ...mirrors };
   });
+  return enrichWithSite(withMirrors);
 }
 
 router.get(

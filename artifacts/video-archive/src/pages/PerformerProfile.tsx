@@ -5,6 +5,7 @@ import { useTrackedMutation } from "@/contexts/SyncStatusContext";
 import { useGetPerformer, getGetPerformerQueryKey } from "@workspace/api-client-react";
 import { Layout } from "@/components/Layout";
 import { VideoCard } from "@/components/VideoCard";
+import { PlatformBadge } from "@/components/PlatformBadge";
 import { AdGridCard } from "@/components/ads/AdGridCard";
 import { isAdCard } from "@/lib/ad-creatives";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -292,7 +293,10 @@ export default function PerformerProfile() {
                 </div>
               ) : profile ? (
                 <div>
-                  <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-foreground">{profile.username}</h1>
+                  <div className="flex items-center gap-2.5 flex-wrap">
+                    <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-foreground">{profile.username}</h1>
+                    <PlatformBadge username={profile.username} />
+                  </div>
                   <div className="flex items-center gap-3 mt-1.5 text-xs text-muted-foreground">
                     <span className="flex items-center gap-1.5">
                       <FilmStrip size={13} weight="duotone" className="text-muted-foreground/60" />

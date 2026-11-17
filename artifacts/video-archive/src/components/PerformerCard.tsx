@@ -6,6 +6,7 @@ import { useHoverPreview } from "@/hooks/use-hover-preview";
 import { getSpriteGrid } from "@/lib/sprite-grid";
 import { proxyUrl, proxySpriteUrl } from "@/lib/proxy-url";
 import { prefetchRoute } from "@/lib/route-chunks";
+import { PlatformBadge } from "@/components/PlatformBadge";
 interface Performer {
   username: string;
   recording_count?: number;
@@ -233,6 +234,8 @@ const SquareCard = memo(function SquareCard({ performer, fetchPriority }: { perf
               </span>
             </div>
           </div>
+
+          <PlatformBadge username={performer.username} className="absolute top-2 left-2 z-30" />
 
           {recCount > 0 && (
             <div className="absolute top-2 right-2">

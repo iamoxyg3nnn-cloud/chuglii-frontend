@@ -28,6 +28,7 @@ export interface Recording {
   thumbnail_mirrors?: Record<string, string> | null;
   sprite_mirrors?: Record<string, string> | null;
   preview_mirrors?: Record<string, string> | null;
+  site?: "chaturbate" | "stripchat" | string | null;
 }
 
 export interface Performer {

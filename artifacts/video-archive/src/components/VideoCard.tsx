@@ -10,6 +10,7 @@ import { useProgressiveImage } from "@/hooks/use-progressive-image";
 import { useCachedMediaSrc } from "@/hooks/use-cached-media-src";
 import { useConnectionConstrained } from "@/hooks/use-connection-quality";
 import { SpriteSlideshow } from "@/components/SpriteSlideshow";
+import { PlatformBadge } from "@/components/PlatformBadge";
 import { cn } from "@/lib/utils";
 import { proxyUrl, proxyImageUrl, proxySpriteUrl, catboxProxyUrl, markWsrvFailedForHost } from "@/lib/proxy-url";
 import { getSpriteGrid } from "@/lib/sprite-grid";
@@ -571,6 +572,7 @@ export const VideoCard = memo(function VideoCard({ recording, showRemove, onRemo
           </div>
 
           <div className="absolute top-2 left-2 flex items-center gap-1 pointer-events-none">
+            <PlatformBadge recording={recording} />
             {recording.resolution && (
               <span className="text-[10px] font-medium text-white/90 bg-black/60 backdrop-blur-md ring-1 ring-white/10 px-1.5 py-0.5 rounded-md">
                 {recording.resolution}

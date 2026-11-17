@@ -7,6 +7,7 @@ import {
 import { supabase } from "../lib/supabase.js";
 import { cache } from "../middleware/cache.js";
 import { resolveGenderBucket } from "../lib/genders.js";
+import { enrichWithSite, enrichSingleWithSite } from "../lib/site-resolver.js";
 
 const router = Router();
 
@@ -117,11 +118,11 @@ async function fetchMirrors(
   return mirrorMap;
 }
 
-/** Enrich an array of recordings with mirror data from both mirror sources */
+/** Enrich an array of recordings with mirror data from both mirror sources and origin site */
 async function enrichWithMirrors(rows: any[]): Promise<any[]> {
   const ids = rows.map(r => r.id).filter(Boolean);
   const mirrorMap = await fetchMirrors(ids);
-  return rows.map(r => {
+  const withMirrors = rows.map(r => {
     const mirrors = mirrorMap.get(r.id);
     if (!mirrors) return r;
     // Don't overwrite an existing mirror field with null/empty: a row that
@@ -133,20 +134,22 @@ async function enrichWithMirrors(rows: any[]): Promise<any[]> {
     }
     return merged;
   });
+  return enrichWithSite(withMirrors);
 }
 
-/** Enrich a single recording object with mirror data from both sources */
+/** Enrich a single recording object with mirror data from both sources and origin site */
 async function enrichSingleWithMirrors(row: any): Promise<any> {
-  if (!row?.id) return row;
+  if (!row?.id) return enrichSingleWithSite(row);
   const mirrorMap = await fetchMirrors([row.id]);
   const mirrors = mirrorMap.get(row.id);
-  if (!mirrors) return row;
   const merged = { ...row };
-  for (const key of MIRROR_KEYS) {
-    const value = mirrors[key];
-    if (value && Object.keys(value).length) merged[key] = value;
+  if (mirrors) {
+    for (const key of MIRROR_KEYS) {
+      const value = mirrors[key];
+      if (value && Object.keys(value).length) merged[key] = value;
+    }
   }
-  return merged;
+  return enrichSingleWithSite(merged);
 }
 
 // ─── LIST RECORDINGS ────────────────────────────────────────────────────────

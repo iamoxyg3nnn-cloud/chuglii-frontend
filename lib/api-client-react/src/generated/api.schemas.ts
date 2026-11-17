@@ -52,6 +52,8 @@ export interface Recording {
   sprite_mirrors?: Record<string, string> | null;
   /** @nullable */
   preview_mirrors?: Record<string, string> | null;
+  /** @nullable */
+  site?: string | null;
 }
 
 export interface RecordingListResponse {

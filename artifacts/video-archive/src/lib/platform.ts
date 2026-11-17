@@ -1,0 +1,152 @@
+export type Platform = "chaturbate" | "stripchat";
+
+/**
+ * Seed set of Stripchat model usernames.
+ * Used for instant, zero-latency detection even when offline, during SSR,
+ * or when accessing legacy cached recording payloads that lack the `site` property.
+ */
+export const KNOWN_STRIPCHAT_USERNAMES = new Set<string>([
+  "-_miaqueen_-",
+  "-barbapapa-",
+  "-victory-fox",
+  "2lund-2chut",
+  "841_yayoi",
+  "_______0_0___________",
+  "______________i__________",
+  "_lovebugs_",
+  "_mona_sona",
+  "arjun_pooja_rani",
+  "avaflowers6",
+  "avnikaur",
+  "ayanloveannu",
+  "barbiesexycouple",
+  "bdsm_fetish",
+  "best_burning_heart",
+  "bhabhi-devar-",
+  "binamalik",
+  "bohemianrhapsody1",
+  "brutal_primium",
+  "brutal_sex5",
+  "desi_fox1",
+  "diamonds__pariss",
+  "dimpu_queens",
+  "dirtyindiancouple",
+  "drillbaby1",
+  "duovibess",
+  "emasalis",
+  "everytokenisimportant",
+  "floriamandjazmin",
+  "gangbangsex09",
+  "glory_cat_official",
+  "goddessanamika",
+  "greciaa_romaa",
+  "hame_niki",
+  "hot_janvi_",
+  "hott_lakshmi",
+  "hotty_cuti",
+  "hotty_nisha21",
+  "iluminaticplrabaabritikaa",
+  "indiangirl711",
+  "irohani_usagi",
+  "jaan_jiya",
+  "jasminenoir2",
+  "jennifer_the_goddess",
+  "jetf_andrea_couple",
+  "justindianlovers",
+  "kayra_20",
+  "kinkylatins",
+  "koalaclub",
+  "korean_half_richan",
+  "laila_cute",
+  "laila_majnuu",
+  "lean_lie8",
+  "lover_girl__",
+  "lunaleoncouplewife",
+  "lustycouple0867",
+  "maataaan",
+  "manami-maru",
+  "mao_maochan",
+  "maya_bdsm",
+  "mero_love_ch",
+  "mia_x1",
+  "mimixhot",
+  "miss_elina",
+  "miss_kamiya_jaan",
+  "misslmrj",
+  "missrani1",
+  "monaji_hot",
+  "na-karen-v8",
+  "naughty-wife",
+  "naughty_couple_fun",
+  "naughty_kayra",
+  "nethu_99",
+  "niharika_model_bhabhi",
+  "nogichan",
+  "oxo_yuna_oxo",
+  "partnersincrime07",
+  "payelonline",
+  "petiteess",
+  "pocari_sweat",
+  "pornite_69",
+  "puting_q",
+  "rahulkajuuu0909",
+  "ricasasha",
+  "rionachanno1",
+  "risafuck",
+  "romantic_couples01",
+  "rupalidixit",
+  "saosao-11",
+  "sara_ass69",
+  "sarakaasar",
+  "sexy_honey01",
+  "sexy_horny_couple",
+  "sexy_ruby_hot@xh",
+  "sexytamilgirl_harini",
+  "shingekino_tetsujin",
+  "sikha_abhi",
+  "siorin_18",
+  "soni_1191",
+  "sonu_bhabi",
+  "sophie_avory",
+  "spex_girl",
+  "suzy-ihab",
+  "sweetie_couple",
+  "sweetmuslim01",
+  "the_queen_of_street",
+  "therealbeverlycious",
+  "tommy_hilficker",
+  "too_yum_girl",
+  "tunderose1",
+  "tutuya01",
+  "twocharmyray",
+  "undo-busoku69",
+  "ursamfuck",
+  "velvett_vixens",
+  "virgin_aisha",
+  "wildharyanacouple",
+  "xiao-lin",
+  "xiaomaomi0123",
+  "yarasero-kun",
+  "yenai_xx",
+]);
+
+/**
+ * Resolves the platform origin ("stripchat" | "chaturbate") for any recording object.
+ */
+export function getRecordingPlatform(recording?: {
+  username?: string | null;
+  site?: string | null;
+} | null): Platform {
+  if (!recording) return "chaturbate";
+
+  const rawSite = (recording.site ?? "").toLowerCase().trim();
+  if (rawSite === "stripchat") return "stripchat";
+  if (rawSite === "chaturbate") return "chaturbate";
+
+  const username = (recording.username ?? "").toLowerCase().trim();
+  if (username && KNOWN_STRIPCHAT_USERNAMES.has(username)) {
+    return "stripchat";
+  }
+
+  return "chaturbate";
+}
