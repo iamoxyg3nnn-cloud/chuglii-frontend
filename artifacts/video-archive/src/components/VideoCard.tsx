@@ -616,15 +616,18 @@ export const VideoCard = memo(function VideoCard({ recording, showRemove, onRemo
             <span className="text-[13px] font-medium text-foreground group-hover:text-primary transition-colors truncate">
               {recording.username}
             </span>
-            <PlatformBadge recording={recording} />
           </div>
 
           <div className="flex items-center justify-between gap-2 text-[11px] text-muted-foreground/75 tabular-nums">
-            <span>
-              {formatRelativeTime(recording.timestamp)}
-            </span>
+            <div className="flex items-center gap-1.5 min-w-0 truncate">
+              {recording.timestamp && (
+                <span className="shrink-0">{formatRelativeTime(recording.timestamp)}</span>
+              )}
+              {recording.timestamp && <span className="text-muted-foreground/40 shrink-0">•</span>}
+              <PlatformBadge recording={recording} variant="simple" />
+            </div>
             {showViewers && (
-              <span className="flex items-center gap-1">
+              <span className="flex items-center gap-1 shrink-0">
                 <Eye size={12} weight="regular" className="text-muted-foreground/50" />
                 {formatViewers(recording.viewers)}
               </span>

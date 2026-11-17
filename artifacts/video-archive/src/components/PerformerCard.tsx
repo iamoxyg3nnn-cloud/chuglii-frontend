@@ -235,7 +235,7 @@ const SquareCard = memo(function SquareCard({ performer, fetchPriority }: { perf
             </div>
           </div>
 
-          <PlatformBadge username={performer.username} className="absolute top-2 left-2 z-30" />
+          <PlatformBadge username={performer.username} variant="pill" className="absolute top-2 left-2 z-30" />
 
           {recCount > 0 && (
             <div className="absolute top-2 right-2">

@@ -1091,7 +1091,7 @@ export default function VideoDetail() {
                       {/* Bottom Metadata Badges */}
                       <div className="flex items-center justify-between text-xs text-white/80">
                         <div className="flex items-center gap-2">
-                          <PlatformBadge recording={video} />
+                          <PlatformBadge recording={video} variant="pill" />
                           {video.resolution && (
                             <span className="px-2 py-0.5 rounded bg-black/60 backdrop-blur-md border border-white/10 text-[10px] font-bold text-white/90">
                               {video.resolution}
@@ -1558,7 +1558,7 @@ export default function VideoDetail() {
                             {video.username}
                           </Link>
                           <span title="Verified recording archive" className="inline-flex items-center"><CheckCircle size={15} weight="fill" className="text-primary shrink-0" /></span>
-                          <PlatformBadge recording={video} />
+                          <PlatformBadge recording={video} variant="simple" className="text-xs text-white/60" />
                         </div>
 
                         {/* Telemetry line */}

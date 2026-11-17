@@ -295,7 +295,7 @@ export default function PerformerProfile() {
                 <div>
                   <div className="flex items-center gap-2.5 flex-wrap">
                     <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-foreground">{profile.username}</h1>
-                    <PlatformBadge username={profile.username} />
+                    <PlatformBadge username={profile.username} variant="simple" className="text-sm text-muted-foreground/75" />
                   </div>
                   <div className="flex items-center gap-3 mt-1.5 text-xs text-muted-foreground">
                     <span className="flex items-center gap-1.5">
