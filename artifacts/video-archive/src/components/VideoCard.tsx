@@ -572,7 +572,6 @@ export const VideoCard = memo(function VideoCard({ recording, showRemove, onRemo
           </div>
 
           <div className="absolute top-2 left-2 flex items-center gap-1 pointer-events-none">
-            <PlatformBadge recording={recording} />
             {recording.resolution && (
               <span className="text-[10px] font-medium text-white/90 bg-black/60 backdrop-blur-md ring-1 ring-white/10 px-1.5 py-0.5 rounded-md">
                 {recording.resolution}
@@ -613,10 +612,11 @@ export const VideoCard = memo(function VideoCard({ recording, showRemove, onRemo
         </div>
 
         <div className="px-0.5 space-y-1">
-          <div className="flex items-center gap-1.5 min-w-0">
+          <div className="flex items-center justify-between gap-1.5 min-w-0">
             <span className="text-[13px] font-medium text-foreground group-hover:text-primary transition-colors truncate">
               {recording.username}
             </span>
+            <PlatformBadge recording={recording} />
           </div>
 
           <div className="flex items-center justify-between gap-2 text-[11px] text-muted-foreground/75 tabular-nums">
