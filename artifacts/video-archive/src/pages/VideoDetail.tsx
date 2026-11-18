@@ -30,17 +30,13 @@ import { useWatchProgress } from "@/hooks/use-watch-progress";
 import { usePreloadRecordings } from "@/hooks/use-preload-recordings";
 import { usePlayQueue } from "@/hooks/use-play-queue";
 import { QueueBar } from "@/components/QueueBar";
-import { UpNextOverlay } from "@/components/UpNextOverlay";
 import { advanceQueue, nextQueueItem, toQueueItem } from "@/lib/play-queue";
 import { proxyUrl } from "@/lib/proxy-url";
 import { safeExternalUrl } from "@/lib/safe-url";
 import { deriveServers, detectHostLabel, iframeReferrerPolicy } from "@/lib/video-hosts";
 import { AdBanner } from "@/components/ads/AdBanner";
 import { AdLeaderboard } from "@/components/ads/AdLeaderboard";
-import { PrerollPlayer } from "@/components/ads/PrerollPlayer";
 import { usePremium } from "@/contexts/PremiumContext";
-import { useAds } from "@/contexts/AdsContext";
-import { pickPreroll, type PrerollCreative } from "@/lib/preroll";
 import {
   absoluteUrl,
   canonicalUrl,
@@ -53,44 +49,13 @@ import {
 } from "@/lib/seo";
 
 import {
-  WarningCircle, ArrowLeft, CornersOut, CornersIn,
+  WarningCircle, ArrowLeft,
   UserCircle, FilmStrip, ThumbsUp, ThumbsDown, BookmarkSimple, ShareNetwork,
   Check, HardDrives, DownloadSimple, Clock, Play, Code, Playlist, Shuffle,
   FolderSimplePlus, Plus, CaretDown, CaretLeft, CaretRight, ArrowSquareOut, SignIn, CheckCircle, ArrowClockwise,
-  Television, Lightbulb, Keyboard, SlidersHorizontal, Sparkle, Info, MonitorPlay, Heart,
+  SlidersHorizontal, Sparkle, Info, MonitorPlay, Heart,
 } from "@phosphor-icons/react";
 import { cn } from "@/lib/utils";
-import {
-  DialogRoot,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
-
-function useFullscreen(ref: React.RefObject<HTMLDivElement | null>) {
-  const [isFullscreen, setIsFullscreen] = useState(false);
-  const enter = useCallback(() => {
-    const el = ref.current;
-    if (!el) return;
-    // Element has requestFullscreen; add webkit variant for Safari support
-    type FullEl = Element & { webkitRequestFullscreen?: () => Promise<void> };
-    const fEl = el as FullEl;
-    if (fEl.requestFullscreen) fEl.requestFullscreen();
-    else if (fEl.webkitRequestFullscreen) fEl.webkitRequestFullscreen();
-  }, [ref]);
-  const exit = useCallback(() => {
-    type FullDoc = Document & { webkitExitFullscreen?: () => void };
-    const fDoc = document as FullDoc;
-    if (fDoc.exitFullscreen) fDoc.exitFullscreen();
-    else if (fDoc.webkitExitFullscreen) fDoc.webkitExitFullscreen();
-  }, []);
-  useEffect(() => {
-    const handler = () => setIsFullscreen(!!document.fullscreenElement);
-    document.addEventListener("fullscreenchange", handler);
-    return () => document.removeEventListener("fullscreenchange", handler);
-  }, []);
-  return { isFullscreen, enter, exit };
-}
 
 // Host detection, normalization (Dropload, AnonMP4, LuluStream, VOE, etc.),
 // and embed/server derivation are handled centrally in "@/lib/video-hosts".
@@ -101,102 +66,16 @@ export default function VideoDetail() {
   const sessionId = getSessionId();
   const playerRef = useRef<HTMLDivElement>(null);
   const recSectionRef = useRef<HTMLDivElement>(null);
-  const { isFullscreen, enter: enterFS, exit: exitFS } = useFullscreen(playerRef);
   const { user } = useAuth();
 
-  // â”€â”€â”€ Video Player Enhancements & States â”€â”€â”€
-  const [isTheaterMode, setIsTheaterMode] = useState(false);
-  const [ambientGlow, setAmbientGlow] = useState(() => {
-    if (typeof window === "undefined") return true;
-    return localStorage.getItem("v_ambient_glow") !== "false";
-  });
-  const [aspectRatio, setAspectRatio] = useState<"16:9" | "21:9" | "4:3">(() => {
-    if (typeof window === "undefined") return "16:9";
-    const stored = localStorage.getItem("v_aspect_ratio");
-    return stored === "21:9" || stored === "4:3" ? stored : "16:9";
-  });
   const [playerReloadKey, setPlayerReloadKey] = useState(0);
-  const [shortcutsOpen, setShortcutsOpen] = useState(false);
-
-
   const [serverToast, setServerToast] = useState<string | null>(null);
-  const [autoplayEnabled, setAutoplayEnabled] = useState(() => {
-    if (typeof window === "undefined") return true;
-    return localStorage.getItem("v_autoplay") !== "false";
-  });
-
-  const toggleAutoplay = useCallback(() => {
-    setAutoplayEnabled((prev) => {
-      const next = !prev;
-      localStorage.setItem("v_autoplay", String(next));
-      setServerToast(`Autoplay ${next ? "Enabled" : "Disabled"}`);
-      setTimeout(() => setServerToast(null), 2000);
-      return next;
-    });
-  }, []);
-
-  const toggleAmbientGlow = useCallback(() => {
-    setAmbientGlow((prev) => {
-      const next = !prev;
-      localStorage.setItem("v_ambient_glow", String(next));
-      return next;
-    });
-  }, []);
-
-  const handleAspectRatioChange = useCallback((ratio: "16:9" | "21:9" | "4:3") => {
-    setAspectRatio(ratio);
-    localStorage.setItem("v_aspect_ratio", ratio);
-  }, []);
 
   const [activeServer, setActiveServer] = useState(() => {
     if (typeof window === "undefined") return 0;
     const stored = sessionStorage.getItem("vserver");
     return stored ? parseInt(stored, 10) : 0;
   });
-  const [videoStarted, setVideoStarted] = useState(() => {
-    if (typeof window === "undefined") return false;
-    return sessionStorage.getItem("vplayed") === id;
-  });
-  // Pre-roll ad (Admin â†’ Ads â†’ "Pre-roll video" slot): "idle" waits for the
-  // play gesture on the poster click, "playing" shows the overlay, "done"
-  // never re-arms during this page visit (server switches included).
-  const [prerollPhase, setPrerollPhase] = useState<"idle" | "playing" | "done">("idle");
-  const [activePreroll, setActivePreroll] = useState<PrerollCreative | null>(null);
-  const [prerollWithGesture, setPrerollWithGesture] = useState(false);
-  const { showAds } = usePremium();
-  const { rows: adRows, status: adsStatus, settings: adSettings } = useAds();
-  const prerollOn = showAds && adSettings.placements.preroll !== false;
-  // Do not let the build-time file fallback win while the authoritative
-  // database request is still pending. "file" means the provider settled
-  // on fallback; "database" means even an empty DB result is authoritative.
-  const preroll = useMemo(
-    () => (prerollOn && adsStatus !== "pending" ? pickPreroll(adRows) : null),
-    [prerollOn, adsStatus, adRows],
-  );
-
-  const startPlayback = useCallback(() => {
-    setVideoStarted(true);
-    if (id) sessionStorage.setItem("vplayed", id);
-  }, [id]);
-
-  /** Poster click: gate through the preroll when one is armed, else start. */
-  const handlePosterClick = () => {
-    if (prerollOn && prerollPhase === "idle" && preroll) {
-      setPrerollWithGesture(true);
-      setActivePreroll(preroll);
-      setPrerollPhase("playing");
-      return;
-    }
-    startPlayback();
-  };
-
-  /** Preroll ended/errored/skipped â†’ start the main video (never the other way around). */
-  const finishPreroll = useCallback(() => {
-    setPrerollPhase("done");
-    setActivePreroll(null);
-    setPrerollWithGesture(false);
-    startPlayback();
-  }, [startPlayback]);
   const [bookmarked, setBookmarked] = useState(false);
   const bookmarkedRef = useRef(false);
   const [watchLater, setWatchLater] = useState(false);
@@ -304,7 +183,7 @@ export default function VideoDetail() {
     return null;
   }, [video, id, related, recData?.data]);
 
-  const effectiveNext = nextInQueue ?? (autoplayEnabled ? nextRecommended : null);
+  const effectiveNext = nextInQueue ?? nextRecommended;
 
   const effectiveDuration = useMemo(() => {
     if (typeof video?.duration === "number" && video.duration > 0) {
@@ -336,28 +215,6 @@ export default function VideoDetail() {
   const toggleReaction = useToggleReaction();
 
   useEffect(() => {
-    // Consume a pending queue-arrival flag (vauto, set by handleQueueAdvance /
-    // QueueBar before navigation): start playback immediately instead of
-    // parking on the click-to-play poster â€” a queue means continuous
-    // playback. When a preroll is loaded it is armed for the auto-arrival
-    // without a gesture (PrerollPlayer then autoplays it muted); otherwise
-    // the video starts straight away. The flag is consumed unconditionally so
-    // a stale value can never auto-start an unrelated video later.
-    const autoId = sessionStorage.getItem("vauto");
-    sessionStorage.removeItem("vauto");
-    const isAutoArrival = !!id && autoId === id;
-    if (isAutoArrival && prerollOn && preroll) {
-      setVideoStarted(false);
-      setPrerollWithGesture(false);
-      setActivePreroll(preroll);
-      setPrerollPhase("playing");
-    } else {
-      setPrerollWithGesture(false);
-      setPrerollPhase("idle");
-      setActivePreroll(null);
-      if (isAutoArrival) startPlayback();
-      else setVideoStarted(sessionStorage.getItem("vplayed") === id);
-    }
     setActiveServer(0);
     setCollectionOpen(false);
     setAddedToCol(null);
@@ -536,9 +393,6 @@ export default function VideoDetail() {
     if (queue && nextInQueue) {
       if (nextInQueue.id === id) {
         trackActivity("queue_advance", { meta: { recording_id: nextInQueue.id } });
-        sessionStorage.removeItem("vplayed");
-        setVideoStarted(false);
-        setPrerollPhase("idle");
         window.scrollTo({ top: 0, behavior: "auto" });
         return;
       }
@@ -562,7 +416,7 @@ export default function VideoDetail() {
 
   // Handle postMessage events from embeds reporting ended playback
   useEffect(() => {
-    if (!videoStarted || !effectiveNext || !autoplayEnabled) return;
+    if (!effectiveNext) return;
 
     const handleMessage = (e: MessageEvent) => {
       try {
@@ -597,62 +451,10 @@ export default function VideoDetail() {
 
     window.addEventListener("message", handleMessage);
     return () => window.removeEventListener("message", handleMessage);
-  }, [videoStarted, effectiveNext, autoplayEnabled, handleAdvance]);
+  }, [effectiveNext, handleAdvance]);
 
-  const aspectClass = useMemo(() => {
-    if (aspectRatio === "21:9") return "aspect-[21/9]";
-    if (aspectRatio === "4:3") return "aspect-[4/3]";
-    return "aspect-video";
-  }, [aspectRatio]);
-
-  useEffect(() => {
-    const handleKey = (e: KeyboardEvent) => {
-      if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return;
-      if (e.key === "f" || e.key === "F") {
-        e.preventDefault();
-        isFullscreen ? exitFS() : enterFS();
-      } else if (e.key === "t" || e.key === "T") {
-        e.preventDefault();
-        setIsTheaterMode((prev) => !prev);
-      } else if (e.key === "a" || e.key === "A") {
-        e.preventDefault();
-        toggleAmbientGlow();
-      } else if (e.key === "s" || e.key === "S") {
-        if (servers.length > 1) {
-          e.preventDefault();
-          handleNextServer();
-        }
-      } else if (e.key === "r" || e.key === "R") {
-        e.preventDefault();
-        handleReloadPlayer();
-      } else if (e.key === "n" || e.key === "N") {
-        if (effectiveNext) {
-          e.preventDefault();
-          handleAdvance();
-        }
-      } else if (e.key === "?") {
-        e.preventDefault();
-        setShortcutsOpen((prev) => !prev);
-      } else if (e.key === " " || e.key === "k" || e.key === "K") {
-        if (!videoStarted) {
-          e.preventDefault();
-          handlePosterClick();
-        }
-      } else if (e.key === "Escape") {
-        if (isTheaterMode) {
-          setIsTheaterMode(false);
-        }
-        if (shortcutsOpen) {
-          setShortcutsOpen(false);
-        }
-      }
-    };
-    window.addEventListener("keydown", handleKey);
-    return () => window.removeEventListener("keydown", handleKey);
-  }, [isFullscreen, enterFS, exitFS, isTheaterMode, shortcutsOpen, servers.length, videoStarted, effectiveNext, handleNextServer, handleReloadPlayer, toggleAmbientGlow, handlePosterClick, handleAdvance]);
-  
-  // Count estimated watch time only after the in-page player is launched.
-  useWatchProgress({ video, durationSeconds: video?.duration, isActive: videoStarted && currentServer?.type === "iframe" });
+  // Count estimated watch time only while the video is active
+  useWatchProgress({ video, durationSeconds: video?.duration, isActive: !!video && currentServer?.type === "iframe" });
 
   const posterUrl = video?.sprite_url || video?.thumbnail_url;
 
@@ -965,549 +767,143 @@ export default function VideoDetail() {
           </Link>
         </div>
 
-        {/* Theater mode ambient backdrop */}
-        {isTheaterMode && (
-          <div
-            className="fixed inset-0 bg-black/85 z-30 transition-opacity duration-300 backdrop-blur-sm cursor-pointer"
-            onClick={() => setIsTheaterMode(false)}
-            title="Exit theater mode (Esc or T)"
-            aria-label="Exit theater mode"
-          />
-        )}
+        <div className="grid grid-cols-1 lg:grid-cols-[1fr_300px] gap-8">
+          {/* Main column */}
+          <div className="space-y-4 min-w-0">
+            {/* Ad above the player */}
+            <AdLeaderboard />
 
-        <div className={cn("grid gap-8 transition-all duration-300", isTheaterMode ? "grid-cols-1" : "grid-cols-1 lg:grid-cols-[1fr_300px]")}>
-          {/* â”€â”€â”€ Main column â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
-          <div className={cn("space-y-4 min-w-0 transition-all duration-300", isTheaterMode && "relative z-40 max-w-6xl mx-auto w-full")}>
-            {/* Ad above the player â€” 728Ã—90 / 468Ã—60 / 300Ã—100 */}
-            {!isTheaterMode && <AdLeaderboard />}
-
-
-
-            {/* Player — click-to-play with Ambient glow wrapper */}
+            {/* Direct Embedded Player */}
             {isLoading ? (
               <Skeleton className="w-full aspect-video rounded-2xl" />
             ) : video ? (
-              <div className="relative">
-                {/* Ambient lighting glow */}
-                {ambientGlow && proxyUrl(posterUrl) && (
-                  <div
-                    className={cn(
-                      "pointer-events-none absolute -inset-3 sm:-inset-6 -z-10 rounded-3xl opacity-35 blur-2xl sm:blur-3xl transition-opacity duration-700 bg-cover bg-center overflow-hidden",
-                      isTheaterMode ? "opacity-55 blur-3xl scale-105" : "opacity-35"
-                    )}
-                    style={{
-                      backgroundImage: `url(${proxyUrl(posterUrl)})`,
-                      transform: "translate3d(0, 0, 0)",
-                    }}
-                    aria-hidden="true"
-                  />
-                )}
-
+              <div className="space-y-2">
                 <div
                   ref={playerRef}
-                  className={cn(
-                    "relative group w-full bg-black overflow-hidden rounded-2xl border border-border/70 shadow-sm transition-all duration-300",
-                    aspectClass,
-                    isTheaterMode && "z-40 ring-1 ring-white/20 shadow-2xl scale-[1.01]"
-                  )}
+                  className="relative w-full bg-black overflow-hidden rounded-2xl border border-border/70 shadow-sm aspect-video"
                 >
-                  {/* Transient action feedback toast */}
+                  {/* Transient server switch toast */}
                   {serverToast && (
-                    <div className="absolute top-14 left-1/2 -translate-x-1/2 z-40 px-4 py-1.5 rounded-full bg-black/85 backdrop-blur-md border border-white/20 text-white text-xs font-semibold shadow-2xl pointer-events-none flex items-center gap-2 animate-in fade-in zoom-in-95 duration-150">
+                    <div className="absolute top-4 left-1/2 -translate-x-1/2 z-40 px-3.5 py-1.5 rounded-full bg-black/85 backdrop-blur-md border border-white/20 text-white text-xs font-semibold shadow-2xl pointer-events-none flex items-center gap-2 animate-in fade-in zoom-in-95 duration-150">
                       <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
                       <span>{serverToast}</span>
                     </div>
                   )}
 
-                  {currentServer?.type === "iframe" && !videoStarted ? (
-                    /* Pre-roll first (armed by this click), else poster / click-to-play */
-                    prerollPhase === "playing" && prerollOn && activePreroll ? (
-                      <PrerollPlayer creative={activePreroll} onDone={finishPreroll} withGesture={prerollWithGesture} />
-                    ) : (
-                    <button
-                      className="absolute inset-0 w-full h-full cursor-pointer focus:outline-none group/poster"
-                      onClick={handlePosterClick}
-                      aria-label="Play video"
-                    >
-                    {proxyUrl(posterUrl) ? (
-                      <OptimizedImage
-                        src={proxyUrl(posterUrl)!}
-                        alt={video.username}
-                        className="w-full h-full object-cover transition-transform duration-700 group-hover/poster:scale-[1.02]"
-                        containerClassName="w-full h-full"
-                        width="hero"
-                        fetchPriority="high"
-                        loading="eager"
-                        fallback={
-                          <div className="w-full h-full bg-black flex items-center justify-center">
-                            <FilmStrip size={44} weight="duotone" className="text-white/10" />
+                  {currentServer?.type === "iframe" ? (
+                    <iframe
+                      key={`${currentServer.src}-${activeServer}-${playerReloadKey}`}
+                      src={currentServer.src}
+                      className="w-full h-full border-0"
+                      allow="autoplay; fullscreen; picture-in-picture; encrypted-media; accelerometer; gyroscope"
+                      allowFullScreen
+                      referrerPolicy={iframeReferrerPolicy(currentServer.src)}
+                      title={video.room_title || video.filename}
+                    />
+                  ) : currentServer?.type === "link" ? (
+                    <div className="relative w-full h-full flex flex-col items-center justify-center p-6 text-center overflow-hidden bg-black/90 select-none">
+                      {posterUrl && (
+                        <div
+                          className="absolute inset-0 bg-cover bg-center opacity-15 blur-2xl scale-110 pointer-events-none"
+                          style={{ backgroundImage: `url(${proxyUrl(posterUrl)})` }}
+                        />
+                      )}
+                      <div className="absolute inset-0 bg-radial from-transparent via-black/60 to-black pointer-events-none" />
+
+                      <div className="relative z-10 max-w-md w-full mx-auto p-6 sm:p-8 rounded-2xl bg-neutral-900/85 backdrop-blur-xl border border-white/10 shadow-2xl flex flex-col items-center gap-4 animate-in fade-in zoom-in-95 duration-200">
+                        <div className="w-14 h-14 rounded-2xl bg-primary/10 border border-primary/25 flex items-center justify-center text-primary shadow-inner">
+                          <MonitorPlay size={30} weight="duotone" />
+                        </div>
+
+                        <div className="flex flex-col items-center gap-1.5">
+                          <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-primary/10 border border-primary/20 text-[11px] font-semibold text-primary">
+                            <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                            <span>{currentServer.label} Dedicated Player</span>
                           </div>
-                        }
-                      />
-                    ) : (
-                      <div className="w-full h-full bg-black flex items-center justify-center">
-                        <FilmStrip size={44} weight="duotone" className="text-white/10" />
-                      </div>
-                    )}
-
-                    {/* Cinema Stage Vignette & Overlay */}
-                    <div className="absolute inset-0 bg-gradient-to-t from-black/85 via-black/30 to-black/60 flex flex-col justify-between p-4 sm:p-6 transition-colors group-hover/poster:from-black/80 group-hover/poster:via-black/20">
-                      {/* Top poster bar */}
-                      <div className="flex items-center justify-between gap-2">
-                        <div className="flex items-center gap-2">
-                          <span className="px-2.5 py-1 rounded-md bg-black/60 backdrop-blur-md border border-white/10 text-[11px] font-semibold text-white/95 shadow-xs">
-                            {video.username}
-                          </span>
-                          {video.timestamp && (
-                            <span className="text-[11px] text-white/70 hidden sm:inline">
-                              {new Date(video.timestamp).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' })}
-                            </span>
-                          )}
+                          <h3 className="text-lg font-bold text-white tracking-tight">
+                            {currentServer.label === "AnonMP4"
+                              ? "AnonMP4 Secure Playback"
+                              : `Launch ${currentServer.label}`}
+                          </h3>
+                          <p className="text-xs text-white/60 leading-relaxed max-w-xs">
+                            {currentServer.label === "AnonMP4"
+                              ? "AnonMP4 uses single-session ticket security requiring direct top-level browser access. Launch the dedicated popout player below."
+                              : `This mirror requires direct playback on ${currentServer.label} for optimal streaming performance.`}
+                          </p>
                         </div>
 
-                        <div className="flex items-center gap-1.5">
-                          <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-black/60 backdrop-blur-md border border-white/10 text-[11px] font-medium text-white/90 shadow-xs">
-                            <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
-                            <span>{currentServer.label}</span>
-                          </div>
-                        </div>
-                      </div>
-
-                      {/* Center Play Button */}
-                      <div className="flex flex-col items-center justify-center gap-3">
-                        <div className="w-18 h-18 sm:w-20 sm:h-20 rounded-full bg-black/50 backdrop-blur-md border border-white/25 group-hover/poster:border-primary/80 group-hover/poster:bg-primary/20 flex items-center justify-center transition-all duration-300 group-hover/poster:scale-105 active:scale-95 shadow-2xl">
-                          <Play size={28} weight="fill" className="text-white ml-1 group-hover/poster:text-primary transition-colors" />
-                        </div>
-                        <div className="flex flex-col items-center gap-0.5">
-                          <span className="text-white font-medium text-xs tracking-wide">
-                            Click or press <kbd className="px-1.5 py-0.5 text-[10px] bg-white/10 border border-white/20 rounded font-mono">Space</kbd> to play
-                          </span>
-                          <span className="text-white/50 text-[11px]">
-                            Streaming via {currentServer.label}
-                          </span>
-                        </div>
-                      </div>
-
-                      {/* Bottom Metadata Badges */}
-                      <div className="flex items-center justify-between text-xs text-white/80">
-                        <div className="flex items-center gap-2">
-                          <PlatformBadge recording={video} variant="pill" />
-                          {video.resolution && (
-                            <span className="px-2 py-0.5 rounded bg-black/60 backdrop-blur-md border border-white/10 text-[10px] font-bold text-white/90">
-                              {video.resolution}
-                            </span>
-                          )}
-                          {video.duration != null && video.duration > 0 && (
-                            <span className="px-2 py-0.5 rounded bg-black/60 backdrop-blur-md border border-white/10 text-[11px] tabular-nums font-mono text-white/80">
-                              {formatDuration(video.duration)}
-                            </span>
-                          )}
-                          {video.filesize ? (
-                            <span className="text-[11px] text-white/60 hidden sm:inline tabular-nums">
-                              {formatBytes(video.filesize)}
-                            </span>
-                          ) : null}
-                        </div>
-
-                        <div className="text-[11px] text-white/60 font-mono hidden sm:inline">
-                          Direct Embed Player
-                        </div>
-                      </div>
-                    </div>
-                    </button>
-                    )
-                ) : currentServer?.type === "link" ? (
-                  <div className="relative w-full h-full flex flex-col items-center justify-center p-6 text-center overflow-hidden bg-black/90 select-none">
-                    {/* Atmospheric blurred poster backdrop */}
-                    {posterUrl && (
-                      <div
-                        className="absolute inset-0 bg-cover bg-center opacity-15 blur-2xl scale-110 pointer-events-none"
-                        style={{ backgroundImage: `url(${proxyUrl(posterUrl)})` }}
-                      />
-                    )}
-                    <div className="absolute inset-0 bg-radial from-transparent via-black/60 to-black pointer-events-none" />
-
-                    {/* Centered Glassmorphism Launcher Box */}
-                    <div className="relative z-10 max-w-md w-full mx-auto p-6 sm:p-8 rounded-2xl bg-neutral-900/85 backdrop-blur-xl border border-white/10 shadow-2xl flex flex-col items-center gap-4 animate-in fade-in zoom-in-95 duration-200">
-                      <div className="w-14 h-14 rounded-2xl bg-primary/10 border border-primary/25 flex items-center justify-center text-primary shadow-inner">
-                        <MonitorPlay size={30} weight="duotone" />
-                      </div>
-
-                      <div className="flex flex-col items-center gap-1.5">
-                        <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-primary/10 border border-primary/20 text-[11px] font-semibold text-primary">
-                          <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
-                          <span>{currentServer.label} Dedicated Player</span>
-                        </div>
-                        <h3 className="text-lg font-bold text-white tracking-tight">
-                          {currentServer.label === "AnonMP4"
-                            ? "AnonMP4 Secure Playback"
-                            : `Launch ${currentServer.label}`}
-                        </h3>
-                        <p className="text-xs text-white/60 leading-relaxed max-w-xs">
-                          {currentServer.label === "AnonMP4"
-                            ? "AnonMP4 uses single-session ticket security requiring direct top-level browser access. Launch the dedicated popout player below."
-                            : `This mirror requires direct playback on ${currentServer.label} for optimal streaming performance.`}
-                        </p>
-                      </div>
-
-                      <div className="flex flex-col sm:flex-row items-center gap-2.5 w-full pt-1">
-                        <button
-                          type="button"
-                          onClick={() => {
-                            window.open(
-                              currentServer.src,
-                              "anonmp4_player",
-                              "width=1120,height=680,menubar=no,toolbar=no,location=no,status=no,resizable=yes"
-                            );
-                          }}
-                          className="w-full sm:flex-1 inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-primary hover:bg-primary/90 text-primary-foreground text-xs sm:text-sm font-semibold shadow-lg shadow-primary/20 hover:shadow-primary/30 active:scale-95 transition-all cursor-pointer"
-                        >
-                          <MonitorPlay size={16} weight="bold" />
-                          <span>Launch Popout</span>
-                        </button>
-
-                        <a
-                          href={currentServer.src}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-white/10 hover:bg-white/15 border border-white/10 text-white/90 text-xs sm:text-sm font-medium transition-colors"
-                        >
-                          <ArrowSquareOut size={16} weight="bold" />
-                          <span>New Tab</span>
-                        </a>
-                      </div>
-
-                      {/* Mirror switch shortcut if other in-page servers exist */}
-                      {servers.some((s) => s.type === "iframe") && (
-                        <button
-                          type="button"
-                          onClick={() => {
-                            const firstIframe = servers.findIndex((s) => s.type === "iframe");
-                            if (firstIframe !== -1) handleSelectServer(firstIframe);
-                          }}
-                          className="inline-flex items-center gap-1.5 text-xs text-white/50 hover:text-white transition-colors pt-1 cursor-pointer"
-                        >
-                          <ArrowClockwise size={13} weight="bold" />
-                          <span>Switch to In-Page Server ({servers.find((s) => s.type === "iframe")?.label})</span>
-                        </button>
-                      )}
-                    </div>
-                  </div>
-                ) : currentServer?.type === "iframe" ? (
-                  <iframe
-                    key={`${currentServer.src}-${activeServer}-${playerReloadKey}`}
-                    src={currentServer.src}
-                    className="w-full h-full border-0"
-                    allow="autoplay; fullscreen; picture-in-picture; encrypted-media; accelerometer; gyroscope"
-                    allowFullScreen
-                    referrerPolicy={iframeReferrerPolicy(currentServer.src)}
-                    title={video.room_title || video.filename}
-                  />
-                ) : proxyUrl(posterUrl) ? (
-                  <OptimizedImage
-                    src={proxyUrl(posterUrl)!}
-                    alt={video.filename}
-                    className="w-full h-full object-contain"
-                    containerClassName="w-full h-full"
-                    width="hero"
-                    fallback={
-                      <div className="w-full h-full flex items-center justify-center">
-                        <FilmStrip size={44} weight="duotone" className="text-muted-foreground/20" />
-                      </div>
-                    }
-                  />
-                ) : (
-                  <div className="w-full h-full flex items-center justify-center">
-                    <FilmStrip size={44} weight="duotone" className="text-muted-foreground/20" />
-                  </div>
-                )}
-
-                {/* Up Next countdown & Autoplay Overlay */}
-                {currentServer?.type === "iframe" && videoStarted && video && effectiveNext && (
-                  <UpNextOverlay
-                    key={`${video.id}-${effectiveNext.id}`}
-                    next={effectiveNext}
-                    durationSeconds={effectiveDuration}
-                    autoplay={autoplayEnabled}
-                    onPlayNow={handleAdvance}
-                  />
-                )}
-
-                {/* Fullscreen Floating Exit Button (only shown in native fullscreen) */}
-                {isFullscreen && (
-                  <div className="absolute bottom-4 right-4 z-40 flex items-center gap-2">
-                    <button
-                      onClick={exitFS}
-                      className="h-9 px-3.5 flex items-center gap-2 rounded-xl bg-black/80 backdrop-blur-md border border-white/20 text-white text-xs font-semibold hover:bg-black transition-all cursor-pointer shadow-2xl"
-                      title="Exit fullscreen (F or Esc)"
-                    >
-                      <CornersIn size={16} weight="bold" />
-                      <span>Exit Fullscreen</span>
-                    </button>
-                  </div>
-                )}
-                </div>
-
-                {/* Docked Cinema Deck — Consolidated Pro Toolbar */}
-                {video && servers.length > 0 && (
-                  <div className="w-full mt-2.5 p-2 sm:p-2.5 rounded-2xl bg-neutral-900/90 backdrop-blur-md border border-white/[0.08] shadow-lg flex items-center justify-between gap-3 flex-wrap select-none">
-                    {/* Left: Source Mirrors */}
-                    <div className="flex items-center gap-1.5 flex-wrap">
-                      <div className="flex items-center gap-1 px-1.5 text-[11px] font-semibold text-white/40 uppercase tracking-wider">
-                        <HardDrives size={13} weight="bold" />
-                        <span className="hidden sm:inline">Source</span>
-                      </div>
-
-                      <div className="flex items-center gap-1 bg-black/40 p-0.5 rounded-xl border border-white/5">
-                        {servers.map((s, i) => (
-                          <button
-                            key={i}
-                            onClick={() => handleSelectServer(i)}
-                            className={cn(
-                              "px-2.5 py-1 text-xs font-medium rounded-lg transition-all cursor-pointer flex items-center gap-1.5",
-                              activeServer === i
-                                ? "bg-white/15 text-white font-semibold shadow-xs border border-white/10"
-                                : "text-white/60 hover:text-white hover:bg-white/5"
-                            )}
-                            title={`Switch to ${s.label} (${s.type === "iframe" ? "In-Page Embed" : "External Popout"})`}
-                          >
-                            <span className={cn(
-                              "w-1.5 h-1.5 rounded-full",
-                              activeServer === i ? "bg-emerald-400 animate-pulse" : "bg-white/30"
-                            )} />
-                            <span>{s.label}</span>
-                            <span className="text-[10px] text-white/40 hidden md:inline font-mono">
-                              {s.type === "iframe" ? "embed" : "popout"}
-                            </span>
-                          </button>
-                        ))}
-                      </div>
-
-                      {/* Stream Reload */}
-                      <button
-                        onClick={handleReloadPlayer}
-                        className="h-7 w-7 flex items-center justify-center rounded-lg bg-black/40 border border-white/5 text-white/60 hover:text-white hover:bg-white/10 transition-colors cursor-pointer"
-                        title="Reload mirror stream (R)"
-                        aria-label="Reload stream"
-                      >
-                        <ArrowClockwise size={13} weight="bold" />
-                      </button>
-                    </div>
-
-                    {/* Center Telemetry (Resolution & Duration) */}
-                    <div className="hidden lg:flex items-center gap-2 text-xs text-white/40 font-mono">
-                      {video.resolution && (
-                        <span className="px-1.5 py-0.5 rounded bg-white/5 border border-white/5 text-white/70 font-semibold text-[11px]">
-                          {video.resolution}
-                        </span>
-                      )}
-                      {video.duration != null && video.duration > 0 && (
-                        <span className="tabular-nums">
-                          {formatDuration(video.duration)}
-                        </span>
-                      )}
-                    </div>
-
-                    {/* Right: Stage Controls */}
-                    <div className="flex items-center gap-1.5 ml-auto">
-                      {/* Aspect Ratio */}
-                      <div className="hidden sm:flex items-center bg-black/40 rounded-lg p-0.5 border border-white/5">
-                        {(["16:9", "21:9", "4:3"] as const).map((ratio) => (
-                          <button
-                            key={ratio}
-                            onClick={() => handleAspectRatioChange(ratio)}
-                            className={cn(
-                              "px-2 py-0.5 text-[11px] font-medium rounded-md transition-all cursor-pointer",
-                              aspectRatio === ratio
-                                ? "bg-white/15 text-white font-semibold shadow-xs"
-                                : "text-white/50 hover:text-white"
-                            )}
-                            title={`Aspect ratio: ${ratio}`}
-                          >
-                            {ratio}
-                          </button>
-                        ))}
-                      </div>
-
-                      {/* Autoplay Next */}
-                      <button
-                        onClick={toggleAutoplay}
-                        className={cn(
-                          "h-7 px-2.5 flex items-center gap-1.5 rounded-lg border text-xs font-medium transition-all cursor-pointer",
-                          autoplayEnabled
-                            ? "border-emerald-500/40 text-emerald-400 bg-emerald-500/10 shadow-xs"
-                            : "border-white/5 bg-black/40 text-white/60 hover:text-white hover:border-white/15"
-                        )}
-                        title={`Autoplay next video: ${autoplayEnabled ? "ON" : "OFF"}`}
-                      >
-                        <span className={cn(
-                          "w-1.5 h-1.5 rounded-full",
-                          autoplayEnabled ? "bg-emerald-400 animate-pulse" : "bg-white/30"
-                        )} />
-                        <span className="hidden sm:inline">Autoplay</span>
-                      </button>
-
-                      {/* Ambient Glow */}
-                      <button
-                        onClick={toggleAmbientGlow}
-                        className={cn(
-                          "h-7 px-2.5 flex items-center gap-1.5 rounded-lg border text-xs font-medium transition-all cursor-pointer",
-                          ambientGlow
-                            ? "border-amber-400/40 text-amber-300 bg-amber-400/10"
-                            : "border-white/5 bg-black/40 text-white/60 hover:text-white hover:border-white/15"
-                        )}
-                        title="Toggle Ambient Glow (A)"
-                        aria-label="Toggle ambient lighting"
-                      >
-                        <Lightbulb size={13} weight={ambientGlow ? "fill" : "regular"} />
-                        <span className="hidden md:inline">Glow</span>
-                      </button>
-
-                      {/* Theater Mode */}
-                      <button
-                        onClick={() => setIsTheaterMode((prev) => !prev)}
-                        className={cn(
-                          "h-7 px-2.5 flex items-center gap-1.5 rounded-lg border text-xs font-medium transition-all cursor-pointer",
-                          isTheaterMode
-                            ? "border-primary/50 text-primary bg-primary/10 shadow-xs"
-                            : "border-white/5 bg-black/40 text-white/60 hover:text-white hover:border-white/15"
-                        )}
-                        title="Theater Mode (T)"
-                        aria-label="Toggle theater mode"
-                      >
-                        <Television size={13} weight={isTheaterMode ? "fill" : "regular"} />
-                        <span className="hidden md:inline">Theater</span>
-                      </button>
-
-                      {/* Popout Player */}
-                      {currentServer?.src && (
-                        <button
-                          type="button"
-                          onClick={() => {
-                            window.open(
-                              currentServer.src,
-                              "player_popout",
-                              "width=1120,height=680,menubar=no,toolbar=no,location=no,status=no,resizable=yes"
-                            );
-                          }}
-                          className="h-7 w-7 flex items-center justify-center rounded-lg bg-black/40 border border-white/5 text-white/60 hover:text-white hover:bg-white/10 transition-colors cursor-pointer"
-                          title="Open in dedicated popout window"
-                          aria-label="Popout window"
-                        >
-                          <ArrowSquareOut size={14} weight="bold" />
-                        </button>
-                      )}
-
-                      {/* Fullscreen */}
-                      <button
-                        onClick={isFullscreen ? exitFS : enterFS}
-                        className="h-7 w-7 flex items-center justify-center rounded-lg bg-black/40 border border-white/5 text-white/60 hover:text-white hover:bg-white/10 transition-colors cursor-pointer"
-                        title="Cinema Stage Fullscreen (F)"
-                        aria-label="Fullscreen"
-                      >
-                        {isFullscreen ? <CornersIn size={14} weight="bold" /> : <CornersOut size={14} weight="bold" />}
-                      </button>
-
-                      {/* Shortcuts */}
-                      <button
-                        onClick={() => setShortcutsOpen(true)}
-                        className="h-7 w-7 flex items-center justify-center rounded-lg bg-black/40 border border-white/5 text-white/60 hover:text-white hover:bg-white/10 transition-colors cursor-pointer"
-                        title="Keyboard Shortcuts (?)"
-                        aria-label="Keyboard shortcuts"
-                      >
-                        <Keyboard size={13} weight="regular" />
-                      </button>
-                    </div>
-                  </div>
-                )}
-
-                {/* Mirror Telemetry & Unstick Helper Strip */}
-                {video && videoStarted && currentServer?.type === "iframe" && (
-                  <div className="w-full mt-1.5 px-3 py-1.5 rounded-xl bg-white/[0.03] border border-white/[0.06] text-[11px] text-white/50 flex items-center justify-between gap-2 flex-wrap">
-                    <div className="flex items-center gap-1.5 min-w-0 truncate">
-                      <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 shrink-0" />
-                      <span className="truncate">
-                        Host: <strong className="text-white/80 font-medium">{currentServer.label}</strong> (controls inside video frame).
-                      </span>
-                    </div>
-                    <div className="flex items-center gap-2 text-white/40 text-[11px] ml-auto">
-                      <span>Controls stuck or ad blocked?</span>
-                      <button
-                        type="button"
-                        onClick={handleReloadPlayer}
-                        className="text-primary hover:text-primary/90 hover:underline font-medium cursor-pointer"
-                        title="Reload embed to unstick player"
-                      >
-                        Reload (R)
-                      </button>
-                      {servers.length > 1 && (
-                        <>
-                          <span>•</span>
+                        <div className="flex flex-col sm:flex-row items-center gap-2.5 w-full pt-1">
                           <button
                             type="button"
-                            onClick={handleNextServer}
-                            className="text-white/70 hover:text-white hover:underline cursor-pointer"
-                            title="Switch to next mirror server (S)"
+                            onClick={() => {
+                              window.open(
+                                currentServer.src,
+                                "anonmp4_player",
+                                "width=1120,height=680,menubar=no,toolbar=no,location=no,status=no,resizable=yes"
+                              );
+                            }}
+                            className="w-full sm:flex-1 inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-primary hover:bg-primary/90 text-primary-foreground text-xs sm:text-sm font-semibold shadow-lg shadow-primary/20 hover:shadow-primary/30 active:scale-95 transition-all cursor-pointer"
                           >
-                            Switch Mirror (S)
+                            <MonitorPlay size={16} weight="bold" />
+                            <span>Launch Popout</span>
                           </button>
-                        </>
-                      )}
+
+                          <a
+                            href={currentServer.src}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-white/10 hover:bg-white/15 border border-white/10 text-white/90 text-xs sm:text-sm font-medium transition-colors"
+                          >
+                            <ArrowSquareOut size={16} weight="bold" />
+                            <span>New Tab</span>
+                          </a>
+                        </div>
+                      </div>
+                    </div>
+                  ) : proxyUrl(posterUrl) ? (
+                    <OptimizedImage
+                      src={proxyUrl(posterUrl)!}
+                      alt={video.filename}
+                      className="w-full h-full object-contain"
+                      containerClassName="w-full h-full"
+                      width="hero"
+                      fallback={
+                        <div className="w-full h-full flex items-center justify-center">
+                          <FilmStrip size={44} weight="duotone" className="text-muted-foreground/20" />
+                        </div>
+                      }
+                    />
+                  ) : (
+                    <div className="w-full h-full flex items-center justify-center">
+                      <FilmStrip size={44} weight="duotone" className="text-muted-foreground/20" />
+                    </div>
+                  )}
+                </div>
+
+                {/* Clean Source Selector — only visible when alternative mirrors exist */}
+                {servers.length > 1 && (
+                  <div className="flex items-center gap-2 pt-1 text-xs text-muted-foreground">
+                    <span className="font-medium text-foreground/80">Source:</span>
+                    <div className="flex items-center gap-1.5 flex-wrap">
+                      {servers.map((s, i) => (
+                        <button
+                          key={i}
+                          onClick={() => handleSelectServer(i)}
+                          className={cn(
+                            "px-2.5 py-1 rounded-lg text-xs font-medium transition-colors cursor-pointer",
+                            activeServer === i
+                              ? "bg-primary text-primary-foreground font-semibold shadow-xs"
+                              : "bg-secondary/70 text-muted-foreground hover:text-foreground hover:bg-secondary"
+                          )}
+                        >
+                          {s.label}
+                        </button>
+                      ))}
                     </div>
                   </div>
                 )}
               </div>
             ) : null}
-
-            {/* Keyboard Shortcuts Dialog */}
-            <DialogRoot open={shortcutsOpen} onOpenChange={setShortcutsOpen}>
-              <DialogContent className="max-w-md bg-card border-border/70 rounded-2xl p-6">
-                <DialogHeader className="mb-4">
-                  <div className="flex items-center gap-2 text-foreground">
-                    <Keyboard size={20} weight="bold" className="text-primary" />
-                    <DialogTitle className="text-base font-semibold">Player Keyboard Shortcuts</DialogTitle>
-                  </div>
-                  <p className="text-xs text-muted-foreground">
-                    Control the video player directly from your keyboard for an uninterrupted cinema experience.
-                  </p>
-                </DialogHeader>
-
-                <div className="space-y-2.5">
-                  {[
-                    { key: "Space / K", desc: "Start playback from poster", action: "Play" },
-                    { key: "F", desc: "Toggle Fullscreen mode", action: "Fullscreen" },
-                    { key: "T", desc: "Toggle Cinema / Theater mode", action: "Theater" },
-                    { key: "N", desc: "Advance to next video", action: "Next Video" },
-                    { key: "S", desc: "Cycle through mirror servers", action: "Next Server" },
-                    { key: "R", desc: "Reload player & refresh ticket", action: "Reload" },
-                    { key: "A", desc: "Toggle ambient backlight glow", action: "Ambient" },
-                    { key: "Esc", desc: "Exit theater or fullscreen", action: "Exit" },
-                  ].map((item) => (
-                    <div
-                      key={item.key}
-                      className="flex items-center justify-between p-2.5 rounded-lg bg-secondary/40 border border-border/40"
-                    >
-                      <div className="flex flex-col">
-                        <span className="text-xs font-medium text-foreground">{item.action}</span>
-                        <span className="text-[11px] text-muted-foreground">{item.desc}</span>
-                      </div>
-                      <kbd className="px-2 py-1 text-xs font-mono font-semibold bg-card border border-border/70 rounded-md text-foreground shadow-xs">
-                        {item.key}
-                      </kbd>
-                    </div>
-                  ))}
-                </div>
-
-                <div className="mt-4 pt-3 border-t border-border/40 flex justify-end">
-                  <button
-                    onClick={() => setShortcutsOpen(false)}
-                    className="px-4 py-1.5 text-xs font-medium rounded-lg border border-border/60 hover:bg-secondary transition-colors cursor-pointer"
-                  >
-                    Close
-                  </button>
-                </div>
-              </DialogContent>
-            </DialogRoot>
 
             {/* Queue â€” up-next strip (seeded from Playlists / Collections / Watch Later) */}
             {queue && queueIndex >= 0 && (
