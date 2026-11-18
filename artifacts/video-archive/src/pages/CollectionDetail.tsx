@@ -242,14 +242,26 @@ export default function CollectionDetail() {
           const mirrors = parsed.thumbnail_mirrors as Record<string, string>;
           if (mirrors.Pixhost) urls.push(mirrors.Pixhost);
           if (mirrors.ImgChest) urls.push(mirrors.ImgChest);
+          if (mirrors.ImgPile) urls.push(mirrors.ImgPile);
           for (const [k, v] of Object.entries(mirrors)) {
-            if (k !== "Pixhost" && k !== "ImgChest" && typeof v === "string" && !urls.includes(v)) {
+            if (!["Pixhost", "ImgChest", "ImgPile", "Catbox"].includes(k) && typeof v === "string" && !urls.includes(v)) {
               urls.push(v);
             }
+          }
+          if (mirrors.Catbox && !urls.includes(mirrors.Catbox)) {
+            urls.push(mirrors.Catbox);
           }
         }
         if (parsed.thumbnail_url && !urls.includes(parsed.thumbnail_url)) {
           urls.push(parsed.thumbnail_url);
+        }
+        if (parsed.preview_mirrors && typeof parsed.preview_mirrors === "object") {
+          const pMirrors = parsed.preview_mirrors as Record<string, string>;
+          if (pMirrors.Pixhost && !urls.includes(pMirrors.Pixhost)) urls.push(pMirrors.Pixhost);
+          if (pMirrors.ImgChest && !urls.includes(pMirrors.ImgChest)) urls.push(pMirrors.ImgChest);
+        }
+        if (parsed.preview_url && !urls.includes(parsed.preview_url)) {
+          urls.push(parsed.preview_url);
         }
       } catch {}
     }
@@ -310,29 +322,26 @@ export default function CollectionDetail() {
           Back to Playlists
         </Link>
 
-        <div className="flex items-start gap-4 mb-8 pb-6 border-b border-border/40">
-          <div className="w-16 h-16 rounded-lg bg-secondary shrink-0 overflow-hidden border border-border/40">
+        <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4 sm:gap-6 mb-8 pb-6 border-b border-border/40">
+          <div className="w-20 h-20 sm:w-24 sm:h-24 rounded-2xl bg-secondary shrink-0 overflow-hidden border border-border/60 shadow-md relative">
             {previewThumbnail ? (
-              <OptimizedImage
+              <img
+                key={previewThumbnail}
                 src={previewThumbnail}
                 alt={playlistName}
-                width="avatar"
+                loading="eager"
+                decoding="async"
+                referrerPolicy="no-referrer"
                 className="w-full h-full object-cover"
-                containerClassName="w-16 h-16"
                 onError={() => {
                   if (previewIndex + 1 < previewCandidates.length) {
                     setPreviewIndex((i) => i + 1);
                   }
                 }}
-                fallback={
-                  <div className="w-16 h-16 flex items-center justify-center bg-secondary">
-                    <FilmStrip size={24} weight="duotone" className="text-muted-foreground/30" />
-                  </div>
-                }
               />
             ) : (
-              <div className="w-16 h-16 flex items-center justify-center bg-secondary">
-                <FilmStrip size={24} weight="duotone" className="text-muted-foreground/30" />
+              <div className="w-full h-full flex items-center justify-center bg-secondary">
+                <FilmStrip size={28} weight="duotone" className="text-muted-foreground/30" />
               </div>
             )}
           </div>
@@ -466,19 +475,19 @@ export default function CollectionDetail() {
             {items.length > 0 && (
               <>
                 <button
+                  onClick={handlePlayAll}
+                  className="flex items-center gap-2 h-10 px-4 text-xs font-semibold bg-primary hover:bg-primary/90 text-primary-foreground transition-all rounded-xl cursor-pointer shadow-xs active:scale-95"
+                >
+                  <Play size={15} weight="fill" />
+                  <span>Play all</span>
+                </button>
+                <button
                   onClick={handleShuffle}
-                  className="flex items-center gap-1.5 h-9 px-2.5 text-xs font-medium border border-border/50 text-muted-foreground hover:border-primary/40 hover:text-primary transition-all rounded-lg cursor-pointer"
+                  className="flex items-center gap-1.5 h-10 px-3.5 text-xs font-medium bg-secondary hover:bg-secondary/80 text-foreground border border-border/50 transition-all rounded-xl cursor-pointer active:scale-95"
                   title="Shuffle play"
                 >
                   <Shuffle size={14} weight="regular" />
                   <span className="hidden sm:inline">Shuffle</span>
-                </button>
-                <button
-                  onClick={handlePlayAll}
-                  className="flex items-center gap-1.5 h-9 px-3.5 text-xs font-semibold border border-primary/30 text-primary hover:border-primary/60 transition-all rounded-lg cursor-pointer"
-                >
-                  <Play size={14} weight="fill" />
-                  Play all
                 </button>
               </>
             )}
@@ -493,7 +502,7 @@ export default function CollectionDetail() {
                     // Delete failed
                   }
                 }}
-                className="flex items-center gap-1.5 h-9 px-3 text-xs font-medium text-muted-foreground/50 hover:text-destructive border border-border/40 hover:border-destructive/40 rounded-lg transition-all cursor-pointer"
+                className="flex items-center gap-1.5 h-10 px-3 text-xs font-medium text-muted-foreground/60 hover:text-destructive border border-border/40 hover:border-destructive/40 hover:bg-destructive/10 rounded-xl transition-all cursor-pointer"
                 title="Delete playlist"
               >
                 <Trash size={14} weight="regular" />

@@ -71560,8 +71560,22 @@ router9.get("/playlists", async (req, res) => {
     const allRecIds = Array.from(
       new Set(colsWithItems.flatMap((c) => c.items.map((it) => it.recording_id)).filter(Boolean))
     );
-    const { data: recData } = allRecIds.length > 0 ? await supabaseProxy.from("recordings").select("id, thumbnail_url, thumbnail_mirrors, preview_url, preview_mirrors").in("id", allRecIds) : { data: [] };
-    const recMap = new Map((recData ?? []).map((r) => [r.id, r]));
+    const [recRes, prevRes] = allRecIds.length > 0 ? await Promise.all([
+      supabaseProxy.from("recordings").select("id, thumbnail_url, thumbnail_mirrors, preview_url, preview_mirrors").in("id", allRecIds),
+      supabaseProxy.from("preview_images").select("recording_id, thumbnail_mirrors, preview_mirrors").in("recording_id", allRecIds)
+    ]) : [{ data: [] }, { data: [] }];
+    const recMap = new Map((recRes.data ?? []).map((r) => [r.id, { ...r }]));
+    for (const prev of prevRes.data ?? []) {
+      if (!prev?.recording_id) continue;
+      const existing = recMap.get(prev.recording_id) ?? { id: prev.recording_id };
+      if (prev.thumbnail_mirrors) {
+        existing.thumbnail_mirrors = { ...existing.thumbnail_mirrors || {}, ...prev.thumbnail_mirrors };
+      }
+      if (prev.preview_mirrors) {
+        existing.preview_mirrors = { ...existing.preview_mirrors || {}, ...prev.preview_mirrors };
+      }
+      recMap.set(prev.recording_id, existing);
+    }
     const enriched = colsWithItems.map(({ col, items, count }) => {
       const enrichedItems = items.map((item) => {
         const rec = recMap.get(item.recording_id);
@@ -71631,8 +71645,22 @@ router9.get("/playlists/:id/items", async (req, res) => {
       return;
     }
     const recIds = Array.from(new Set(items.map((it) => it.recording_id).filter(Boolean)));
-    const { data: recData } = recIds.length > 0 ? await supabaseProxy.from("recordings").select("id, thumbnail_url, thumbnail_mirrors, preview_url, preview_mirrors").in("id", recIds) : { data: [] };
-    const recMap = new Map((recData ?? []).map((r) => [r.id, r]));
+    const [recRes, prevRes] = recIds.length > 0 ? await Promise.all([
+      supabaseProxy.from("recordings").select("id, thumbnail_url, thumbnail_mirrors, preview_url, preview_mirrors").in("id", recIds),
+      supabaseProxy.from("preview_images").select("recording_id, thumbnail_mirrors, preview_mirrors").in("recording_id", recIds)
+    ]) : [{ data: [] }, { data: [] }];
+    const recMap = new Map((recRes.data ?? []).map((r) => [r.id, { ...r }]));
+    for (const prev of prevRes.data ?? []) {
+      if (!prev?.recording_id) continue;
+      const existing = recMap.get(prev.recording_id) ?? { id: prev.recording_id };
+      if (prev.thumbnail_mirrors) {
+        existing.thumbnail_mirrors = { ...existing.thumbnail_mirrors || {}, ...prev.thumbnail_mirrors };
+      }
+      if (prev.preview_mirrors) {
+        existing.preview_mirrors = { ...existing.preview_mirrors || {}, ...prev.preview_mirrors };
+      }
+      recMap.set(prev.recording_id, existing);
+    }
     const enriched = items.map((item) => {
       const rec = recMap.get(item.recording_id);
       if (!rec) return item;
