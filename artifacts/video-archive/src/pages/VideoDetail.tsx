@@ -796,7 +796,6 @@ export default function VideoDetail() {
                       src={currentServer.src}
                       className="w-full h-full border-0"
                       allow="autoplay; fullscreen; picture-in-picture; encrypted-media; accelerometer; gyroscope"
-                      allowFullScreen
                       referrerPolicy={iframeReferrerPolicy(currentServer.src)}
                       title={video.room_title || video.filename}
                     />
