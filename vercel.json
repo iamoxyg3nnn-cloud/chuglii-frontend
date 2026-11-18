@@ -40,7 +40,7 @@
         },
         {
           "key": "Permissions-Policy",
-          "value": "camera=(), microphone=(), geolocation=(), encrypted-media=*, autoplay=*, fullscreen=*"
+          "value": "camera=(), microphone=(), geolocation=(), fullscreen=*, picture-in-picture=*, autoplay=*, encrypted-media=*, display-capture=*, screen-wake-lock=*"
         },
         {
           "key": "Strict-Transport-Security",

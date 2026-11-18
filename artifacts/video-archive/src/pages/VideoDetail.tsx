@@ -53,7 +53,7 @@ import {
   UserCircle, FilmStrip, ThumbsUp, ThumbsDown, BookmarkSimple, ShareNetwork,
   Check, HardDrives, DownloadSimple, Clock, Play, Code, Playlist, Shuffle,
   FolderSimplePlus, Plus, CaretDown, CaretLeft, CaretRight, ArrowSquareOut, SignIn, CheckCircle, ArrowClockwise,
-  SlidersHorizontal, Sparkle, Info, MonitorPlay, Heart,
+  SlidersHorizontal, Sparkle, Info, MonitorPlay, Heart, ArrowsOutSimple,
 } from "@phosphor-icons/react";
 import { cn } from "@/lib/utils";
 
@@ -688,7 +688,7 @@ export default function VideoDetail() {
 
   const handleCopyEmbed = async () => {
     if (!currentServer?.src) return;
-    const code = `<iframe src="${currentServer.src}" width="960" height="540" frameborder="0" allow="autoplay; fullscreen; picture-in-picture"></iframe>`;
+    const code = `<iframe src="${currentServer.src}" width="960" height="540" frameborder="0" allow="autoplay *; fullscreen *; picture-in-picture *; encrypted-media *" allowfullscreen></iframe>`;
     try {
       await navigator.clipboard.writeText(code);
       setEmbedCopied(true);
@@ -795,7 +795,8 @@ export default function VideoDetail() {
                       key={`${currentServer.src}-${activeServer}-${playerReloadKey}`}
                       src={currentServer.src}
                       className="w-full h-full border-0"
-                      allow="autoplay; fullscreen; picture-in-picture; encrypted-media; accelerometer; gyroscope"
+                      allow="autoplay *; fullscreen *; picture-in-picture *; encrypted-media *; accelerometer *; gyroscope *; display-capture *; screen-wake-lock *; clipboard-write *"
+                      allowFullScreen
                       referrerPolicy={iframeReferrerPolicy(currentServer.src)}
                       title={video.room_title || video.filename}
                     />
@@ -879,11 +880,11 @@ export default function VideoDetail() {
                   )}
                 </div>
 
-                {/* Clean Source Selector — only visible when alternative mirrors exist */}
-                {servers.length > 1 && (
-                  <div className="flex items-center gap-2 pt-1 text-xs text-muted-foreground">
-                    <span className="font-medium text-foreground/80">Source:</span>
+                {/* Source Selector & Quick Actions */}
+                <div className="flex items-center justify-between gap-2 pt-1 text-xs text-muted-foreground flex-wrap">
+                  {servers.length > 1 ? (
                     <div className="flex items-center gap-1.5 flex-wrap">
+                      <span className="font-medium text-foreground/80">Source:</span>
                       {servers.map((s, i) => (
                         <button
                           key={i}
@@ -899,8 +900,29 @@ export default function VideoDetail() {
                         </button>
                       ))}
                     </div>
-                  </div>
-                )}
+                  ) : <div />}
+
+                  {currentServer?.type === "iframe" && (
+                    <div className="flex items-center gap-1.5 ml-auto">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          if (!playerRef.current) return;
+                          if (document.fullscreenElement) {
+                            document.exitFullscreen().catch(() => {});
+                          } else {
+                            playerRef.current.requestFullscreen().catch(() => {});
+                          }
+                        }}
+                        className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-medium bg-secondary/60 hover:bg-secondary text-muted-foreground hover:text-foreground border border-border/40 transition-colors cursor-pointer"
+                        title="Toggle Fullscreen"
+                      >
+                        <ArrowsOutSimple size={13} weight="bold" />
+                        <span>Fullscreen</span>
+                      </button>
+                    </div>
+                  )}
+                </div>
               </div>
             ) : null}
 
