@@ -6,6 +6,7 @@ import { Layout } from "@/components/Layout";
 import { AdBanner } from "@/components/ads/AdBanner";
 import { AdLeaderboard } from "@/components/ads/AdLeaderboard";
 import { OptimizedImage } from "@/components/ui/optimized-image";
+import { proxyUrl } from "@/lib/proxy-url";
 import { useAuth } from "@/contexts/AuthContext";
 import { userApi, type CloudCollection } from "@/lib/user-api";
 import { trackActivity } from "@/lib/rum";
