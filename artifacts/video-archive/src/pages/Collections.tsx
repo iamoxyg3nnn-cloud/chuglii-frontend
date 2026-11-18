@@ -86,7 +86,11 @@ export default function Collections() {
     thumbnail: col.first_item_metadata
       ? (() => {
           try {
-            return JSON.parse(col.first_item_metadata).thumbnail_url;
+            const parsed = typeof col.first_item_metadata === "string" ? JSON.parse(col.first_item_metadata) : col.first_item_metadata;
+            const mirrors = parsed?.thumbnail_mirrors as Record<string, string> | undefined;
+            if (mirrors?.Pixhost) return proxyUrl(mirrors.Pixhost);
+            if (mirrors?.ImgChest) return proxyUrl(mirrors.ImgChest);
+            return parsed?.thumbnail_url ? proxyUrl(parsed.thumbnail_url) : null;
           } catch {
             return null;
           }

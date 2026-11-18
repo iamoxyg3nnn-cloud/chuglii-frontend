@@ -71551,22 +71551,44 @@ router9.get("/playlists", async (req, res) => {
     const userIds = Array.from(new Set((cols ?? []).map((c) => c.user_id)));
     const { data: profiles } = userIds.length > 0 ? await supabaseProxy.from("user_profiles").select("user_id, display_name, avatar_url, username").in("user_id", userIds) : { data: [] };
     const profileMap = new Map((profiles ?? []).map((p) => [p.user_id, p]));
-    const enriched = await Promise.all(
+    const colsWithItems = await Promise.all(
       (cols ?? []).map(async (col) => {
         const { data: items, count } = await supabaseProxy.from("user_collection_items").select("recording_id, metadata, added_at, position", { count: "exact", head: false }).eq("collection_id", col.id).order("position", { ascending: true, nullsFirst: false }).order("added_at", { ascending: false }).limit(4);
-        const profile = profileMap.get(col.user_id);
-        return {
-          ...col,
-          item_count: count ?? items?.length ?? 0,
-          items: items ?? [],
-          author: profile ? {
-            display_name: profile.display_name,
-            avatar_url: profile.avatar_url,
-            username: profile.username
-          } : null
-        };
+        return { col, items: items ?? [], count: count ?? items?.length ?? 0 };
       })
     );
+    const allRecIds = Array.from(
+      new Set(colsWithItems.flatMap((c) => c.items.map((it) => it.recording_id)).filter(Boolean))
+    );
+    const { data: recData } = allRecIds.length > 0 ? await supabaseProxy.from("recordings").select("id, thumbnail_url, thumbnail_mirrors, preview_url, preview_mirrors").in("id", allRecIds) : { data: [] };
+    const recMap = new Map((recData ?? []).map((r) => [r.id, r]));
+    const enriched = colsWithItems.map(({ col, items, count }) => {
+      const enrichedItems = items.map((item) => {
+        const rec = recMap.get(item.recording_id);
+        if (!rec) return item;
+        try {
+          const parsed = typeof item.metadata === "string" ? JSON.parse(item.metadata) : item.metadata || {};
+          if (rec.thumbnail_url) parsed.thumbnail_url = rec.thumbnail_url;
+          if (rec.thumbnail_mirrors) parsed.thumbnail_mirrors = rec.thumbnail_mirrors;
+          if (rec.preview_url) parsed.preview_url = rec.preview_url;
+          if (rec.preview_mirrors) parsed.preview_mirrors = rec.preview_mirrors;
+          return { ...item, metadata: JSON.stringify(parsed) };
+        } catch {
+          return item;
+        }
+      });
+      const profile = profileMap.get(col.user_id);
+      return {
+        ...col,
+        item_count: count,
+        items: enrichedItems,
+        author: profile ? {
+          display_name: profile.display_name,
+          avatar_url: profile.avatar_url,
+          username: profile.username
+        } : null
+      };
+    });
     res.json(enriched);
   } catch (err) {
     req.log?.error?.({ err }, "GET /playlists unexpected error");
@@ -71604,7 +71626,28 @@ router9.get("/playlists/:id/items", async (req, res) => {
       res.status(500).json({ error: "Internal server error" });
       return;
     }
-    res.json(items ?? []);
+    if (!items || items.length === 0) {
+      res.json([]);
+      return;
+    }
+    const recIds = Array.from(new Set(items.map((it) => it.recording_id).filter(Boolean)));
+    const { data: recData } = recIds.length > 0 ? await supabaseProxy.from("recordings").select("id, thumbnail_url, thumbnail_mirrors, preview_url, preview_mirrors").in("id", recIds) : { data: [] };
+    const recMap = new Map((recData ?? []).map((r) => [r.id, r]));
+    const enriched = items.map((item) => {
+      const rec = recMap.get(item.recording_id);
+      if (!rec) return item;
+      try {
+        const parsed = typeof item.metadata === "string" ? JSON.parse(item.metadata) : item.metadata || {};
+        if (rec.thumbnail_url) parsed.thumbnail_url = rec.thumbnail_url;
+        if (rec.thumbnail_mirrors) parsed.thumbnail_mirrors = rec.thumbnail_mirrors;
+        if (rec.preview_url) parsed.preview_url = rec.preview_url;
+        if (rec.preview_mirrors) parsed.preview_mirrors = rec.preview_mirrors;
+        return { ...item, metadata: JSON.stringify(parsed) };
+      } catch {
+        return item;
+      }
+    });
+    res.json(enriched);
   } catch (err) {
     req.log?.error?.({ err }, "GET /playlists/:id/items unexpected error");
     res.status(500).json({ error: "Internal server error" });

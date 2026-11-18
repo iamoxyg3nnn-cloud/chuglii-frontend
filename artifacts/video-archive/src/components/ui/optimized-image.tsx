@@ -109,7 +109,7 @@ export const OptimizedImage = memo(function OptimizedImage({
   src,
   alt,
   className,
-  containerClassName,
+  containerClassName = "w-full h-full",
   fallback,
   fetchPriority,
   loading,

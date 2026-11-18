@@ -1,3 +1,4 @@
+import { useState, useMemo } from "react";
 import { Link } from "wouter";
 import { Playlist, FilmStrip, User, Play } from "@phosphor-icons/react";
 import { OptimizedImage } from "@/components/ui/optimized-image";
@@ -29,23 +30,71 @@ interface StackedPlaylistCardProps {
   playlist: PublicPlaylist;
 }
 
-export function StackedPlaylistCard({ playlist }: StackedPlaylistCardProps) {
-  // Extract up to 3 thumbnails for the stacked deck
-  const thumbnails = (playlist.items ?? [])
-    .map((item) => {
-      if (!item.metadata) return null;
-      try {
-        const parsed = JSON.parse(item.metadata);
-        return parsed.thumbnail_url ? proxyUrl(parsed.thumbnail_url) : null;
-      } catch {
-        return null;
+function extractItemThumbnails(item?: PlaylistCardItem | null): string[] {
+  if (!item?.metadata) return [];
+  try {
+    const parsed = typeof item.metadata === "string" ? JSON.parse(item.metadata) : item.metadata;
+    const candidates: string[] = [];
+    if (parsed.thumbnail_mirrors && typeof parsed.thumbnail_mirrors === "object") {
+      const mirrors = parsed.thumbnail_mirrors as Record<string, string>;
+      if (mirrors.Pixhost) candidates.push(mirrors.Pixhost);
+      if (mirrors.ImgChest) candidates.push(mirrors.ImgChest);
+      for (const [k, v] of Object.entries(mirrors)) {
+        if (k !== "Pixhost" && k !== "ImgChest" && typeof v === "string" && !candidates.includes(v)) {
+          candidates.push(v);
+        }
       }
-    })
-    .filter((url): url is string => !!url);
+    }
+    if (parsed.thumbnail_url && !candidates.includes(parsed.thumbnail_url)) {
+      candidates.push(parsed.thumbnail_url);
+    }
+    return candidates.map((u) => proxyUrl(u)).filter((u): u is string => !!u);
+  } catch {
+    return [];
+  }
+}
 
-  const topThumb = thumbnails[0];
-  const midThumb = thumbnails[1] ?? topThumb;
-  const backThumb = thumbnails[2] ?? midThumb ?? topThumb;
+export function StackedPlaylistCard({ playlist }: StackedPlaylistCardProps) {
+  const items = playlist.items ?? [];
+  const topCandidates = useMemo(() => {
+    const list: string[] = [];
+    for (const it of items) {
+      for (const u of extractItemThumbnails(it)) {
+        if (!list.includes(u)) list.push(u);
+      }
+    }
+    return list;
+  }, [items]);
+  const [topIndex, setTopIndex] = useState(0);
+  const topThumb = topCandidates[Math.min(topIndex, Math.max(0, topCandidates.length - 1))] ?? null;
+
+  const midCandidates = useMemo(() => {
+    if (items.length > 1) {
+      const list: string[] = [];
+      for (let i = 1; i < items.length; i++) {
+        for (const u of extractItemThumbnails(items[i])) {
+          if (!list.includes(u)) list.push(u);
+        }
+      }
+      if (list.length > 0) return list;
+    }
+    return topCandidates;
+  }, [items, topCandidates]);
+  const midThumb = midCandidates[0] ?? (playlist.item_count > 1 ? topThumb : null);
+
+  const backCandidates = useMemo(() => {
+    if (items.length > 2) {
+      const list: string[] = [];
+      for (let i = 2; i < items.length; i++) {
+        for (const u of extractItemThumbnails(items[i])) {
+          if (!list.includes(u)) list.push(u);
+        }
+      }
+      if (list.length > 0) return list;
+    }
+    return midCandidates;
+  }, [items, midCandidates]);
+  const backThumb = backCandidates[0] ?? (playlist.item_count > 2 ? (midThumb ?? topThumb) : null);
 
   const authorName =
     playlist.author?.display_name ||
@@ -59,27 +108,31 @@ export function StackedPlaylistCard({ playlist }: StackedPlaylistCardProps) {
     >
       {/* Stacked Thumbnail Deck Container */}
       <div className="relative w-full aspect-video pt-2">
-        {/* Back Stack Layer */}
-        <div className="absolute inset-x-4 -top-2 bottom-4 rounded-xl bg-muted/60 border border-border/40 overflow-hidden transform scale-[0.88] translate-y-[-8px] opacity-60 transition-transform duration-300 group-hover:scale-[0.90] group-hover:translate-y-[-10px] shadow-sm">
-          {backThumb ? (
-            <img src={backThumb} alt="" className="w-full h-full object-cover blur-[0.5px]" />
-          ) : (
-            <div className="w-full h-full bg-secondary/80 flex items-center justify-center">
-              <FilmStrip size={20} weight="duotone" className="text-muted-foreground/30" />
-            </div>
-          )}
-        </div>
+        {/* Back Stack Layer - visible when 3+ items exist */}
+        {playlist.item_count > 2 && (
+          <div className="absolute inset-x-4 -top-2 bottom-4 rounded-xl bg-muted/60 border border-border/40 overflow-hidden transform scale-[0.88] translate-y-[-8px] opacity-60 transition-transform duration-300 group-hover:scale-[0.90] group-hover:translate-y-[-10px] shadow-sm">
+            {backThumb ? (
+              <img src={backThumb} alt="" className="w-full h-full object-cover blur-[0.5px]" loading="lazy" decoding="async" />
+            ) : (
+              <div className="w-full h-full bg-secondary/80 flex items-center justify-center">
+                <FilmStrip size={20} weight="duotone" className="text-muted-foreground/30" />
+              </div>
+            )}
+          </div>
+        )}
 
-        {/* Middle Stack Layer */}
-        <div className="absolute inset-x-2 -top-1 bottom-2 rounded-xl bg-muted/80 border border-border/50 overflow-hidden transform scale-[0.94] translate-y-[-4px] opacity-85 transition-transform duration-300 group-hover:scale-[0.95] group-hover:translate-y-[-5px] shadow-md">
-          {midThumb ? (
-            <img src={midThumb} alt="" className="w-full h-full object-cover" />
-          ) : (
-            <div className="w-full h-full bg-secondary flex items-center justify-center">
-              <FilmStrip size={22} weight="duotone" className="text-muted-foreground/40" />
-            </div>
-          )}
-        </div>
+        {/* Middle Stack Layer - visible when 2+ items exist */}
+        {playlist.item_count > 1 && (
+          <div className="absolute inset-x-2 -top-1 bottom-2 rounded-xl bg-muted/80 border border-border/50 overflow-hidden transform scale-[0.94] translate-y-[-4px] opacity-85 transition-transform duration-300 group-hover:scale-[0.95] group-hover:translate-y-[-5px] shadow-md">
+            {midThumb ? (
+              <img src={midThumb} alt="" className="w-full h-full object-cover" loading="lazy" decoding="async" />
+            ) : (
+              <div className="w-full h-full bg-secondary flex items-center justify-center">
+                <FilmStrip size={22} weight="duotone" className="text-muted-foreground/40" />
+              </div>
+            )}
+          </div>
+        )}
 
         {/* Top Front Layer */}
         <div className="relative w-full h-full rounded-xl overflow-hidden border border-border/60 bg-secondary shadow-lg transition-transform duration-300 group-hover:scale-[1.01]">
@@ -88,6 +141,18 @@ export function StackedPlaylistCard({ playlist }: StackedPlaylistCardProps) {
               src={topThumb}
               alt={playlist.name}
               className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
+              containerClassName="w-full h-full"
+              width="card"
+              onError={() => {
+                if (topIndex + 1 < topCandidates.length) {
+                  setTopIndex((i) => i + 1);
+                }
+              }}
+              fallback={
+                <div className="w-full h-full flex items-center justify-center bg-secondary/90">
+                  <FilmStrip size={28} weight="duotone" className="text-muted-foreground/30" />
+                </div>
+              }
             />
           ) : (
             <div className="w-full h-full flex items-center justify-center bg-secondary/90">

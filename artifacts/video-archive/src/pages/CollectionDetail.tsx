@@ -232,17 +232,32 @@ export default function CollectionDetail() {
   const playlistCreatedAt = publicPlaylist?.created_at;
   const authorName = publicPlaylist?.author?.display_name || publicPlaylist?.author?.username || "Community User";
 
-  const previewThumbnail = (() => {
-    const first = items[0];
-    if (first?.metadata) {
+  const previewCandidates = useMemo(() => {
+    const urls: string[] = [];
+    for (const it of items) {
+      if (!it?.metadata) continue;
       try {
-        return proxyUrl(JSON.parse(first.metadata).thumbnail_url);
-      } catch {
-        return null;
-      }
+        const parsed = typeof it.metadata === "string" ? JSON.parse(it.metadata) : it.metadata;
+        if (parsed.thumbnail_mirrors && typeof parsed.thumbnail_mirrors === "object") {
+          const mirrors = parsed.thumbnail_mirrors as Record<string, string>;
+          if (mirrors.Pixhost) urls.push(mirrors.Pixhost);
+          if (mirrors.ImgChest) urls.push(mirrors.ImgChest);
+          for (const [k, v] of Object.entries(mirrors)) {
+            if (k !== "Pixhost" && k !== "ImgChest" && typeof v === "string" && !urls.includes(v)) {
+              urls.push(v);
+            }
+          }
+        }
+        if (parsed.thumbnail_url && !urls.includes(parsed.thumbnail_url)) {
+          urls.push(parsed.thumbnail_url);
+        }
+      } catch {}
     }
-    return null;
-  })();
+    return urls.map((u) => proxyUrl(u)).filter((u): u is string => !!u);
+  }, [items]);
+
+  const [previewIndex, setPreviewIndex] = useState(0);
+  const previewThumbnail = previewCandidates[Math.min(previewIndex, Math.max(0, previewCandidates.length - 1))] ?? null;
 
   const listItems = (): QueueItem[] =>
     publicItems.map((it) => toQueueItem(parseCloudItem(it))).filter((it): it is QueueItem => it !== null);
@@ -304,6 +319,11 @@ export default function CollectionDetail() {
                 width="avatar"
                 className="w-full h-full object-cover"
                 containerClassName="w-16 h-16"
+                onError={() => {
+                  if (previewIndex + 1 < previewCandidates.length) {
+                    setPreviewIndex((i) => i + 1);
+                  }
+                }}
                 fallback={
                   <div className="w-16 h-16 flex items-center justify-center bg-secondary">
                     <FilmStrip size={24} weight="duotone" className="text-muted-foreground/30" />
