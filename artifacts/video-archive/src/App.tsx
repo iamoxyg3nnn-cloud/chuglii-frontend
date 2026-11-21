@@ -62,6 +62,8 @@ const RequestPage = lazyWithSkeleton(() => import("@/pages/RequestPage"), <Skele
 const ContentRemoval = lazyWithSkeleton(() => import("@/pages/ContentRemoval"), <SkeletonSimplePage rows={4} />, "ContentRemoval");
 const MyRequests = lazyWithSkeleton(() => import("@/pages/MyRequests"), <SkeletonSimplePage rows={6} />, "MyRequests");
 const Premium = lazyWithSkeleton(() => import("@/pages/Premium"), <SkeletonSimplePage rows={6} />, "Premium");
+const LeakFeed = lazyWithSkeleton(() => import("@/pages/LeakFeed"), <SkeletonGridPage count={12} />, "LeakFeed");
+const LeakWatch = lazyWithSkeleton(() => import("@/pages/LeakWatch"), <SkeletonDetailPage />, "LeakWatch");
 
 const NotFound = lazyWithSkeleton(() => import("@/pages/not-found"), <SkeletonSimplePage rows={3} />, "NotFound");
 
@@ -228,6 +230,8 @@ function Router() {
         <Route path="/admin/*">
           <ProtectedRoute requiredRole="admin"><AdminPage /></ProtectedRoute>
         </Route>
+        <Route path="/leak/video/:id" component={LeakWatch} />
+        <Route path="/leak" component={LeakFeed} />
         <Route path="/premium" component={Premium} />
         <Route path="/login" component={Login} />
         <Route path="/signup" component={Signup} />

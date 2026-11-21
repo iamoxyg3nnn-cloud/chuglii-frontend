@@ -15,6 +15,7 @@ import {
   Gear,
   SunDim,
   MoonStars,
+  Flame,
 } from "@phosphor-icons/react";
 import { NAV_LINKS } from "./DesktopNav";
 import { prefetchRoute } from "@/lib/route-chunks";
@@ -93,6 +94,22 @@ export function MobileMenu({
                 </Link>
               );
             })}
+            {/* Leaks Feed link in Mobile Menu */}
+            <Link href="/leak" aria-current={isActiveNavigationRoute("/leak", location) ? "page" : undefined}>
+              <span
+                className={`block px-3 py-2.5 text-sm rounded-lg transition-all duration-150 inline-flex items-center gap-2.5 ${
+                  isActiveNavigationRoute("/leak", location)
+                    ? "text-rose-400 font-medium bg-rose-500/15 border border-rose-500/30"
+                    : "text-rose-400/90 hover:text-rose-300 hover:bg-rose-500/10"
+                }`}
+                onClick={onClose}
+                onMouseEnter={() => prefetchRoute("/leak")}
+                onFocus={() => prefetchRoute("/leak")}
+              >
+                <Flame size={17} weight="fill" className="text-rose-500 animate-pulse" />
+                Leaks
+              </span>
+            </Link>
             <button
               onClick={() => { onClose?.(); onRequestOpen?.(); }}
               onMouseEnter={() => prefetchRoute("/request")}

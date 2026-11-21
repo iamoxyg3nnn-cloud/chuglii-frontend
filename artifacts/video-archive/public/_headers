@@ -3,6 +3,7 @@
   X-Frame-Options: DENY
   Referrer-Policy: strict-origin-when-cross-origin
   X-XSS-Protection: 0
+  Access-Control-Allow-Origin: *
   Permissions-Policy: camera=(), microphone=(), geolocation=(), fullscreen=*, picture-in-picture=*, autoplay=*, encrypted-media=*, display-capture=*, screen-wake-lock=*
   Strict-Transport-Security: max-age=31536000
 

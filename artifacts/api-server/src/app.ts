@@ -26,7 +26,7 @@ app.use(pinoHttp({
   }
 }));
 
-const DEFAULT_ALLOWED_ORIGINS=new Set(["https://chuglii.in","https://www.chuglii.in"]);
+const DEFAULT_ALLOWED_ORIGINS=new Set(["https://chuglii.in","https://www.chuglii.in","https://chuglii.pages.dev"]);
 const CONFIGURED_ALLOWED_ORIGINS=new Set((process.env.CORS_ALLOWED_ORIGINS??"").split(",").map(v=>v.trim()).filter(Boolean));
 const deploymentHost=process.env.VERCEL_URL?.trim();
 if(deploymentHost){

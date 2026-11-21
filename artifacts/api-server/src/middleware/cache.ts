@@ -911,12 +911,10 @@ export async function purgeAllCache(): Promise<{
 }> {
   const local = await purgeLocalCache();
 
-  // Memory + Redis are gone, but the Vercel CDN still holds copies keyed by
+  // Memory + Redis are gone, but the Cloudflare CDN still holds copies keyed by
   // the s-maxage advertised in cached responses. Best-effort purge it so an
-  // admin purge actually takes effect at the edge; fails open (no token or no
-  // project id configured → simply reports cdnPurged: false). Only the
-  // originating instance pokes the CDN — peers just clear their local caches.
-  const cdnPurged = await purgeVercelCdn();
+  // admin purge actually takes effect at the edge; fails open.
+  const cdnPurged = await purgeCdn();
 
   publishInvalidation({ type: "purge" });
 
@@ -928,34 +926,35 @@ export async function purgeAllCache(): Promise<{
 }
 
 /**
- * Best-effort purge of the Vercel CDN edge cache for the whole project.
- * Requires VERCEL_TOKEN (with the project's scope) and VERCEL_PROJECT_ID in
- * the function environment. Returns false (never throws) when not configured
- * or the API call fails.
+ * Best-effort purge of the Cloudflare CDN edge cache for the whole zone.
+ * Requires CLOUDFLARE_API_TOKEN in the environment.
+ * Returns false (never throws) when not configured or the API call fails.
  */
-export async function purgeVercelCdn(): Promise<boolean> {
-  const token = process.env.VERCEL_TOKEN ?? "";
-  const projectId = process.env.VERCEL_PROJECT_ID ?? "";
-  if (!token || !projectId) return false;
+export async function purgeCdn(): Promise<boolean> {
+  const token = process.env.CLOUDFLARE_API_TOKEN ?? "";
+  const zoneId = process.env.CLOUDFLARE_ZONE_ID ?? process.env.CF_ZONE_ID ?? "9ea004236ef65e8443b72142aa61fa9d";
+  if (!token || !zoneId) return false;
   try {
     const res = await fetch(
-      `https://api.vercel.com/v1/projects/${encodeURIComponent(projectId)}/cache/purge`,
+      `https://api.cloudflare.com/client/v4/zones/${encodeURIComponent(zoneId)}/purge_cache`,
       {
         method: "POST",
         headers: {
           authorization: `Bearer ${token}`,
           "content-type": "application/json",
         },
-        body: JSON.stringify({ type: "all" }),
+        body: JSON.stringify({ purge_everything: true }),
         signal: AbortSignal.timeout(10_000),
       },
     );
     return res.ok;
   } catch (err: unknown) {
-    logger.warn({ err }, "Vercel CDN purge failed (best-effort)");
+    logger.warn({ err }, "Cloudflare CDN purge failed (best-effort)");
     return false;
   }
 }
+
+export const purgeVercelCdn = purgeCdn;
 
 // ─── Stats & Metrics ──────────────────────────────────────────────
 
