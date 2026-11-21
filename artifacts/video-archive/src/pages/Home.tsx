@@ -106,7 +106,7 @@ export default function Home() {
   return (
     <Layout>
       {/* Hero */}
-      <section className="relative border-b border-border/50 px-4 sm:px-6 py-20 md:py-28 overflow-hidden">
+      <section className="relative border-b border-border/50 px-4 sm:px-6 py-20 md:py-28 overflow-hidden section-pattern">
         <div className="container mx-auto max-w-4xl text-center relative">
           <div className="mb-4 flex items-center gap-3 animate-fade-in-up" style={{ animationDelay: '0ms' }}>
             <div className="h-px flex-1 bg-border/50" />
@@ -183,7 +183,7 @@ export default function Home() {
       )}
 
       {/* Recordings — tabs */}
-      <section className="px-4 sm:px-6 py-14 relative overflow-hidden">
+      <section className="px-4 sm:px-6 py-14 relative overflow-hidden section-pattern">
         <div className="container mx-auto">
           <div className="flex items-center justify-between mb-8">
             {/* Tabs */}
@@ -316,7 +316,7 @@ export default function Home() {
       )}
 
       {/* Mid-page ad divider — 728×90 / 468×60 / 300×100 */}
-      <section className="px-4 sm:px-6 py-6 border-t border-border/50">
+      <section className="px-4 sm:px-6 py-6 border-t border-border/50 section-pattern">
         <div className="container mx-auto">
           <AdLeaderboard />
         </div>
@@ -363,7 +363,7 @@ export default function Home() {
 
       {/* Popular Tags */}
       {Array.isArray(tags) && tags.length > 0 && (
-        <section className="border-t border-border/50 px-4 sm:px-6 py-14 relative overflow-hidden">
+        <section className="border-t border-border/50 px-4 sm:px-6 py-14 relative overflow-hidden section-pattern">
           <div className="container mx-auto relative">
             <div className="flex items-center justify-between mb-8">
               <h2 className="flex items-center gap-2 text-xs uppercase tracking-[0.25em] text-muted-foreground font-semibold">
