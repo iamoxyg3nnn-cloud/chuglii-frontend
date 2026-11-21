@@ -15,21 +15,22 @@ import {
   CaretDown,
   Funnel,
   FilmStrip,
-  ArrowClockwise
+  ArrowClockwise,
+  BookmarkSimple
 } from "@phosphor-icons/react";
 
-const FILTER_TAGS = [
-  "All",
-  "desi",
-  "bhabhi",
-  "amateur",
-  "teen",
-  "web-series",
-  "milf",
-  "mature",
-  "village",
-  "mallu",
-  "tamil"
+const CATEGORY_TABS = [
+  { id: "All", label: "All Leaks" },
+  { id: "indian", label: "Indian" },
+  { id: "desi", label: "Desi MMS" },
+  { id: "bhabhi", label: "Bhabhi" },
+  { id: "viral", label: "Viral Clips" },
+  { id: "web-series", label: "Web Series" },
+  { id: "amateur", label: "Amateur" },
+  { id: "teen", label: "Teen" },
+  { id: "village", label: "Village" },
+  { id: "pakistani", label: "Pakistani" },
+  { id: "Saved", label: "Saved" },
 ];
 
 const SORT_OPTIONS: { id: ScrapedSortOption; label: string }[] = [
@@ -58,6 +59,15 @@ export default function LeakFeed() {
   const [searchQuery, setSearchQuery] = useState<string>(initialSearch);
   const [debouncedSearch, setDebouncedSearch] = useState<string>(initialSearch);
   const [sortOpen, setSortOpen] = useState(false);
+  const [savedIds, setSavedIds] = useState<string[]>([]);
+
+  // Load saved bookmarks from localStorage
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem("chuglii_saved_leaks");
+      if (raw) setSavedIds(JSON.parse(raw));
+    } catch {}
+  }, []);
 
   // Sync state if URL query params change externally
   useEffect(() => {
@@ -108,12 +118,6 @@ export default function LeakFeed() {
     updateQueryParams(activeTag, 1, sort, debouncedSearch);
   };
 
-  const handlePageChange = (page: number) => {
-    setCurrentPage(page);
-    updateQueryParams(activeTag, page, activeSort, debouncedSearch);
-    window.scrollTo({ top: 0, behavior: "smooth" });
-  };
-
   const handleClearSearch = () => {
     setSearchQuery("");
     setDebouncedSearch("");
@@ -121,57 +125,106 @@ export default function LeakFeed() {
     updateQueryParams(activeTag, 1, activeSort, "");
   };
 
-  // Query Supabase directly
-  const { data, isLoading, isFetching } = useScrapedVideos({
-    tag: activeTag === "All" ? undefined : activeTag,
-    search: debouncedSearch,
+  // Query Hook - if "Saved" is selected, don't pass tag to hook, we filter client-side
+  const queryTag = activeTag === "Saved" || activeTag === "All" ? undefined : activeTag;
+
+  const {
+    videos: rawVideos,
+    totalCount,
+    totalPages,
+    isLoading,
+    isFetching,
+    stats,
+    refetch
+  } = useScrapedVideos({
+    tag: queryTag,
+    search: debouncedSearch || undefined,
     sort: activeSort,
-    limit: ITEMS_PER_PAGE,
     page: currentPage,
+    limit: ITEMS_PER_PAGE,
   });
 
-  const videos = data?.items || [];
-  const totalCount = data?.total || 0;
+  // Client-side filter for Saved tab
+  const videos = activeTag === "Saved"
+    ? rawVideos.filter((v) => savedIds.includes(v.id))
+    : rawVideos;
+
+  // Active hover preview state
+  const [hoveredVideoId, setHoveredVideoId] = useState<string | null>(null);
+  const hoverTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
+  const handleMouseEnter = (id: string) => {
+    if (hoverTimeoutRef.current) clearTimeout(hoverTimeoutRef.current);
+    hoverTimeoutRef.current = setTimeout(() => {
+      setHoveredVideoId(id);
+    }, 200);
+  };
+
+  const handleMouseLeave = () => {
+    if (hoverTimeoutRef.current) clearTimeout(hoverTimeoutRef.current);
+    setHoveredVideoId(null);
+  };
 
   return (
     <Layout>
-      <div className="min-h-screen bg-background text-foreground pb-24">
-        {/* Header / Banner matching Browse hero */}
-        <section className="relative border-b border-border/50 px-4 sm:px-6 py-8 overflow-hidden bg-card/20 backdrop-blur-sm">
-          <div className="container mx-auto max-w-7xl">
-            <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
+      <div className="min-h-screen bg-background text-foreground pb-20">
+        {/* Hero Section */}
+        <section className="relative border-b border-border/50 bg-linear-to-b from-rose-950/20 via-background to-background py-8 sm:py-12">
+          <div className="container mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+            <div className="flex flex-col md:flex-row md:items-end justify-between gap-6">
               <div>
-                <div className="flex items-center gap-2.5 mb-2">
-                  <span className="p-2 rounded-xl bg-rose-500/10 border border-rose-500/20 text-rose-500 shadow-sm shadow-rose-500/10">
-                    <Flame size={24} weight="fill" className="animate-pulse" />
-                  </span>
-                  <div>
-                    <div className="flex items-center gap-2">
-                      <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight text-foreground">
-                        Leaks Catalog
-                      </h1>
-                      <span className="text-xs font-semibold px-2 py-0.5 rounded-full bg-rose-500/15 text-rose-400 border border-rose-500/30">
-                        {totalCount.toLocaleString()} Videos
-                      </span>
-                    </div>
-                  </div>
+                <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-rose-500/10 text-rose-500 border border-rose-500/20 text-xs font-semibold uppercase tracking-wider mb-3">
+                  <Flame size={14} weight="fill" className="animate-pulse" />
+                  Exclusive Leaks & MMS Archive
                 </div>
-                <p className="text-xs sm:text-sm text-muted-foreground max-w-xl">
-                  Dedicated scraped archive. Full direct CDN streams, hover trailers, and categorized Indian leaks.
+                <h1 className="text-2xl sm:text-4xl font-extrabold tracking-tight text-foreground">
+                  Desi Leaks & Viral Video Feed
+                </h1>
+                <p className="mt-2 text-sm sm:text-base text-muted-foreground max-w-2xl leading-relaxed">
+                  Stream thousands of viral Indian clips, leaked web-series, and exclusive private tapes in high quality with instant previews.
                 </p>
               </div>
 
-              {/* Search Bar matching the real frontend Search component */}
-              <div className="relative w-full md:w-80">
+              {/* Stats badges */}
+              <div className="flex flex-wrap items-center gap-2.5 sm:gap-3 text-xs shrink-0">
+                <div className="px-3.5 py-2 rounded-xl bg-card border border-border/60 shadow-xs flex items-center gap-2">
+                  <FilmStrip size={16} className="text-rose-500" />
+                  <span className="font-semibold text-foreground">
+                    {stats?.total_videos ? stats.total_videos.toLocaleString() : "9,240+"}
+                  </span>
+                  <span className="text-muted-foreground">Videos</span>
+                </div>
+                <div className="px-3.5 py-2 rounded-xl bg-card border border-border/60 shadow-xs flex items-center gap-2">
+                  <Sparkle size={16} className="text-amber-400" />
+                  <span className="font-semibold text-foreground">
+                    {stats?.with_streams ? stats.with_streams.toLocaleString() : "8,000+"}
+                  </span>
+                  <span className="text-muted-foreground">MP4 Streams</span>
+                </div>
+                <button
+                  onClick={() => refetch()}
+                  title="Refresh leaks"
+                  className={`p-2 rounded-xl bg-card border border-border/60 hover:bg-secondary text-muted-foreground hover:text-foreground transition-all cursor-pointer ${
+                    isFetching ? "animate-spin text-rose-500" : ""
+                  }`}
+                >
+                  <ArrowClockwise size={16} />
+                </button>
+              </div>
+            </div>
+
+            {/* Search Input */}
+            <div className="mt-6 sm:mt-8 max-w-2xl">
+              <div className="relative">
                 <MagnifyingGlass
                   size={16}
-                  className="absolute left-3.5 top-1/2 -translate-y-1/2 text-muted-foreground"
+                  className="absolute left-3.5 top-1/2 -translate-y-1/2 text-muted-foreground/80 pointer-events-none"
                 />
                 <input
                   type="text"
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
-                  placeholder="Search scraped leak titles..."
+                  placeholder="Search scraped leak titles, models, tags..."
                   className="w-full h-10 pl-9 pr-9 rounded-xl bg-card border border-border/60 text-sm placeholder:text-muted-foreground/70 focus:outline-none focus:ring-2 focus:ring-rose-500/40 focus:border-rose-500/50 transition-all shadow-inner"
                 />
                 {searchQuery && (
@@ -186,25 +239,34 @@ export default function LeakFeed() {
               </div>
             </div>
 
-            {/* Filter Pills & Sort Dropdown bar */}
+            {/* Category Filter Pills & Sort Dropdown bar */}
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mt-6 pt-5 border-t border-border/40">
               {/* Category / Tag pills */}
               <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar py-1 max-w-full">
-                {FILTER_TAGS.map((tag) => {
-                  const isActive = activeTag.toLowerCase() === tag.toLowerCase();
+                {CATEGORY_TABS.map((tab) => {
+                  const isActive = activeTag.toLowerCase() === tab.id.toLowerCase();
+                  const isSavedTab = tab.id === "Saved";
                   return (
                     <button
-                      key={tag}
-                      onClick={() => handleTagClick(tag)}
+                      key={tab.id}
+                      onClick={() => handleTagClick(tab.id)}
                       type="button"
-                      className={`px-3 py-1.5 rounded-full text-xs font-medium transition-all duration-150 cursor-pointer capitalize whitespace-nowrap shrink-0 ${
+                      className={`px-3 py-1.5 rounded-full text-xs font-medium transition-all duration-150 cursor-pointer capitalize whitespace-nowrap shrink-0 flex items-center gap-1.5 ${
                         isActive
                           ? "bg-rose-500 text-white shadow-sm shadow-rose-500/25 ring-1 ring-rose-400/50"
                           : "bg-secondary/70 hover:bg-secondary text-muted-foreground hover:text-foreground border border-border/40"
                       }`}
                     >
-                      {tag === "All" && <Sparkle size={12} weight="fill" className="inline mr-1 -mt-0.5" />}
-                      {tag}
+                      {tab.id === "All" && <Sparkle size={12} weight="fill" />}
+                      {isSavedTab && <BookmarkSimple size={13} weight={isActive ? "fill" : "bold"} className={isActive ? "text-white" : "text-rose-400"} />}
+                      <span>{tab.label}</span>
+                      {isSavedTab && savedIds.length > 0 && (
+                        <span className={`px-1.5 py-0.2 rounded-full text-[10px] font-bold ${
+                          isActive ? "bg-white/20 text-white" : "bg-rose-500/15 text-rose-400"
+                        }`}>
+                          {savedIds.length}
+                        </span>
+                      )}
                     </button>
                   );
                 })}
@@ -257,150 +319,153 @@ export default function LeakFeed() {
             ) : videos.length === 0 ? (
               <div className="text-center py-24 bg-card/20 rounded-2xl border border-border/40 max-w-xl mx-auto px-4">
                 <FilmStrip size={48} className="mx-auto text-muted-foreground/40 mb-3" />
-                <h3 className="text-lg font-bold text-foreground mb-1">No videos found</h3>
+                <h3 className="text-lg font-bold text-foreground mb-1">
+                  {activeTag === "Saved" ? "No saved leaks yet" : "No videos found"}
+                </h3>
                 <p className="text-sm text-muted-foreground mb-4">
-                  {debouncedSearch
-                    ? `No scraped videos matched "${debouncedSearch}".`
-                    : `No items found under tag "${activeTag}".`}
+                  {activeTag === "Saved"
+                    ? "Click the bookmark icon on any leak video to save it here for quick access."
+                    : "Try adjusting your search terms or selecting a different category."}
                 </p>
-                <button
-                  onClick={() => {
-                    setActiveTag("All");
-                    handleClearSearch();
-                  }}
-                  type="button"
-                  className="px-4 py-2 rounded-xl text-xs font-semibold bg-rose-500 text-white hover:bg-rose-600 transition-colors cursor-pointer"
-                >
-                  Clear Filters
-                </button>
+                {(activeTag !== "All" || debouncedSearch) && (
+                  <button
+                    onClick={() => {
+                      setActiveTag("All");
+                      handleClearSearch();
+                    }}
+                    className="px-4 py-2 rounded-xl text-xs font-medium bg-rose-500 text-white hover:bg-rose-600 transition-colors cursor-pointer"
+                  >
+                    View All Leaks
+                  </button>
+                )}
               </div>
             ) : (
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-                {videos.map((video) => (
-                  <LeakCard key={video.id} video={video} />
-                ))}
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-5 sm:gap-6">
+                {videos.map((item) => {
+                  const isHovered = hoveredVideoId === item.id;
+                  const isSaved = savedIds.includes(item.id);
+
+                  return (
+                    <div
+                      key={item.id}
+                      className="group flex flex-col bg-card/40 border border-border/40 hover:border-rose-500/50 hover:shadow-xl rounded-2xl overflow-hidden transition-all duration-200"
+                      onMouseEnter={() => handleMouseEnter(item.id)}
+                      onMouseLeave={handleMouseLeave}
+                    >
+                      {/* Media container */}
+                      <Link href={`/leak/video/${item.id}`}>
+                        <div className="relative aspect-video w-full bg-muted/60 overflow-hidden cursor-pointer">
+                          {isHovered && item.trailer_preview_url ? (
+                            <video
+                              src={item.trailer_preview_url}
+                              autoPlay
+                              muted
+                              loop
+                              playsInline
+                              className="w-full h-full object-cover transition-opacity duration-200"
+                            />
+                          ) : (
+                            <img
+                              src={item.clean_thumbnail_url || item.thumbnail_url || undefined}
+                              alt={item.title}
+                              loading="lazy"
+                              className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                            />
+                          )}
+
+                          {/* Duration Badge */}
+                          {item.duration_formatted && (
+                            <div className="absolute bottom-2 right-2 px-1.5 py-0.5 rounded-md bg-black/80 backdrop-blur-xs text-[11px] font-semibold text-white tracking-wide">
+                              {item.duration_formatted}
+                            </div>
+                          )}
+
+                          {/* MP4 Stream Available indicator */}
+                          {item.full_video_url && (
+                            <div className="absolute top-2 left-2 px-1.5 py-0.5 rounded-md bg-rose-500/90 text-white text-[10px] font-bold uppercase tracking-wider shadow-sm">
+                              HD Stream
+                            </div>
+                          )}
+
+                          {/* Hover Play Icon overlay */}
+                          <div className="absolute inset-0 bg-black/20 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                            <div className="w-10 h-10 rounded-full bg-rose-500/90 text-white flex items-center justify-center shadow-lg transform scale-75 group-hover:scale-100 transition-transform">
+                              <Play size={18} weight="fill" className="ml-0.5" />
+                            </div>
+                          </div>
+
+                          {/* Saved icon badge */}
+                          {isSaved && (
+                            <div className="absolute top-2 right-2 p-1 rounded-md bg-rose-500 text-white shadow-sm">
+                              <BookmarkSimple size={12} weight="fill" />
+                            </div>
+                          )}
+                        </div>
+                      </Link>
+
+                      {/* Content Card Body */}
+                      <div className="p-3.5 flex flex-col flex-1 justify-between gap-2">
+                        <div>
+                          <Link href={`/leak/video/${item.id}`}>
+                            <h3 className="font-semibold text-sm line-clamp-2 text-foreground group-hover:text-rose-400 transition-colors cursor-pointer leading-snug">
+                              {item.title}
+                            </h3>
+                          </Link>
+
+                          {/* Tags snippet */}
+                          {item.tags && item.tags.length > 0 && (
+                            <div className="flex flex-wrap gap-1 mt-2">
+                              {item.tags.slice(0, 3).map((t) => (
+                                <button
+                                  key={t}
+                                  onClick={(e) => {
+                                    e.preventDefault();
+                                    handleTagClick(t);
+                                  }}
+                                  className="text-[10px] text-muted-foreground hover:text-rose-400 px-1.5 py-0.5 rounded bg-secondary/80 transition-colors"
+                                >
+                                  #{t}
+                                </button>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+
+                        {/* Card Footer: views & rating */}
+                        <div className="flex items-center justify-between text-[11px] text-muted-foreground pt-2 border-t border-border/30">
+                          <span className="flex items-center gap-1 font-medium">
+                            <Eye size={12} /> {item.views_raw || "0 views"}
+                          </span>
+                          {item.rating_raw && (
+                            <span className="flex items-center gap-1 text-emerald-400 font-semibold">
+                              <ThumbsUp size={11} weight="fill" /> {item.rating_raw}
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
               </div>
             )}
 
-            {/* Standard App Pagination component */}
-            <div className="mt-12 flex justify-center">
-              <AppPagination
-                itemsCount={totalCount}
-                itemsPerPage={ITEMS_PER_PAGE}
-                currentPage={currentPage}
-                onPageChange={handlePageChange}
-              />
-            </div>
+            {/* Pagination Controls */}
+            {totalPages > 1 && (
+              <div className="mt-10 flex justify-center">
+                <AppPagination
+                  currentPage={currentPage}
+                  totalPages={totalPages}
+                  onPageChange={(page) => {
+                    setCurrentPage(page);
+                    updateQueryParams(activeTag, page, activeSort, debouncedSearch);
+                    window.scrollTo({ top: 0, behavior: "smooth" });
+                  }}
+                />
+              </div>
+            )}
           </div>
         </section>
       </div>
     </Layout>
-  );
-}
-
-function LeakCard({ video }: { video: ScrapedVideo }) {
-  const [isHovered, setIsHovered] = useState(false);
-  const videoRef = useRef<HTMLVideoElement | null>(null);
-
-  useEffect(() => {
-    if (isHovered && videoRef.current && video.trailer_preview_url) {
-      videoRef.current.currentTime = 0;
-      videoRef.current.play().catch(() => {});
-    } else if (!isHovered && videoRef.current) {
-      videoRef.current.pause();
-    }
-  }, [isHovered, video.trailer_preview_url]);
-
-  return (
-    <Link href={`/leak/video/${video.id}`}>
-      <div
-        onMouseEnter={() => setIsHovered(true)}
-        onMouseLeave={() => setIsHovered(false)}
-        className="group rounded-2xl overflow-hidden bg-card border border-border/50 hover:border-rose-500/60 hover:shadow-2xl hover:shadow-rose-500/10 transition-all duration-300 cursor-pointer flex flex-col h-full"
-      >
-        {/* Thumbnail / Hover Video Preview */}
-        <div className="relative aspect-video w-full bg-black/60 overflow-hidden">
-          {video.trailer_preview_url && isHovered ? (
-            <video
-              ref={videoRef}
-              src={video.trailer_preview_url}
-              loop
-              muted
-              playsInline
-              className="w-full h-full object-cover"
-            />
-          ) : (
-            <img
-              src={video.thumbnail_url || ""}
-              alt={video.title}
-              loading="lazy"
-              className="w-full h-full object-cover group-hover:scale-[1.03] transition-transform duration-300"
-            />
-          )}
-
-          {/* Hover Play Button Overlay */}
-          <div className="absolute inset-0 bg-black/30 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center pointer-events-none">
-            <div className="w-12 h-12 rounded-full bg-rose-500/95 text-white flex items-center justify-center shadow-xl shadow-rose-500/50 transform group-hover:scale-110 transition-transform">
-              <Play size={20} weight="fill" className="ml-0.5" />
-            </div>
-          </div>
-
-          {/* Duration Badge */}
-          {video.duration_formatted && (
-            <div className="absolute bottom-2.5 right-2.5 px-1.5 py-0.5 rounded-md bg-black/85 backdrop-blur-sm text-[11px] font-semibold text-white tracking-wide border border-white/10 shadow-sm">
-              {video.duration_formatted}
-            </div>
-          )}
-
-          {/* Views Badge */}
-          {video.views_raw && (
-            <div className="absolute bottom-2.5 left-2.5 px-2 py-0.5 rounded-md bg-black/75 backdrop-blur-sm text-[11px] text-white/90 font-medium flex items-center gap-1 border border-white/10 shadow-sm">
-              <Eye size={12} /> {video.views_raw}
-            </div>
-          )}
-        </div>
-
-        {/* Card Body matching VideoCard metadata */}
-        <div className="p-4 flex-1 flex flex-col justify-between">
-          <div>
-            <h3 className="text-sm font-semibold line-clamp-2 text-foreground group-hover:text-rose-400 transition-colors leading-snug">
-              {video.title}
-            </h3>
-
-            {/* Tags preview */}
-            {video.tags && video.tags.length > 0 && (
-              <div className="flex flex-wrap items-center gap-1 mt-2.5">
-                {video.tags.slice(0, 2).map((t) => (
-                  <span
-                    key={t}
-                    className="px-2 py-0.5 rounded-md bg-secondary/80 text-[10px] text-muted-foreground font-medium capitalize"
-                  >
-                    #{t}
-                  </span>
-                ))}
-                {video.tags.length > 2 && (
-                  <span className="text-[10px] text-muted-foreground/60">
-                    +{video.tags.length - 2}
-                  </span>
-                )}
-              </div>
-            )}
-          </div>
-
-          {/* Card Footer: Source & Upvotes */}
-          <div className="mt-4 pt-3 border-t border-border/30 flex items-center justify-between text-xs text-muted-foreground">
-            <span className="font-semibold uppercase tracking-wider text-[10px] text-rose-400">
-              {video.source_site}
-            </span>
-
-            {video.rating_score !== null && (
-              <span className="flex items-center gap-1 text-emerald-400 font-semibold text-xs">
-                <ThumbsUp size={13} weight="fill" /> {video.rating_raw || `${video.rating_score}%`}
-              </span>
-            )}
-          </div>
-        </div>
-      </div>
-    </Link>
   );
 }

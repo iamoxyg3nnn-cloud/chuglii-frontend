@@ -1,6 +1,8 @@
 // Cloudflare Pages Advanced Worker (_worker.js)
-// Handles API routes at the Cloudflare Edge directly with Supabase & media proxying,
-// and passes all other asset / SPA routes to env.ASSETS.fetch(request).
+// 1. Handles API routes at the Cloudflare Edge directly with Supabase PostgREST
+// 2. High-performance Edge Media Proxy for thumbnails and sprites
+// 3. Automated Serverless Scraper for Indian MMS & Viral clips (HTTP & Cron)
+// 4. Fallback to Cloudflare Pages static assets & SPA routing
 
 const CORS_HEADERS = {
   "Access-Control-Allow-Origin": "*",
@@ -46,7 +48,203 @@ export default {
     // 3. Fallback to Cloudflare Pages static assets & SPA routing
     return env.ASSETS.fetch(request);
   },
+
+  // Automated Cron Trigger handler for Cloudflare Workers
+  async scheduled(event, env, ctx) {
+    ctx.waitUntil(syncMmsvibex(env, 2));
+  },
 };
+
+// ─── Scraper Helper Functions ────────────────────────────────────────
+
+function parseDurationSeconds(str) {
+  if (!str) return 0;
+  const parts = str.trim().split(":").map(p => parseInt(p, 10));
+  if (parts.length === 2) return parts[0] * 60 + parts[1];
+  if (parts.length === 3) return parts[0] * 3600 + parts[1] * 60 + parts[2];
+  return 0;
+}
+
+function parseViewsNumber(str) {
+  if (!str) return 0;
+  const s = str.trim().toUpperCase();
+  const num = parseFloat(s.replace(/[^0-9.]/g, ""));
+  if (isNaN(num)) return 0;
+  if (s.includes("M")) return Math.round(num * 1000000);
+  if (s.includes("K")) return Math.round(num * 1000);
+  return Math.round(num);
+}
+
+function extractTagsFromTitle(title) {
+  const commonTags = [
+    "desi", "bhabhi", "amateur", "teen", "viral", "mms", "village", "aunty",
+    "web-series", "hot", "romance", "mallu", "tamil", "telugu", "bengali",
+    "bhojpuri", "college", "girlfriend", "call-recording", "leaked", "scandal"
+  ];
+  const tLower = (title || "").toLowerCase();
+  const tags = new Set();
+  for (const tag of commonTags) {
+    if (tLower.includes(tag.replace("-", " ")) || tLower.includes(tag)) {
+      tags.add(tag);
+    }
+  }
+  if (tags.size === 0) tags.add("desi");
+  return Array.from(tags);
+}
+
+async function scrapeMmsPage(pageNum) {
+  const url = pageNum === 1
+    ? "https://mmsvibex.life/?filter=latest"
+    : `https://mmsvibex.life/page/${pageNum}/?filter=latest`;
+
+  const res = await fetch(url, {
+    headers: {
+      "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
+      "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+    },
+  });
+
+  if (!res.ok) return [];
+  const html = await res.text();
+
+  // Parse articles via regex
+  const articleRegex = /<article\b([^>]*)>([\s\S]*?)<\/article>/gi;
+  const items = [];
+  let match;
+
+  while ((match = articleRegex.exec(html)) !== null) {
+    const attrString = match[1];
+    const body = match[2];
+
+    const postIdMatch = attrString.match(/data-post-id=["'](\d+)["']/i);
+    if (!postIdMatch) continue;
+    const postId = postIdMatch[1];
+
+    const trailerMatch = attrString.match(/data-trailer=["']([^"']+)["']/i);
+    const trailerUrl = trailerMatch ? trailerMatch[1] : "";
+
+    const mainThumbMatch = attrString.match(/data-main-thumb=["']([^"']+)["']/i);
+
+    // Extract title & link
+    const titleMatch = body.match(/class=["']title["'][^>]*>([^<]+)<\//i)
+      || body.match(/title=["']([^"']+)["']/i);
+    const title = titleMatch ? titleMatch[1].trim() : `MMS Clip #${postId}`;
+
+    const linkMatch = body.match(/href=["'](https?:\/\/[^"']+)["']/i);
+    const detailUrl = linkMatch ? linkMatch[1] : `https://mmsvibex.life/video/${postId}/`;
+
+    // Extract thumbnail
+    const thumbMatch = body.match(/src=["']([^"']+)["']/i);
+    const thumbUrl = (mainThumbMatch && mainThumbMatch[1])
+      || (thumbMatch && thumbMatch[1])
+      || `https://cdn.mmsvibex.fit/thumbnails/${postId}_thumb_960.jpg`;
+
+    // Extract duration
+    const durMatch = body.match(/class=["']duration["'][^>]*>([^<]+)<\//i);
+    const durFormatted = durMatch ? durMatch[1].trim() : "00:00";
+
+    // Extract views
+    const viewsMatch = body.match(/class=["']views["'][^>]*>([^<]+)<\//i);
+    const viewsRaw = viewsMatch ? viewsMatch[1].trim() : "0";
+
+    // Extract rating
+    const ratingMatch = body.match(/class=["']rating["'][^>]*>([^<]+)<\//i);
+    const ratingRaw = ratingMatch ? ratingMatch[1].trim() : "0%";
+
+    // Fast direct CDN processed stream derivation
+    let fullVideoUrl = `https://cdn.mmsvibex.fit/processed/${postId}_final.mp4`;
+    if (trailerUrl) {
+      const trMatch = trailerUrl.match(/\/trailers\/(\d+)_trailer\.mp4/i);
+      if (trMatch) {
+        fullVideoUrl = `https://cdn.mmsvibex.fit/processed/${trMatch[1]}_final.mp4`;
+      }
+    }
+
+    // Parse classes for categories, tags, actors
+    const classMatch = attrString.match(/class=["']([^"']+)["']/i);
+    const classes = classMatch ? classMatch[1].split(/\s+/) : [];
+
+    const categories = classes
+      .filter(c => c.startsWith("category-"))
+      .map(c => c.replace("category-", ""));
+    if (!categories.includes("indian")) categories.push("indian");
+
+    const tags = classes
+      .filter(c => c.startsWith("tag-"))
+      .map(c => c.replace("tag-", ""));
+    if (tags.length === 0) {
+      extractTagsFromTitle(title).forEach(t => tags.push(t));
+    }
+
+    const actors = classes
+      .filter(c => c.startsWith("actors-"))
+      .map(c => c.replace("actors-", ""));
+
+    items.push({
+      source_site: "mmsvibex",
+      source_post_id: postId,
+      title,
+      slug: title.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "").slice(0, 100),
+      detail_url: detailUrl,
+      full_video_url: fullVideoUrl,
+      video_mime_type: "video/mp4",
+      trailer_preview_url: trailerUrl || null,
+      thumbnail_url: thumbUrl,
+      clean_thumbnail_url: thumbUrl,
+      duration_seconds: parseDurationSeconds(durFormatted),
+      duration_formatted: durFormatted,
+      views_count: parseViewsNumber(viewsRaw),
+      views_raw: viewsRaw,
+      rating_score: parseFloat(ratingRaw) || 0,
+      rating_raw: ratingRaw,
+      categories,
+      tags,
+      actors,
+      published_at: new Date().toISOString(),
+      raw_payload: { post_id: postId, trailer: trailerUrl },
+    });
+  }
+
+  return items;
+}
+
+async function syncMmsvibex(env, maxPages = 2) {
+  const supabaseUrl = env.SUPABASE_URL || "https://supabase.chuglii.in";
+  const supabaseKey = env.SUPABASE_SERVICE_ROLE_KEY || env.SUPABASE_ANON_KEY;
+
+  let allItems = [];
+  for (let p = 1; p <= maxPages; p++) {
+    try {
+      const items = await scrapeMmsPage(p);
+      allItems.push(...items);
+    } catch {}
+  }
+
+  if (allItems.length === 0) {
+    return { success: false, items_scraped: 0, message: "No items parsed" };
+  }
+
+  // Upsert into Supabase via RPC bridge
+  const res = await fetch(`${supabaseUrl}/rest/v1/rpc/scraper_upsert_videos`, {
+    method: "POST",
+    headers: {
+      "apikey": supabaseKey,
+      "Authorization": `Bearer ${supabaseKey}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({ items: allItems }),
+  });
+
+  const result = await res.json();
+  return {
+    success: res.ok,
+    pages_crawled: maxPages,
+    items_scraped: allItems.length,
+    upsert_result: result,
+  };
+}
+
+// ─── API Router ──────────────────────────────────────────────────────
 
 async function handleApi(request, env, url) {
   const supabaseUrl = env.SUPABASE_URL || "https://supabase.chuglii.in";
@@ -62,7 +260,6 @@ async function handleApi(request, env, url) {
     }
 
     try {
-      // Determine appropriate Referer for hotlink-protected hosts
       let referer = "https://chuglii.in/";
       if (targetUrl.includes("pixhost.to")) referer = "https://pixhost.to/";
       else if (targetUrl.includes("catbox.moe")) referer = "https://catbox.moe/";
@@ -81,7 +278,6 @@ async function handleApi(request, env, url) {
       });
 
       if (!upstreamRes.ok) {
-        // Fallback: redirect directly to target if proxying fails
         return Response.redirect(targetUrl, 302);
       }
 
@@ -92,13 +288,17 @@ async function handleApi(request, env, url) {
       headers.set("Access-Control-Allow-Origin", "*");
       headers.set("Vary", "Accept");
 
-      return new Response(upstreamRes.body, {
-        status: 200,
-        headers,
-      });
+      return new Response(upstreamRes.body, { status: 200, headers });
     } catch {
       return Response.redirect(targetUrl, 302);
     }
+  }
+
+  // ─── Serverless Scraper Sync (/api/scraper/sync) ────────────────────
+  if (path === "/api/scraper/sync") {
+    const pages = Math.min(5, Math.max(1, parseInt(url.searchParams.get("pages") || "2", 10)));
+    const syncResult = await syncMmsvibex(env, pages);
+    return jsonResponse(syncResult);
   }
 
   // ─── Common PostgREST Headers ──────────────────────────────────────
@@ -158,15 +358,17 @@ async function handleApi(request, env, url) {
     });
     if (!res.ok) {
       return jsonResponse({
-        total_recordings: 6415,
+        total_recordings: 6418,
         total_performers: 451,
         total_tags: 473,
-        total_size_bytes: 14141535727356,
+        total_size_bytes: 14146369231967,
         newest_recording: new Date().toISOString(),
       });
     }
     const arr = await res.json();
-    return jsonResponse(arr[0] || {});
+    return jsonResponse(arr[0] || {}, 200, {
+      "Cache-Control": "public, s-maxage=120, stale-while-revalidate=300",
+    });
   }
 
   // GET /api/tags
@@ -180,7 +382,9 @@ async function handleApi(request, env, url) {
       return errorResponse("Failed to fetch tags", res.status);
     }
     const tags = await res.json();
-    return jsonResponse(tags);
+    return jsonResponse(tags, 200, {
+      "Cache-Control": "public, s-maxage=300, stale-while-revalidate=600",
+    });
   }
 
   // GET /api/recordings/recommendations
@@ -199,6 +403,8 @@ async function handleApi(request, env, url) {
       page: 1,
       limit,
       totalPages: 1,
+    }, 200, {
+      "Cache-Control": "public, s-maxage=60, stale-while-revalidate=180",
     });
   }
 
@@ -216,13 +422,11 @@ async function handleApi(request, env, url) {
 
     const offset = (page - 1) * limit;
 
-    // Build PostgREST query parameters
     const params = new URLSearchParams();
     params.set("select", "id,channel_id,username,filename,timestamp,room_title,tags,viewers,resolution,framerate,filesize,duration,gender,thumbnail_url,sprite_url,embed_url,preview_url,instance_id,created_at,updated_at");
     params.set("limit", String(limit));
     params.set("offset", String(offset));
 
-    // Sort order
     if (sort === "oldest") {
       params.set("order", "timestamp.asc.nullslast,id.desc");
     } else if (sort === "largest") {
@@ -233,21 +437,12 @@ async function handleApi(request, env, url) {
       params.set("order", "timestamp.desc.nullslast,id.desc");
     }
 
-    // Filters
-    if (username) {
-      params.set("username", `eq.${username}`);
-    }
-    if (resolution) {
-      params.set("resolution", `eq.${resolution}`);
-    }
-    if (gender) {
-      params.set("gender", `eq.${gender}`);
-    }
+    if (username) params.set("username", `eq.${username}`);
+    if (resolution) params.set("resolution", `eq.${resolution}`);
+    if (gender) params.set("gender", `eq.${gender}`);
     if (tags) {
       const tagList = tags.split(",").map(t => t.trim()).filter(Boolean);
-      if (tagList.length > 0) {
-        params.set("tags", `ov.{${tagList.join(",")}}`);
-      }
+      if (tagList.length > 0) params.set("tags", `ov.{${tagList.join(",")}}`);
     }
     if (search) {
       const s = search.replace(/[\\%_]/g, "\\$&");
@@ -273,12 +468,9 @@ async function handleApi(request, env, url) {
     let total = data.length;
     if (contentRange.includes("/")) {
       const totalStr = contentRange.split("/")[1];
-      if (totalStr && totalStr !== "*") {
-        total = parseInt(totalStr, 10);
-      }
+      if (totalStr && totalStr !== "*") total = parseInt(totalStr, 10);
     }
 
-    // Enrich items with origin site field if missing
     const enriched = data.map(item => ({
       ...item,
       site: item.site || (item.instance_id?.includes("node") ? "stripchat" : "chaturbate"),
@@ -291,6 +483,8 @@ async function handleApi(request, env, url) {
       page,
       limit,
       totalPages: Math.max(1, Math.ceil(total / limit)),
+    }, 200, {
+      "Cache-Control": "public, s-maxage=60, stale-while-revalidate=180",
     });
   }
 
@@ -330,6 +524,8 @@ async function handleApi(request, env, url) {
     return jsonResponse({
       ...item,
       site: item.site || (item.instance_id?.includes("node") ? "stripchat" : "chaturbate"),
+    }, 200, {
+      "Cache-Control": "public, s-maxage=120, stale-while-revalidate=300",
     });
   }
 
@@ -358,6 +554,8 @@ async function handleApi(request, env, url) {
       page,
       limit,
       totalPages: Math.max(1, Math.ceil(total / limit)),
+    }, 200, {
+      "Cache-Control": "public, s-maxage=300, stale-while-revalidate=600",
     });
   }
 

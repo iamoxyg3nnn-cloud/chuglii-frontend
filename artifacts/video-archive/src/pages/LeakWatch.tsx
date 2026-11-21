@@ -15,7 +15,9 @@ import {
   Check,
   FilmStrip,
   WarningCircle,
-  Sparkle
+  Sparkle,
+  BookmarkSimple,
+  LinkSimple
 } from "@phosphor-icons/react";
 
 export default function LeakWatch() {
@@ -24,14 +26,54 @@ export default function LeakWatch() {
   const videoRef = useRef<HTMLVideoElement | null>(null);
 
   const [copied, setCopied] = useState(false);
+  const [copiedStream, setCopiedStream] = useState(false);
+  const [isSaved, setIsSaved] = useState(false);
+
   const { data: video, isLoading, error } = useScrapedVideoById(id);
   const { data: relatedVideos, isLoading: relatedLoading } = useScrapedRelatedVideos(id, 8);
+
+  // Check saved state from localStorage
+  useEffect(() => {
+    if (!id) return;
+    try {
+      const raw = localStorage.getItem("chuglii_saved_leaks");
+      const list: string[] = raw ? JSON.parse(raw) : [];
+      setIsSaved(list.includes(id));
+    } catch {
+      setIsSaved(false);
+    }
+  }, [id]);
+
+  const toggleSave = () => {
+    if (!id) return;
+    try {
+      const raw = localStorage.getItem("chuglii_saved_leaks");
+      let list: string[] = raw ? JSON.parse(raw) : [];
+      if (list.includes(id)) {
+        list = list.filter((x) => x !== id);
+        setIsSaved(false);
+      } else {
+        list.unshift(id);
+        setIsSaved(true);
+      }
+      localStorage.setItem("chuglii_saved_leaks", JSON.stringify(list));
+    } catch {}
+  };
 
   const handleShare = () => {
     if (navigator.clipboard) {
       navigator.clipboard.writeText(window.location.href);
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
+    }
+  };
+
+  const handleCopyStream = () => {
+    const stream = video?.full_video_url || video?.trailer_preview_url;
+    if (stream && navigator.clipboard) {
+      navigator.clipboard.writeText(stream);
+      setCopiedStream(true);
+      setTimeout(() => setCopiedStream(false), 2000);
     }
   };
 
@@ -67,6 +109,8 @@ export default function LeakWatch() {
     );
   }
 
+  const primaryStream = video.full_video_url || video.trailer_preview_url;
+
   return (
     <Layout>
       <div className="min-h-screen bg-background text-foreground pb-20">
@@ -80,48 +124,49 @@ export default function LeakWatch() {
             </Link>
 
             <div className="flex items-center gap-2">
+              {/* Save / Favorite Button */}
+              <button
+                onClick={toggleSave}
+                className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold border transition-all ${
+                  isSaved
+                    ? "bg-rose-500 text-white border-rose-500 shadow-md shadow-rose-500/20"
+                    : "bg-secondary/70 hover:bg-secondary text-muted-foreground hover:text-foreground border-border/40"
+                }`}
+                title={isSaved ? "Saved to Favorites" : "Save to Favorites"}
+              >
+                <BookmarkSimple size={15} weight={isSaved ? "fill" : "bold"} />
+                <span>{isSaved ? "Saved" : "Save"}</span>
+              </button>
+
+              {/* Share Button */}
               <button
                 onClick={handleShare}
-                type="button"
-                className="px-3 py-1.5 rounded-lg text-xs font-medium bg-secondary/80 hover:bg-secondary text-muted-foreground hover:text-foreground border border-border/40 inline-flex items-center gap-1.5 transition-colors cursor-pointer"
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold bg-secondary/70 hover:bg-secondary text-muted-foreground hover:text-foreground border border-border/40 transition-colors"
               >
-                {copied ? <Check size={14} className="text-emerald-400" /> : <ShareNetwork size={14} />}
-                {copied ? "Copied Link" : "Share"}
+                {copied ? (
+                  <>
+                    <Check size={14} className="text-emerald-400" />
+                    <span className="text-emerald-400">Copied!</span>
+                  </>
+                ) : (
+                  <>
+                    <ShareNetwork size={14} />
+                    <span>Share</span>
+                  </>
+                )}
               </button>
-              {video.full_video_url && (
-                <a
-                  href={video.full_video_url}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  download
-                  className="px-3 py-1.5 rounded-lg text-xs font-medium bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 border border-rose-500/30 inline-flex items-center gap-1.5 transition-colors cursor-pointer"
-                >
-                  <DownloadSimple size={14} /> Direct MP4
-                </a>
-              )}
             </div>
           </div>
 
-          {/* Main Cinema Player Container */}
-          <div className="rounded-2xl overflow-hidden bg-black border border-border/80 shadow-2xl aspect-video w-full relative">
-            {video.full_video_url ? (
+          {/* Video Player Cinema Frame */}
+          <div className="relative aspect-video w-full max-h-[70vh] mx-auto bg-black rounded-2xl overflow-hidden shadow-2xl border border-border/30">
+            {primaryStream ? (
               <video
                 ref={videoRef}
-                src={video.full_video_url}
+                src={primaryStream}
+                poster={video.clean_thumbnail_url || video.thumbnail_url || undefined}
                 controls
                 autoPlay
-                playsInline
-                className="w-full h-full object-contain"
-                poster={video.thumbnail_url || undefined}
-              >
-                Your browser does not support HTML5 video.
-              </video>
-            ) : video.trailer_preview_url ? (
-              <video
-                src={video.trailer_preview_url}
-                controls
-                autoPlay
-                loop
                 playsInline
                 className="w-full h-full object-contain"
               />
@@ -143,8 +188,59 @@ export default function LeakWatch() {
             )}
           </div>
 
+          {/* Video Action Toolbar */}
+          <div className="mt-4 flex flex-wrap items-center justify-between gap-3">
+            <div className="flex flex-wrap items-center gap-2">
+              {/* Direct Download Button */}
+              {primaryStream && (
+                <a
+                  href={primaryStream}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  download
+                  className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs sm:text-sm font-semibold bg-rose-500 hover:bg-rose-600 text-white shadow-sm transition-all"
+                >
+                  <DownloadSimple size={16} weight="bold" />
+                  <span>Download MP4</span>
+                </a>
+              )}
+
+              {/* Copy Direct Stream Link */}
+              {primaryStream && (
+                <button
+                  onClick={handleCopyStream}
+                  className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs sm:text-sm font-medium bg-secondary/80 hover:bg-secondary text-foreground border border-border/40 transition-colors"
+                >
+                  {copiedStream ? (
+                    <>
+                      <Check size={16} className="text-emerald-400" />
+                      <span className="text-emerald-400 font-semibold">Stream Copied!</span>
+                    </>
+                  ) : (
+                    <>
+                      <LinkSimple size={16} />
+                      <span>Copy Stream Link</span>
+                    </>
+                  )}
+                </button>
+              )}
+            </div>
+
+            {/* Original Source Reference */}
+            {video.detail_url && (
+              <a
+                href={video.detail_url}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-xs text-muted-foreground hover:text-rose-400 transition-colors flex items-center gap-1"
+              >
+                <span>Source: {video.source_site}</span> &rarr;
+              </a>
+            )}
+          </div>
+
           {/* Video Metadata & Title */}
-          <div className="mt-5 p-5 bg-card/40 border border-border/40 rounded-2xl backdrop-blur-sm">
+          <div className="mt-4 p-5 bg-card/40 border border-border/40 rounded-2xl backdrop-blur-sm">
             <div className="flex flex-col md:flex-row md:items-start justify-between gap-4">
               <div className="flex-1">
                 <h1 className="text-lg sm:text-2xl font-bold tracking-tight text-foreground leading-snug">
@@ -218,33 +314,28 @@ export default function LeakWatch() {
                 {relatedVideos.map((item) => (
                   <Link key={item.id} href={`/leak/video/${item.id}`}>
                     <div className="group rounded-xl overflow-hidden bg-card border border-border/40 hover:border-rose-500/50 hover:shadow-lg transition-all duration-200 cursor-pointer flex flex-col">
-                      <div className="relative aspect-video w-full bg-black/60 overflow-hidden">
+                      <div className="relative aspect-video w-full bg-muted/50 overflow-hidden">
                         <img
-                          src={item.thumbnail_url || ""}
+                          src={item.clean_thumbnail_url || item.thumbnail_url || undefined}
                           alt={item.title}
                           loading="lazy"
                           className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
                         />
                         {item.duration_formatted && (
-                          <div className="absolute bottom-2 right-2 px-1.5 py-0.5 rounded-md bg-black/85 text-[11px] font-semibold text-white">
+                          <div className="absolute bottom-2 right-2 px-1.5 py-0.5 rounded bg-black/80 text-[11px] font-semibold text-white">
                             {item.duration_formatted}
                           </div>
                         )}
-                        {item.views_raw && (
-                          <div className="absolute bottom-2 left-2 px-1.5 py-0.5 rounded-md bg-black/70 text-[10px] text-white flex items-center gap-1">
-                            <Eye size={11} /> {item.views_raw}
-                          </div>
-                        )}
                       </div>
-                      <div className="p-3 flex-1 flex flex-col justify-between">
-                        <h4 className="text-xs font-semibold line-clamp-2 text-foreground group-hover:text-rose-400 transition-colors">
+                      <div className="p-3">
+                        <p className="text-xs sm:text-sm font-semibold line-clamp-2 text-foreground group-hover:text-rose-400 transition-colors">
                           {item.title}
-                        </h4>
-                        <div className="mt-2 text-[11px] text-muted-foreground flex items-center justify-between">
-                          <span>{item.source_site}</span>
-                          {item.rating_score && (
-                            <span className="text-emerald-400 font-medium">
-                              {item.rating_raw}
+                        </p>
+                        <div className="flex items-center justify-between gap-2 mt-2 text-[11px] text-muted-foreground">
+                          <span>{item.views_raw || "0 views"}</span>
+                          {item.rating_raw && (
+                            <span className="text-emerald-400 font-medium flex items-center gap-0.5">
+                              <ThumbsUp size={11} weight="fill" /> {item.rating_raw}
                             </span>
                           )}
                         </div>
@@ -254,7 +345,9 @@ export default function LeakWatch() {
                 ))}
               </div>
             ) : (
-              <p className="text-sm text-muted-foreground">No related leaks found.</p>
+              <div className="text-center py-10 text-muted-foreground text-sm">
+                No related leaks found.
+              </div>
             )}
           </div>
         </div>
