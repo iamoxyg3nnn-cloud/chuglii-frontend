@@ -106,7 +106,7 @@ export default function Home() {
   return (
     <Layout>
       {/* Hero */}
-      <section className="relative border-b border-border/50 px-4 sm:px-6 py-20 md:py-28 overflow-hidden section-pattern">
+      <section className="relative border-b border-border/50 px-4 sm:px-6 py-20 md:py-28 overflow-hidden section-accent">
         <div className="container mx-auto max-w-4xl text-center relative">
           <div className="mb-4 flex items-center gap-3 animate-fade-in-up" style={{ animationDelay: '0ms' }}>
             <div className="h-px flex-1 bg-border/50" />
@@ -130,7 +130,7 @@ export default function Home() {
             </p>
           </div>
 
-          <form onSubmit={handleSearch} className="max-w-xl mx-auto relative animate-fade-in-up" style={{ animationDelay: '240ms' }}>
+          <form onSubmit={handleSearch} role="search" aria-label="Search the recording archive" className="max-w-xl mx-auto relative animate-fade-in-up" style={{ animationDelay: '240ms' }}>
             <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground/60" />
             <input
               type="text"
@@ -142,6 +142,7 @@ export default function Home() {
             />
             <button
               type="submit"
+              aria-label="Search archive"
               className="absolute right-1.5 top-1/2 -translate-y-1/2 h-9 px-4 border border-primary/30 text-primary text-xs font-semibold tracking-wide hover:border-primary/60 transition-all duration-200 rounded-lg"
             >
               Search
@@ -183,7 +184,7 @@ export default function Home() {
       )}
 
       {/* Recordings — tabs */}
-      <section className="px-4 sm:px-6 py-14 relative overflow-hidden section-pattern">
+      <section className="px-4 sm:px-6 py-14 relative overflow-hidden">
         <div className="container mx-auto">
           <div className="flex items-center justify-between mb-8">
             {/* Tabs */}
@@ -279,7 +280,7 @@ export default function Home() {
 
       {/* You might like these — personalized recommendations */}
       {(recommendations.length > 0 || recLoading) && (
-        <section className="border-t border-border/50 px-4 sm:px-6 py-14 relative overflow-hidden">
+        <section className="border-t border-border/50 px-4 sm:px-6 py-14 relative overflow-hidden section-accent">
           <div className="container mx-auto relative">
             <div className="flex items-center justify-between mb-8">
               <div className="flex items-center gap-3">
@@ -316,7 +317,7 @@ export default function Home() {
       )}
 
       {/* Mid-page ad divider — 728×90 / 468×60 / 300×100 */}
-      <section className="px-4 sm:px-6 py-6 border-t border-border/50 section-pattern">
+      <section className="px-4 sm:px-6 py-6 border-t border-border/50">
         <div className="container mx-auto">
           <AdLeaderboard />
         </div>
