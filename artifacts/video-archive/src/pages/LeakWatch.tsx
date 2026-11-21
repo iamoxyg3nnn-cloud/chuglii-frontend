@@ -29,9 +29,19 @@ export default function LeakWatch() {
   const [copied, setCopied] = useState(false);
   const [copiedStream, setCopiedStream] = useState(false);
   const [isSaved, setIsSaved] = useState(false);
+  const [selectedServerUrl, setSelectedServerUrl] = useState<string | null>(null);
 
   const { data: video, isLoading, error } = useScrapedVideoById(id);
   const { data: relatedVideos, isLoading: relatedLoading } = useScrapedRelatedVideos(id, 8);
+
+  const isDirectMp4 = Boolean(
+    video?.full_video_url && video.full_video_url.endsWith(".mp4")
+  );
+
+  const rawPayload = video?.raw_payload as any;
+  const servers: Array<{ name: string; embed_url: string }> = rawPayload?.servers || [];
+  const defaultEmbedUrl = rawPayload?.embed_url || (!isDirectMp4 ? (video?.full_video_url || video?.trailer_preview_url) : null);
+  const activeEmbedUrl = selectedServerUrl || defaultEmbedUrl;
 
   // Check saved state from localStorage
   useEffect(() => {
@@ -194,15 +204,25 @@ export default function LeakWatch() {
 
           {/* Video Player Cinema Frame */}
           <div className="relative aspect-video w-full max-h-[70vh] mx-auto bg-black rounded-2xl overflow-hidden shadow-2xl border border-border/30">
-            {primaryStream ? (
+            {isDirectMp4 ? (
               <video
                 ref={videoRef}
-                src={primaryStream}
+                src={video.full_video_url!}
                 poster={video.clean_thumbnail_url || video.thumbnail_url || undefined}
                 controls
                 autoPlay
                 playsInline
                 className="w-full h-full object-contain"
+              />
+            ) : activeEmbedUrl ? (
+              <iframe
+                src={activeEmbedUrl}
+                title={video.title}
+                sandbox="allow-scripts allow-same-origin allow-forms"
+                referrerPolicy="no-referrer"
+                allow="autoplay; fullscreen"
+                allowFullScreen
+                className="w-full h-full border-none bg-black"
               />
             ) : (
               <div className="w-full h-full flex flex-col items-center justify-center p-6 text-center text-muted-foreground">
@@ -221,6 +241,31 @@ export default function LeakWatch() {
               </div>
             )}
           </div>
+
+          {/* Multi-Server Mirror Selector (if available) */}
+          {servers && servers.length > 1 && (
+            <div className="mt-3 flex flex-wrap items-center gap-2 p-3 rounded-xl bg-card/60 border border-border/40 text-xs">
+              <span className="text-muted-foreground font-medium flex items-center gap-1">
+                <Sparkle size={14} className="text-rose-400" /> Server Mirrors:
+              </span>
+              {servers.map((srv, idx) => {
+                const isSelected = activeEmbedUrl === srv.embed_url;
+                return (
+                  <button
+                    key={srv.name + idx}
+                    onClick={() => setSelectedServerUrl(srv.embed_url)}
+                    className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors cursor-pointer ${
+                      isSelected
+                        ? "bg-rose-500 text-white shadow-sm"
+                        : "bg-secondary/70 hover:bg-secondary text-muted-foreground hover:text-foreground border border-border/30"
+                    }`}
+                  >
+                    {srv.name}
+                  </button>
+                );
+              })}
+            </div>
+          )}
 
           {/* Video Action Toolbar */}
           <div className="mt-4 flex flex-wrap items-center justify-between gap-3">

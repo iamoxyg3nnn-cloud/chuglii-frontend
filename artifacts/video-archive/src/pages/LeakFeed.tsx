@@ -31,6 +31,7 @@ const TAG_TABS = [
   { id: "amateur", label: "Amateur" },
   { id: "teen", label: "Teen" },
   { id: "village", label: "Village" },
+  { id: "jav", label: "JAV" },
   { id: "Saved", label: "Saved" },
 ];
 
