@@ -2,6 +2,7 @@ import { Router } from "express";
 import { supabase } from "../lib/supabase.js";
 import { notifyUser } from "../lib/notify.js";
 import { logger } from "../lib/logger.js";
+import { addRequestToPool, MissingPerformerError } from "../lib/request-pool.js";
 import { invalidateOnSuccess } from "../middleware/cache.js";
 import { requireAuth } from "../middleware/auth.js";
 import { requireRole } from "../middleware/requireRole.js";
@@ -314,6 +315,18 @@ router.patch("/requests/:id/status", ...admin, invalidateOnSuccess(["performers"
       }
       throw error;
     }
+    if (status === "approved") {
+      try {
+        await addRequestToPool(data);
+      } catch (poolErr: any) {
+        if (poolErr instanceof MissingPerformerError) {
+          res.status(400).json({ error: poolErr.message });
+          return;
+        }
+        logger.error({ err: poolErr, requestId: id }, "Failed to auto-add approved performer to recording pool");
+      }
+    }
+
     res.json(data);
   } catch {
     res.status(500).json({ error: "Failed to update status" });

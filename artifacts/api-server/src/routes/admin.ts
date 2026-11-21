@@ -5,6 +5,7 @@ import { requireRole } from "../middleware/requireRole.js";
 import { getCacheStats, getCacheMetrics, invalidateTags, invalidatePattern, purgeAllCache } from "../middleware/cache.js";
 import { getFeatureRedis, getRedis, isRedisConnected, getRedisStatus } from "../lib/redis.js";
 import { logger } from "../lib/logger.js";
+import { addRequestToPool, MissingPerformerError } from "../lib/request-pool.js";
 
 const router: IRouter = Router();
 
@@ -224,6 +225,19 @@ router.patch("/admin/requests/:id/status", ...admin, async (req: Request, res: R
     }
 
     logger.info({ requestId: id, newStatus: status, adminId: req.user!.id }, "Request status updated by admin");
+
+    // Automatically enroll the performer into the DVR fleet recording pool when approved
+    if (status === "approved") {
+      try {
+        await addRequestToPool(updated);
+      } catch (poolErr: any) {
+        if (poolErr instanceof MissingPerformerError) {
+          res.status(400).json({ error: poolErr.message });
+          return;
+        }
+        logger.error({ err: poolErr, requestId: id }, "Failed to auto-add approved performer to recording pool");
+      }
+    }
 
     // ── Notify the requester ───────────────────────────────────────────────
     const statusLabels: Record<string, string> = {
