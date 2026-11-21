@@ -364,7 +364,7 @@ export default function Home() {
 
       {/* Popular Tags */}
       {Array.isArray(tags) && tags.length > 0 && (
-        <section className="border-t border-border/50 px-4 sm:px-6 py-14 relative overflow-hidden section-pattern">
+        <section className="border-t border-border/50 px-4 sm:px-6 py-14 relative overflow-hidden">
           <div className="container mx-auto relative">
             <div className="flex items-center justify-between mb-8">
               <h2 className="flex items-center gap-2 text-xs uppercase tracking-[0.25em] text-muted-foreground font-semibold">
