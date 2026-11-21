@@ -515,7 +515,7 @@ export default function LeakFeed() {
                   currentPage={currentPage}
                   onPageChange={(page) => {
                     setCurrentPage(page);
-                    updateQueryParams(activeTag, page, activeSort, debouncedSearch);
+                    updateQueryParams(activeCategory, activeTag, page, activeSort, debouncedSearch);
                     window.scrollTo({ top: 0, behavior: "smooth" });
                   }}
                 />

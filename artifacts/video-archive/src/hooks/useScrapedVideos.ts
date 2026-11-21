@@ -24,6 +24,7 @@ export interface ScrapedVideo {
   actors: string[];
   published_at: string | null;
   scraped_at: string;
+  raw_payload?: Record<string, any> | null;
 }
 
 export type ScrapedSortOption = "newest" | "views" | "rating" | "longest" | "oldest";

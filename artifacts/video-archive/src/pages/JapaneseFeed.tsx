@@ -299,8 +299,9 @@ export default function JapaneseFeed() {
           {totalPages > 1 && (
             <div className="mt-12 flex justify-center">
               <AppPagination
+                itemsCount={totalCount}
+                itemsPerPage={ITEMS_PER_PAGE}
                 currentPage={currentPage}
-                totalPages={totalPages}
                 onPageChange={(p) => {
                   setCurrentPage(p);
                   updateUrl({ page: p });
