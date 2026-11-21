@@ -378,8 +378,7 @@
     background-image:
       linear-gradient(135deg, transparent 49.35%, hsl(var(--foreground) / 0.022) 49.65%, hsl(var(--foreground) / 0.022) 50.35%, transparent 50.65%);
   }
-  /* Background pattern is applied to the document itself so it scrolls
-     naturally with the content instead of floating in a fixed viewport layer. */
+  /* Textures remain section-scoped and scroll naturally with their section. */
   .nav-underline {
     position: relative;
     transition: color 0.2s ease;
