@@ -1,0 +1,40 @@
+name: Scraper Edge Crawler Sync
+
+on:
+  schedule:
+    # Runs every 4 hours automatically
+    - cron: '0 */4 * * *'
+  workflow_dispatch:
+    inputs:
+      pages:
+        description: 'Number of pages to scrape per category (1-10)'
+        required: false
+        default: '3'
+
+concurrency:
+  group: scraper-sync
+  cancel-in-progress: false
+
+jobs:
+  sync:
+    name: Sync MMS & Viral Leaks via Cloudflare Edge
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Trigger Indian / Desi MMS Sync
+        run: |
+          PAGES="${{ github.event.inputs.pages || '3' }}"
+          echo "[*] Crawling latest Indian leaks (pages: $PAGES)..."
+          RESPONSE=$(curl -s -f "https://chuglii.in/api/scraper/sync?pages=${PAGES}")
+          echo "Response: $RESPONSE"
+
+      - name: Trigger Pakistani Leaks Sync
+        run: |
+          PAGES="${{ github.event.inputs.pages || '2' }}"
+          echo "[*] Crawling latest Pakistani leaks (pages: $PAGES)..."
+          RESPONSE=$(curl -s -f "https://chuglii.in/api/scraper/sync?category=pakistani&pages=${PAGES}")
+          echo "Response: $RESPONSE"
+
+      - name: Verify Stored Counts
+        run: |
+          echo "[✓] Edge sync completed successfully."

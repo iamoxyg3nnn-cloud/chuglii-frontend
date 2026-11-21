@@ -92,10 +92,17 @@ function extractTagsFromTitle(title) {
   return Array.from(tags);
 }
 
-async function scrapeMmsPage(pageNum) {
-  const url = pageNum === 1
-    ? "https://mmsvibex.life/?filter=latest"
-    : `https://mmsvibex.life/page/${pageNum}/?filter=latest`;
+async function scrapeMmsPage(pageNum, category = null) {
+  let url;
+  if (category && category !== "all" && category !== "indian") {
+    url = pageNum === 1
+      ? `https://mmsvibex.life/category/${encodeURIComponent(category)}/`
+      : `https://mmsvibex.life/category/${encodeURIComponent(category)}/page/${pageNum}/`;
+  } else {
+    url = pageNum === 1
+      ? "https://mmsvibex.life/?filter=latest"
+      : `https://mmsvibex.life/page/${pageNum}/?filter=latest`;
+  }
 
   const res = await fetch(url, {
     headers: {
@@ -208,14 +215,14 @@ async function scrapeMmsPage(pageNum) {
   return items;
 }
 
-async function syncMmsvibex(env, maxPages = 2) {
+async function syncMmsvibex(env, maxPages = 2, category = null) {
   const supabaseUrl = env.SUPABASE_URL || "https://supabase.chuglii.in";
   const supabaseKey = env.SUPABASE_SERVICE_ROLE_KEY || env.SUPABASE_ANON_KEY;
 
   let allItems = [];
   for (let p = 1; p <= maxPages; p++) {
     try {
-      const items = await scrapeMmsPage(p);
+      const items = await scrapeMmsPage(p, category);
       allItems.push(...items);
     } catch {}
   }
@@ -296,8 +303,9 @@ async function handleApi(request, env, url) {
 
   // ─── Serverless Scraper Sync (/api/scraper/sync) ────────────────────
   if (path === "/api/scraper/sync") {
-    const pages = Math.min(5, Math.max(1, parseInt(url.searchParams.get("pages") || "2", 10)));
-    const syncResult = await syncMmsvibex(env, pages);
+    const pages = Math.min(10, Math.max(1, parseInt(url.searchParams.get("pages") || "2", 10)));
+    const category = url.searchParams.get("category") || null;
+    const syncResult = await syncMmsvibex(env, pages, category);
     return jsonResponse(syncResult);
   }
 
