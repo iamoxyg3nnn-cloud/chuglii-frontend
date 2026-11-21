@@ -19,17 +19,17 @@ import {
   BookmarkSimple
 } from "@phosphor-icons/react";
 
-const CATEGORY_TABS = [
-  { id: "All", label: "All Leaks" },
-  { id: "indian", label: "Indian" },
+const TAG_TABS = [
+  { id: "All", label: "All Viral MMS" },
   { id: "desi", label: "Desi MMS" },
   { id: "bhabhi", label: "Bhabhi" },
+  { id: "indian", label: "Indian" },
   { id: "viral", label: "Viral Clips" },
+  { id: "pakistani", label: "Pakistani" },
   { id: "web-series", label: "Web Series" },
   { id: "amateur", label: "Amateur" },
   { id: "teen", label: "Teen" },
   { id: "village", label: "Village" },
-  { id: "pakistani", label: "Pakistani" },
   { id: "Saved", label: "Saved" },
 ];
 
@@ -48,11 +48,13 @@ export default function LeakFeed() {
 
   // Parse query params from URL
   const queryParams = new URLSearchParams(searchString);
+  const initialCategory = queryParams.get("category") || "indian";
   const initialTag = queryParams.get("tag") || "All";
   const initialPage = parseInt(queryParams.get("page") || "1", 10);
   const initialSort = (queryParams.get("sort") as ScrapedSortOption) || "newest";
   const initialSearch = queryParams.get("q") || "";
 
+  const [activeCategory, setActiveCategory] = useState<string>(initialCategory);
   const [activeTag, setActiveTag] = useState<string>(initialTag);
   const [currentPage, setCurrentPage] = useState<number>(initialPage);
   const [activeSort, setActiveSort] = useState<ScrapedSortOption>(initialSort);
@@ -72,10 +74,12 @@ export default function LeakFeed() {
   // Sync state if URL query params change externally
   useEffect(() => {
     const params = new URLSearchParams(searchString);
+    const cat = params.get("category") || "indian";
     const tag = params.get("tag") || "All";
     const p = parseInt(params.get("page") || "1", 10);
     const s = (params.get("sort") as ScrapedSortOption) || "newest";
     const q = params.get("q") || "";
+    setActiveCategory(cat);
     setActiveTag(tag);
     setCurrentPage(p);
     setActiveSort(s);
@@ -95,8 +99,9 @@ export default function LeakFeed() {
   }, [searchQuery, initialSearch]);
 
   // Update URL query params
-  const updateQueryParams = useCallback((tag: string, page: number, sort: ScrapedSortOption, q: string) => {
+  const updateQueryParams = useCallback((cat: string, tag: string, page: number, sort: ScrapedSortOption, q: string) => {
     const params = new URLSearchParams();
+    if (cat && cat !== "all") params.set("category", cat);
     if (tag && tag !== "All") params.set("tag", tag);
     if (page > 1) params.set("page", page.toString());
     if (sort && sort !== "newest") params.set("sort", sort);
@@ -108,27 +113,28 @@ export default function LeakFeed() {
   const handleTagClick = (tag: string) => {
     setActiveTag(tag);
     setCurrentPage(1);
-    updateQueryParams(tag, 1, activeSort, debouncedSearch);
+    updateQueryParams(activeCategory, tag, 1, activeSort, debouncedSearch);
   };
 
   const handleSortChange = (sort: ScrapedSortOption) => {
     setActiveSort(sort);
     setSortOpen(false);
     setCurrentPage(1);
-    updateQueryParams(activeTag, 1, sort, debouncedSearch);
+    updateQueryParams(activeCategory, activeTag, 1, sort, debouncedSearch);
   };
 
   const handleClearSearch = () => {
     setSearchQuery("");
     setDebouncedSearch("");
     setCurrentPage(1);
-    updateQueryParams(activeTag, 1, activeSort, "");
+    updateQueryParams(activeCategory, activeTag, 1, activeSort, "");
   };
 
-  // Query Hook - if "Saved" is selected, don't pass tag to hook, we filter client-side
+  // Query Hook - filtered by the parent scraper category & internal tag
   const queryTag = activeTag === "Saved" || activeTag === "All" ? undefined : activeTag;
 
   const { data, isLoading, isFetching, refetch } = useScrapedVideos({
+    category: activeCategory,
     tag: queryTag,
     search: debouncedSearch || undefined,
     sort: activeSort,
@@ -171,13 +177,13 @@ export default function LeakFeed() {
               <div>
                 <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-rose-500/10 text-rose-500 border border-rose-500/20 text-xs font-semibold uppercase tracking-wider mb-3">
                   <Flame size={14} weight="fill" className="animate-pulse" />
-                  Exclusive Leaks & MMS Archive
+                  Category: Viral MMS &bull; MMSVibeX Archive
                 </div>
                 <h1 className="text-2xl sm:text-4xl font-extrabold tracking-tight text-foreground">
-                  Desi Leaks & Viral Video Feed
+                  Viral MMS Leaks & Video Feed
                 </h1>
                 <p className="mt-2 text-sm sm:text-base text-muted-foreground max-w-2xl leading-relaxed">
-                  Stream thousands of viral Indian clips, leaked web-series, and exclusive private tapes in high quality with instant previews.
+                  Stream thousands of viral clips, uncut web-series, and exclusive leaked private tapes in high quality with instant previews.
                 </p>
               </div>
 
@@ -239,7 +245,7 @@ export default function LeakFeed() {
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mt-6 pt-5 border-t border-border/40">
               {/* Category / Tag pills */}
               <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar py-1 max-w-full">
-                {CATEGORY_TABS.map((tab) => {
+                {TAG_TABS.map((tab) => {
                   const isActive = activeTag.toLowerCase() === tab.id.toLowerCase();
                   const isSavedTab = tab.id === "Saved";
                   return (

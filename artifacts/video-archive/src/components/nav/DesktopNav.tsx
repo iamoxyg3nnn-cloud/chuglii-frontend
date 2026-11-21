@@ -1,6 +1,6 @@
 import { Link } from "wouter";
 import { useCallback, memo, useState, useRef } from "react";
-import { PaperPlaneTilt, Flame, CaretDown, Sparkle, BookmarkSimple } from "@phosphor-icons/react";
+import { PaperPlaneTilt, Flame, CaretDown } from "@phosphor-icons/react";
 import { prefetchRoute } from "@/lib/route-chunks";
 import { isActiveNavigationRoute } from "@/lib/navigation";
 
@@ -11,17 +11,16 @@ export const NAV_LINKS = [
   { href: "/playlists", label: "Playlists" },
 ] as const;
 
-export const LEAK_DROPDOWN_CATEGORIES = [
-  { label: "All Leaks", href: "/leak", tag: "All", badge: "Live" },
-  { label: "Indian & Desi MMS", href: "/leak?tag=desi", tag: "desi", badge: "Hot" },
-  { label: "Bhabhi & Aunty", href: "/leak?tag=bhabhi", tag: "bhabhi" },
-  { label: "Viral Clips", href: "/leak?tag=viral", tag: "viral", badge: "Trending" },
-  { label: "Pakistani Leaks", href: "/leak?tag=pakistani", tag: "pakistani" },
-  { label: "Bangladeshi", href: "/leak?tag=bangladesi", tag: "bangladesi" },
-  { label: "Web Series", href: "/leak?tag=web-series", tag: "web-series" },
-  { label: "Amateur & College", href: "/leak?tag=amateur", tag: "amateur" },
-  { label: "Village / Dehati", href: "/leak?tag=village", tag: "village" },
-  { label: "Saved Favorites", href: "/leak?tag=Saved", tag: "Saved", isSaved: true },
+// Top-level categories correspond to scraper modules / site archives
+export const SCRAPER_CATEGORIES = [
+  {
+    id: "viral-mms",
+    name: "Viral MMS",
+    href: "/leak?category=viral-mms",
+    description: "All leaked videos & viral clips from MMSVibeX archive",
+    count: "9,300+ videos",
+    badge: "MMSVibeX",
+  },
 ] as const;
 
 interface DesktopNavProps {
@@ -55,13 +54,13 @@ export const DesktopNav = memo(function DesktopNav({ location, onRequestOpen }: 
         <NavLink key={href} href={href} label={label} isActive={isActiveNavigationRoute(href, location)} />
       ))}
 
-      {/* Leaks Item with Hover Category Dropdown */}
+      {/* Leaks Item with Scraper Category Hover Dropdown */}
       <div
         className="relative inline-block"
         onMouseEnter={handleMouseEnter}
         onMouseLeave={handleMouseLeave}
       >
-        <Link href="/leak" aria-current={isLeakActive ? "page" : undefined}>
+        <Link href="/leak?category=viral-mms" aria-current={isLeakActive ? "page" : undefined}>
           <span
             onFocus={handleMouseEnter}
             className={`px-2.5 py-1.5 rounded-lg inline-flex items-center gap-1.5 transition-all duration-150 cursor-pointer font-medium text-xs ${
@@ -69,7 +68,7 @@ export const DesktopNav = memo(function DesktopNav({ location, onRequestOpen }: 
                 ? "bg-rose-500/20 text-rose-400 border border-rose-500/35 shadow-sm shadow-rose-500/10"
                 : "text-rose-400 hover:text-rose-300 hover:bg-rose-500/10 border border-transparent"
             }`}
-            title="Trending Leaks & Viral Clips"
+            title="Leaks Archive by Scraper Category"
           >
             <Flame size={15} weight="fill" className="text-rose-500 animate-pulse" />
             <span>Leaks</span>
@@ -82,50 +81,53 @@ export const DesktopNav = memo(function DesktopNav({ location, onRequestOpen }: 
           </span>
         </Link>
 
-        {/* Floating Category Dropdown */}
+        {/* Dropdown showing Scraper Categories */}
         {dropdownOpen && (
           <div
-            className="absolute top-full left-0 mt-2 w-64 rounded-2xl bg-card/95 backdrop-blur-md border border-border/80 shadow-2xl shadow-rose-950/20 z-50 p-2 animate-in fade-in zoom-in-95 duration-150"
+            className="absolute top-full left-0 mt-2 w-72 rounded-2xl bg-card/95 backdrop-blur-md border border-border/80 shadow-2xl shadow-rose-950/20 z-50 p-2.5 animate-in fade-in zoom-in-95 duration-150"
             role="menu"
-            aria-label="Leak Categories"
+            aria-label="Scraper Categories"
           >
-            <div className="px-3 py-1.5 mb-1 border-b border-border/40 flex items-center justify-between">
-              <span className="text-[10px] font-bold uppercase tracking-wider text-rose-400 flex items-center gap-1">
-                <Flame size={12} weight="fill" /> Desi Leaks Categories
+            <div className="px-3 py-1.5 mb-1.5 border-b border-border/40 flex items-center justify-between">
+              <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground/80">
+                Categories
               </span>
-              <span className="text-[10px] text-muted-foreground/70">9,300+ clips</span>
+              <span className="text-[10px] text-muted-foreground/60 font-medium">By Scraper</span>
             </div>
 
-            <div className="grid grid-cols-1 gap-0.5 max-h-[70vh] overflow-y-auto no-scrollbar py-0.5">
-              {LEAK_DROPDOWN_CATEGORIES.map((cat) => {
-                const isSelected = location.includes(`tag=${cat.tag}`) || (cat.tag === "All" && location === "/leak");
+            <div className="space-y-1">
+              {SCRAPER_CATEGORIES.map((cat) => {
+                const isSelected = location.includes(`category=${cat.id}`) || location === "/leak";
                 return (
-                  <Link key={cat.href} href={cat.href}>
-                    <span
+                  <Link key={cat.id} href={cat.href}>
+                    <div
                       onClick={() => setDropdownOpen(false)}
-                      className={`w-full px-2.5 py-1.5 rounded-xl text-xs font-medium flex items-center justify-between transition-colors cursor-pointer ${
+                      className={`w-full p-2.5 rounded-xl flex items-start gap-2.5 transition-all cursor-pointer ${
                         isSelected
-                          ? "bg-rose-500/15 text-rose-400 font-semibold"
-                          : "text-muted-foreground hover:bg-secondary/70 hover:text-foreground"
+                          ? "bg-rose-500/15 border border-rose-500/30 text-rose-400"
+                          : "hover:bg-secondary/70 text-foreground border border-transparent"
                       }`}
                     >
-                      <span className="flex items-center gap-2">
-                        {cat.isSaved ? (
-                          <BookmarkSimple size={13} weight="fill" className="text-amber-400" />
-                        ) : cat.tag === "All" ? (
-                          <Sparkle size={13} weight="fill" className="text-rose-400" />
-                        ) : (
-                          <span className="w-1.5 h-1.5 rounded-full bg-rose-500/70" />
-                        )}
-                        <span>{cat.label}</span>
-                      </span>
-
-                      {cat.badge && (
-                        <span className="px-1.5 py-0.2 rounded text-[9px] font-bold uppercase tracking-wider bg-rose-500/15 text-rose-400 border border-rose-500/20">
-                          {cat.badge}
+                      <div className="w-8 h-8 rounded-lg bg-rose-500/20 text-rose-400 flex items-center justify-center shrink-0 mt-0.5">
+                        <Flame size={18} weight="fill" />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center justify-between">
+                          <span className="font-semibold text-sm">{cat.name}</span>
+                          {cat.badge && (
+                            <span className="text-[9px] font-bold uppercase tracking-wider px-1.5 py-0.2 rounded bg-rose-500/20 text-rose-400">
+                              {cat.badge}
+                            </span>
+                          )}
+                        </div>
+                        <p className="text-xs text-muted-foreground mt-0.5 line-clamp-1">
+                          {cat.description}
+                        </p>
+                        <span className="text-[10px] text-muted-foreground/70 mt-1 inline-block">
+                          {cat.count}
                         </span>
-                      )}
-                    </span>
+                      </div>
+                    </div>
                   </Link>
                 );
               })}
