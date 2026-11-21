@@ -16,6 +16,7 @@ import {
   SunDim,
   MoonStars,
   Flame,
+  GlobeHemisphereWest,
 } from "@phosphor-icons/react";
 import { NAV_LINKS } from "./DesktopNav";
 import { prefetchRoute } from "@/lib/route-chunks";
@@ -94,11 +95,15 @@ export function MobileMenu({
                 </Link>
               );
             })}
-            {/* Leaks Feed link in Mobile Menu */}
-            <div className="space-y-1">
+            {/* Leaks Categories in Mobile Menu */}
+            <div className="space-y-1 pt-1">
+              <p className="px-3 py-1 text-xs text-muted-foreground/70 font-medium flex items-center gap-1.5">
+                <Flame size={13} weight="fill" className="text-rose-500" />
+                <span>Leaks & Exclusives</span>
+              </p>
               <Link href="/leak?category=viral-mms" aria-current={isActiveNavigationRoute("/leak", location) ? "page" : undefined}>
                 <span
-                  className={`w-full px-3 py-2.5 text-sm rounded-lg transition-all duration-150 inline-flex items-center justify-between ${
+                  className={`w-full px-3 py-2 text-sm rounded-lg transition-all duration-150 inline-flex items-center justify-between ${
                     isActiveNavigationRoute("/leak", location)
                       ? "text-rose-400 font-medium bg-rose-500/15 border border-rose-500/30"
                       : "text-rose-400/90 hover:text-rose-300 hover:bg-rose-500/10"
@@ -108,11 +113,31 @@ export function MobileMenu({
                   onFocus={() => prefetchRoute("/leak")}
                 >
                   <span className="inline-flex items-center gap-2.5">
-                    <Flame size={17} weight="fill" className="text-rose-500 animate-pulse" />
-                    Leaks &bull; Viral MMS
+                    <Flame size={16} weight="fill" className="text-rose-500" />
+                    Viral MMS
                   </span>
                   <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-rose-500/20 text-rose-400 uppercase">
-                    MMSVibeX
+                    9.2k
+                  </span>
+                </span>
+              </Link>
+              <Link href="/japanese" aria-current={isActiveNavigationRoute("/japanese", location) ? "page" : undefined}>
+                <span
+                  className={`w-full px-3 py-2 text-sm rounded-lg transition-all duration-150 inline-flex items-center justify-between ${
+                    isActiveNavigationRoute("/japanese", location)
+                      ? "text-rose-400 font-medium bg-rose-500/15 border border-rose-500/30"
+                      : "text-rose-400/90 hover:text-rose-300 hover:bg-rose-500/10"
+                  }`}
+                  onClick={onClose}
+                  onMouseEnter={() => prefetchRoute("/japanese")}
+                  onFocus={() => prefetchRoute("/japanese")}
+                >
+                  <span className="inline-flex items-center gap-2.5">
+                    <GlobeHemisphereWest size={16} weight="fill" className="text-rose-500" />
+                    Japanese (JAV)
+                  </span>
+                  <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-rose-500/20 text-rose-400 uppercase">
+                    Hot
                   </span>
                 </span>
               </Link>

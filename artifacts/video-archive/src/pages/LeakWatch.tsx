@@ -43,6 +43,12 @@ export default function LeakWatch() {
   const defaultEmbedUrl = rawPayload?.embed_url || (!isDirectMp4 ? (video?.full_video_url || video?.trailer_preview_url) : null);
   const activeEmbedUrl = selectedServerUrl || defaultEmbedUrl;
 
+  const resolvedEmbedUrl = activeEmbedUrl
+    ? (activeEmbedUrl.includes("supremejav.com") || activeEmbedUrl.includes("supjav.php")
+        ? `/api/player?url=${encodeURIComponent(activeEmbedUrl)}`
+        : activeEmbedUrl)
+    : null;
+
   // Check saved state from localStorage
   useEffect(() => {
     if (!id) return;
@@ -214,13 +220,12 @@ export default function LeakWatch() {
                 playsInline
                 className="w-full h-full object-contain"
               />
-            ) : activeEmbedUrl ? (
+            ) : resolvedEmbedUrl ? (
               <iframe
-                src={activeEmbedUrl}
+                src={resolvedEmbedUrl}
                 title={video.title}
-                sandbox="allow-scripts allow-same-origin allow-forms"
                 referrerPolicy="no-referrer"
-                allow="autoplay; fullscreen"
+                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share; fullscreen"
                 allowFullScreen
                 className="w-full h-full border-none bg-black"
               />
@@ -270,17 +275,17 @@ export default function LeakWatch() {
           {/* Video Action Toolbar */}
           <div className="mt-4 flex flex-wrap items-center justify-between gap-3">
             <div className="flex flex-wrap items-center gap-2">
-              {/* Direct Download Button */}
+              {/* Direct Download / External Stream Button */}
               {primaryStream && (
                 <a
                   href={primaryStream}
                   target="_blank"
                   rel="noopener noreferrer"
-                  download
+                  download={isDirectMp4 ? "" : undefined}
                   className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs sm:text-sm font-semibold bg-rose-500 hover:bg-rose-600 text-white shadow-sm transition-all"
                 >
                   <DownloadSimple size={16} weight="bold" />
-                  <span>Download MP4</span>
+                  <span>{isDirectMp4 ? "Download MP4" : "Open Stream Mirror"}</span>
                 </a>
               )}
 

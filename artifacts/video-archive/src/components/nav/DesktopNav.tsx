@@ -19,6 +19,12 @@ export const SCRAPER_CATEGORIES = [
     href: "/leak?category=viral-mms",
     count: "9.2k",
   },
+  {
+    id: "japanese",
+    name: "Japanese (JAV)",
+    href: "/japanese",
+    count: "Hot",
+  },
 ] as const;
 
 interface DesktopNavProps {
@@ -27,7 +33,7 @@ interface DesktopNavProps {
 }
 
 export const DesktopNav = memo(function DesktopNav({ location, onRequestOpen }: DesktopNavProps) {
-  const isLeakActive = isActiveNavigationRoute("/leak", location);
+  const isLeakActive = isActiveNavigationRoute("/leak", location) || isActiveNavigationRoute("/japanese", location);
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const closeTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
@@ -37,6 +43,7 @@ export const DesktopNav = memo(function DesktopNav({ location, onRequestOpen }: 
       closeTimeoutRef.current = null;
     }
     prefetchRoute("/leak");
+    prefetchRoute("/japanese");
     setDropdownOpen(true);
   };
 
@@ -80,7 +87,9 @@ export const DesktopNav = memo(function DesktopNav({ location, onRequestOpen }: 
             role="menu"
           >
             {SCRAPER_CATEGORIES.map((cat) => {
-              const active = location.includes(`category=${cat.id}`) || location === "/leak";
+              const active =
+                (cat.id === "japanese" && isActiveNavigationRoute("/japanese", location)) ||
+                (cat.id === "viral-mms" && (isActiveNavigationRoute("/leak", location) || location.includes("category=viral-mms")));
               return (
                 <Link key={cat.id} href={cat.href}>
                   <span

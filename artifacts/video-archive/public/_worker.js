@@ -60,8 +60,67 @@ async function handleSitemap(request, env, url) {
     <loc>${url.origin}/sitemap-leaks.xml</loc>
     <lastmod>${new Date().toISOString().split("T")[0]}</lastmod>
   </sitemap>
+  <sitemap>
+    <loc>${url.origin}/sitemap-japanese.xml</loc>
+    <lastmod>${new Date().toISOString().split("T")[0]}</lastmod>
+  </sitemap>
 </sitemapindex>`;
     return new Response(sitemapIndex, {
+      headers: {
+        "Content-Type": "application/xml; charset=utf-8",
+        "Cache-Control": "public, max-age=3600, s-maxage=7200",
+      },
+    });
+  }
+
+  if (url.pathname === "/sitemap-japanese.xml") {
+    const res = await fetch(`${supabaseUrl}/rest/v1/rpc/scraper_get_japanese_videos`, {
+      method: "POST",
+      headers: {
+        "apikey": supabaseKey,
+        "Authorization": `Bearer ${supabaseKey}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        p_source_site: null,
+        p_tag: null,
+        p_category: null,
+        p_search: null,
+        p_sort: "newest",
+        p_limit: 1000,
+        p_offset: 0,
+      }),
+    });
+
+    const videos = res.ok ? await res.json() : [];
+
+    const xml = `<?xml version="1.0" encoding="UTF-8"?>
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9"
+        xmlns:video="http://www.google.com/schemas/sitemap-video/1.1">
+  <url>
+    <loc>${url.origin}/japanese</loc>
+    <changefreq>hourly</changefreq>
+    <priority>1.0</priority>
+  </url>
+  ${videos.map((v) => `
+  <url>
+    <loc>${url.origin}/japanese/video/${v.id}</loc>
+    <lastmod>${(v.updated_at || v.published_at || new Date().toISOString()).split("T")[0]}</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.8</priority>
+    <video:video>
+      <video:thumbnail_loc>${escapeXml(v.clean_thumbnail_url || v.thumbnail_url || '')}</video:thumbnail_loc>
+      <video:title>${escapeXml(v.title)}</video:title>
+      <video:description>${escapeXml(v.title + " - Watch Japanese JAV uncensored and amateur video on Chuglii.")}</video:description>
+      ${v.full_video_url ? `<video:content_loc>${escapeXml(v.full_video_url)}</video:content_loc>` : ""}
+      ${v.duration_seconds ? `<video:duration>${v.duration_seconds}</video:duration>` : ""}
+      <video:publication_date>${(v.published_at || new Date().toISOString()).split("T")[0]}</video:publication_date>
+      <video:family_friendly>no</video:family_friendly>
+    </video:video>
+  </url>`).join("")}
+</urlset>`;
+
+    return new Response(xml, {
       headers: {
         "Content-Type": "application/xml; charset=utf-8",
         "Cache-Control": "public, max-age=3600, s-maxage=7200",
@@ -251,6 +310,98 @@ async function handleSocialEmbed(request, env, url) {
     });
   }
 
+  // Match /japanese/video/:id or /japanese/:id
+  const japMatch = url.pathname.match(/\/japanese\/(?:video\/)?([a-f0-9-]+)/i);
+  if (japMatch) {
+    const videoId = japMatch[1];
+    const res = await fetch(`${supabaseUrl}/rest/v1/rpc/scraper_get_japanese_video_by_id`, {
+      method: "POST",
+      headers: {
+        "apikey": supabaseKey,
+        "Authorization": `Bearer ${supabaseKey}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ p_id: videoId }),
+    });
+
+    if (res.ok) {
+      const rows = await res.json();
+      if (rows && rows.length > 0) {
+        const video = rows[0];
+        const pageTitle = `${video.title} - Japanese Vault`;
+        const pageDesc = `Watch ${video.title} (${video.duration_formatted || "HD"}). Stream Japanese JAV uncensored and amateur tapes in HD on Chuglii.`;
+        const thumbUrl = video.clean_thumbnail_url || video.thumbnail_url || `${url.origin}/logo.png`;
+        const videoUrl = video.full_video_url || video.trailer_preview_url || "";
+        const canonical = `${url.origin}/japanese/video/${video.id}`;
+
+        const html = `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>${escapeHtml(pageTitle)}</title>
+  <meta name="description" content="${escapeHtml(pageDesc)}" />
+  <link rel="canonical" href="${canonical}" />
+  <meta property="og:site_name" content="Chuglii" />
+  <meta property="og:title" content="${escapeHtml(video.title)}" />
+  <meta property="og:description" content="${escapeHtml(pageDesc)}" />
+  <meta property="og:type" content="video.other" />
+  <meta property="og:url" content="${canonical}" />
+  <meta property="og:image" content="${escapeHtml(thumbUrl)}" />
+  <meta name="twitter:card" content="summary_large_image" />
+  <meta name="twitter:title" content="${escapeHtml(video.title)}" />
+  <meta name="twitter:description" content="${escapeHtml(pageDesc)}" />
+  <meta name="twitter:image" content="${escapeHtml(thumbUrl)}" />
+</head>
+<body style="background:#09090b;color:#f4f4f5;font-family:sans-serif;padding:2rem;text-align:center;">
+  <h1>${escapeHtml(video.title)}</h1>
+  <p>${escapeHtml(pageDesc)}</p>
+  <p><a href="${canonical}" style="color:#f43f5e;">Watch Video on Chuglii &rarr;</a></p>
+  <script>window.location.replace("${canonical}");</script>
+</body>
+</html>`;
+        return new Response(html, {
+          headers: {
+            "Content-Type": "text/html; charset=utf-8",
+            "Cache-Control": "public, max-age=86400, s-maxage=604800",
+          },
+        });
+      }
+    }
+  }
+
+  // Japanese catalog general share embed
+  if (url.pathname === "/japanese" || url.pathname === "/japanese/") {
+    const html = `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>Japanese JAV Vault & Video Feed - Chuglii</title>
+  <meta name="description" content="Stream thousands of uncensored Japanese adult videos, FC2-PPV releases, and amateur recordings in HD." />
+  <link rel="canonical" href="${url.origin}/japanese" />
+  <meta property="og:site_name" content="Chuglii" />
+  <meta property="og:title" content="Japanese JAV Vault & Video Feed | Chuglii" />
+  <meta property="og:description" content="Stream thousands of uncensored Japanese adult videos, FC2-PPV releases, and amateur recordings in HD." />
+  <meta property="og:type" content="website" />
+  <meta property="og:url" content="${url.origin}/japanese" />
+  <meta property="og:image" content="${url.origin}/logo.png" />
+  <meta name="twitter:card" content="summary_large_image" />
+  <meta name="twitter:title" content="Japanese JAV Vault & Video Feed - Chuglii" />
+  <meta name="twitter:description" content="Stream thousands of uncensored Japanese adult videos, FC2-PPV releases, and amateur recordings in HD." />
+</head>
+<body style="background:#09090b;color:#f4f4f5;font-family:sans-serif;padding:2rem;text-align:center;">
+  <h1>Japanese JAV Vault & Video Feed</h1>
+  <p><a href="${url.origin}/japanese" style="color:#f43f5e;">Explore Japanese Videos on Chuglii &rarr;</a></p>
+  <script>window.location.replace("${url.origin}/japanese");</script>
+</body>
+</html>`;
+    return new Response(html, {
+      headers: {
+        "Content-Type": "text/html; charset=utf-8",
+        "Cache-Control": "public, max-age=86400, s-maxage=604800",
+      },
+    });
+  }
+
   return null;
 }
 
@@ -272,8 +423,8 @@ export default {
       }
     }
 
-    // 3. Dynamic Sitemaps (/sitemap.xml, /sitemap-leaks.xml)
-    if (url.pathname === "/sitemap.xml" || url.pathname === "/sitemap-leaks.xml") {
+    // 3. Dynamic Sitemaps (/sitemap.xml, /sitemap-leaks.xml, /sitemap-japanese.xml)
+    if (url.pathname === "/sitemap.xml" || url.pathname === "/sitemap-leaks.xml" || url.pathname === "/sitemap-japanese.xml") {
       try {
         const sitemapRes = await handleSitemap(request, env, url);
         if (sitemapRes) return sitemapRes;
@@ -282,10 +433,10 @@ export default {
       }
     }
 
-    // 4. Edge OpenGraph / Social Bot Metadata injection for Leaks
+    // 4. Edge OpenGraph / Social Bot Metadata injection for Leaks & Japanese
     const userAgent = request.headers.get("user-agent") || "";
     if (BOT_REGEX.test(userAgent)) {
-      if (url.pathname.startsWith("/leak")) {
+      if (url.pathname.startsWith("/leak") || url.pathname.startsWith("/japanese")) {
         try {
           const socialResponse = await handleSocialEmbed(request, env, url);
           if (socialResponse) return socialResponse;
@@ -548,6 +699,258 @@ async function handleApi(request, env, url) {
       return new Response(upstreamRes.body, { status: 200, headers });
     } catch {
       return Response.redirect(targetUrl, 302);
+    }
+  }
+
+// ─── Clean Video Player Renderer (Ad-Free Hls.js / HTML5) ────────
+function renderCleanHlsPlayer(streamingUrl, title = "", poster = "") {
+  const safeTitle = (title || "Chuglii Player").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+  const isHls = streamingUrl.includes(".m3u8") || streamingUrl.includes("/hls/");
+  return `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+  <title>${safeTitle}</title>
+  ${isHls ? '<script src="https://cdn.jsdelivr.net/npm/hls.js@1.5.8/dist/hls.min.js"></script>' : ''}
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    html, body { width: 100%; height: 100%; background: #000; overflow: hidden; display: flex; align-items: center; justify-content: center; }
+    video { width: 100%; height: 100%; max-height: 100vh; object-fit: contain; background: #000; outline: none; }
+  </style>
+</head>
+<body>
+  <video id="player" controls autoplay playsinline ${poster ? `poster="${poster}"` : ""}></video>
+  <script>
+    (function() {
+      var video = document.getElementById('player');
+      var streamUrl = ${JSON.stringify(streamingUrl)};
+      ${isHls ? `
+      if (typeof Hls !== 'undefined' && Hls.isSupported()) {
+        var hls = new Hls({
+          enableWorker: true,
+          lowLatencyMode: true,
+          backBufferLength: 90
+        });
+        hls.loadSource(streamUrl);
+        hls.attachMedia(video);
+        hls.on(Hls.Events.MANIFEST_PARSED, function() {
+          video.play().catch(function() {});
+        });
+      } else if (video.canPlayType('application/vnd.apple.mpegurl')) {
+        video.src = streamUrl;
+        video.addEventListener('loadedmetadata', function() {
+          video.play().catch(function() {});
+        });
+      } else {
+        video.src = streamUrl;
+      }
+      ` : `
+      video.src = streamUrl;
+      video.play().catch(function() {});
+      `}
+    })();
+  </script>
+</body>
+</html>`;
+}
+
+// ─── EarnVids Unpacker & Stream Extractor ────────────────────────────
+function extractEarnVidsStream(html) {
+  try {
+    const match = html.match(/eval\(function\(p,a,c,k,e,d\)[\s\S]*?return p\}\('(.*?)',(\d+),(\d+),'(.*?)'\.split\('\|'\)/);
+    if (!match) return null;
+    const [_, p, aStr, cStr, kStr] = match;
+    const a = parseInt(aStr, 10);
+    const c = parseInt(cStr, 10);
+    const k = kStr.split('|');
+    function baseN(num, b) {
+      const digits = '0123456789abcdefghijklmnopqrstuvwxyz';
+      let res = '';
+      while (num > 0) {
+        res = digits[num % b] + res;
+        num = Math.floor(num / b);
+      }
+      return res || '0';
+    }
+    let unpacked = p;
+    for (let i = c - 1; i >= 0; i--) {
+      const key = baseN(i, a);
+      const val = k[i] || key;
+      unpacked = unpacked.replace(new RegExp('\\b' + key + '\\b', 'g'), val);
+    }
+    const hls2Match = unpacked.match(/"hls2"\s*:\s*"([^"]+)"/);
+    const hls4Match = unpacked.match(/"hls4"\s*:\s*"([^"]+)"/);
+    const titleMatch = unpacked.match(/title\s*:\s*"([^"]+)"/);
+    const imgMatch = unpacked.match(/image\s*:\s*"([^"]+)"/);
+    const stream = (hls2Match && hls2Match[1]) || (hls4Match && hls4Match[1]);
+    if (!stream) return null;
+    return {
+      streamUrl: stream,
+      title: titleMatch ? titleMatch[1] : "",
+      image: imgMatch ? imgMatch[1] : ""
+    };
+  } catch (e) {
+    return null;
+  }
+}
+
+  // ─── Edge Video Player Proxy (/api/player) ─────────────────────────
+  if (path === "/api/player") {
+    let targetUrl = url.searchParams.get("url");
+    if (!targetUrl || (!targetUrl.startsWith("http://") && !targetUrl.startsWith("https://"))) {
+      return errorResponse("Missing or invalid url parameter", 400);
+    }
+
+    try {
+      // 1. Auto-resolve SupJav gatekeeper link (?l=...) to direct destination locker
+      const targetObj = new URL(targetUrl);
+      if (targetObj.hostname.includes("supremejav.com") || targetObj.hostname.includes("supjav.com")) {
+        const lParam = targetObj.searchParams.get("l");
+        if (lParam && lParam.length >= 32) {
+          const revHex = lParam.split("").reverse().join("");
+          const resolveUrl = `https://lk1.supremejav.com/supjav.php?c=${revHex}`;
+          const resolveRes = await fetch(resolveUrl, {
+            headers: {
+              "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
+              "Referer": "https://supjav.com/",
+            },
+            redirect: "manual",
+          });
+          const loc = resolveRes.headers.get("location");
+          if (loc) {
+            targetUrl = loc;
+          }
+        }
+      }
+
+      const destObj = new URL(targetUrl);
+
+      // 2. Direct lockers (VOE, LuluStream) can be redirected directly
+      const isDirectLocker = destObj.hostname.includes("voe.sx") 
+        || destObj.hostname.includes("caseyseemavoid.com")
+        || destObj.hostname.includes("luminscdn.xyz");
+
+      if (isDirectLocker) {
+        return Response.redirect(targetUrl, 302);
+      }
+
+      // 3. VidSpeed Resolver (vvaassjjav.xyz / vidspeed)
+      // Call their internal stream API to get direct .m3u8, bypasses CSP frame-ancestors block
+      if (destObj.hostname.includes("vvaassjjav.xyz") || destObj.hostname.includes("vidspeed")) {
+        const filecode = destObj.pathname.split("/").filter(Boolean).pop();
+        if (filecode) {
+          try {
+            const apiRes = await fetch("https://vvaassjjav.xyz/api/stream", {
+              method: "POST",
+              headers: {
+                "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
+                "Referer": targetUrl,
+                "Content-Type": "application/json",
+              },
+              body: JSON.stringify({ filecode: filecode, device: "web", codecs: [] }),
+            });
+            if (apiRes.ok) {
+              const streamData = await apiRes.json();
+              if (streamData && streamData.streaming_url) {
+                return new Response(renderCleanHlsPlayer(streamData.streaming_url, streamData.title, streamData.thumbnail), {
+                  status: 200,
+                  headers: {
+                    "Content-Type": "text/html; charset=utf-8",
+                    "Access-Control-Allow-Origin": "*",
+                    "Cache-Control": "no-store",
+                  },
+                });
+              }
+            }
+          } catch (e) {
+            console.error("VidSpeed resolve error:", e);
+          }
+        }
+      }
+
+      // 4. EarnVids Resolver (evsishere.xyz / earnvids / vidhide)
+      // Unpack JW Player packed payload, extract clean hls2 master stream (avoids broken willowgrovelearning SSL)
+      if (destObj.hostname.includes("evsishere.xyz") || destObj.hostname.includes("earnvids") || destObj.hostname.includes("vidhide")) {
+        try {
+          const earnRes = await fetch(targetUrl, {
+            headers: {
+              "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
+              "Referer": "https://supjav.com/",
+              "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+            },
+          });
+          if (earnRes.ok) {
+            const earnHtml = await earnRes.text();
+            const earnStream = extractEarnVidsStream(earnHtml);
+            if (earnStream && earnStream.streamUrl) {
+              return new Response(renderCleanHlsPlayer(earnStream.streamUrl, earnStream.title, earnStream.image), {
+                status: 200,
+                headers: {
+                  "Content-Type": "text/html; charset=utf-8",
+                  "Access-Control-Allow-Origin": "*",
+                  "Cache-Control": "no-store",
+                },
+              });
+            }
+          }
+        } catch (e) {
+          console.error("EarnVids resolve error:", e);
+        }
+      }
+
+      // 5. Streamtape: Redirect directly to full embed URL (do NOT strip filename as it causes 404)
+      if (destObj.hostname.includes("streamtape.com")) {
+        return Response.redirect(targetUrl, 302);
+      }
+
+      // 6. Generic Fallback Proxy (EarnVids / evsishere / legacy):
+      // Edge worker proxies the HTML with spoofed Referer: https://supjav.com/ and injects <base>
+      let referer = "https://supjav.com/";
+      if (targetUrl.includes("mmsvibex")) referer = "https://mmsvibex.life/";
+
+      const upstreamRes = await fetch(targetUrl, {
+        headers: {
+          "User-Agent": request.headers.get("user-agent") || "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
+          "Referer": referer,
+          "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+        },
+        redirect: "follow",
+      });
+
+      const contentType = upstreamRes.headers.get("content-type") || "text/html; charset=utf-8";
+
+      if (contentType.includes("text/html")) {
+        let body = await upstreamRes.text();
+        // Remove frame busting check
+        body = body.replace(/if\s*\(\s*top\.location\.href\s*==\s*location\.href\s*\)\s*\{[^}]*\}/g, "");
+        // Inject <base> tag so relative CSS/JS load from destination host
+        const baseTag = `<base href="${destObj.origin}/">`;
+        if (body.includes("<head>")) {
+          body = body.replace("<head>", `<head>${baseTag}`);
+        } else {
+          body = `${baseTag}${body}`;
+        }
+
+        return new Response(body, {
+          status: 200,
+          headers: {
+            "Content-Type": contentType,
+            "Access-Control-Allow-Origin": "*",
+            "Cache-Control": "no-store",
+          },
+        });
+      }
+
+      return new Response(upstreamRes.body, {
+        status: upstreamRes.status,
+        headers: {
+          "Content-Type": contentType,
+          "Access-Control-Allow-Origin": "*",
+        },
+      });
+    } catch (err) {
+      return errorResponse("Player proxy error: " + (err.message || err), 502);
     }
   }
 
