@@ -50,10 +50,14 @@ async function readPgViewers(id: string): Promise<number | null> {
       .select("viewers")
       .eq("id", id)
       .maybeSingle();
-    if (error || !data) return null;
-    return Number(data.viewers ?? 0);
+    // null means the row was confirmed missing; NaN marks a DB/network failure
+    // so callers never mistake a transient outage for a deleted recording.
+    if (error) return Number.NaN;
+    if (!data) return null;
+    const viewers = Number(data.viewers ?? 0);
+    return Number.isSafeInteger(viewers) && viewers >= 0 ? viewers : Number.NaN;
   } catch {
-    return null;
+    return Number.NaN;
   }
 }
 
@@ -122,13 +126,34 @@ export async function recordView(recordingId: string): Promise<number | null> {
   const redis = client();
   if (!redis) return null;
 
-  const pendKey = `${PEND_KEY}${recordingId}`;
-  const baseKey = `${BASE_KEY}${recordingId}`;
+  const pendKey = PEND_KEY + recordingId;
+  const baseKey = BASE_KEY + recordingId;
 
   try {
-    // Anchor the buffer to the current PG value ONCE (SETNX). Concurrent first
-    // views race harmlessly: whoever wins set the same PG snapshot.
-    await redis.setnx(baseKey, String(await readPgViewers(recordingId) ?? 0));
+    // Avoid a Postgres read on every play. SETNX only helps if we do not
+    // eagerly evaluate the PG lookup when the anchor already exists.
+    let baseRaw = await redis.get(baseKey);
+    if (baseRaw === null) {
+      const pgBase = await readPgViewers(recordingId);
+      // Fail closed: if the anchor cannot be read from PG, use the existing
+      // direct-PG route fallback rather than creating a zero anchor and losing
+      // historical counts.
+      if (pgBase === null || !Number.isSafeInteger(pgBase) || pgBase < 0) return null;
+      const wonAnchor = await redis.setnx(baseKey, String(pgBase));
+      if (Number(wonAnchor) === 1) {
+        baseRaw = String(pgBase);
+      } else {
+        // Another request initialized the anchor first; read its canonical
+        // value rather than using our potentially older snapshot.
+        baseRaw = await redis.get(baseKey);
+      }
+    }
+
+    const base = baseRaw === null ? null : Number.parseInt(baseRaw, 10);
+    if (base === null || !Number.isSafeInteger(base) || base < 0) {
+      logger.warn({ recordingId }, "View buffer anchor invalid; falling back to direct write");
+      return null;
+    }
 
     const pending = await redis.incr(pendKey);
     await redis.zadd(CHANGED_SET, Date.now(), recordingId);
@@ -142,8 +167,6 @@ export async function recordView(recordingId: string): Promise<number | null> {
       queueFlushId(recordingId);
     }
 
-    const baseRaw = await redis.get(baseKey);
-    const base = baseRaw === null ? 0 : Number.parseInt(baseRaw, 10) || 0;
     return base + pending;
   } catch (err) {
     logger.error({ err, recordingId }, "View buffer record error");
@@ -177,9 +200,15 @@ async function flushId(redis: RedisClient, recordingId: string): Promise<{
 
   const pg = await readPgViewers(recordingId);
   if (pg === null) {
-    // Recording no longer exists — drop the whole buffer.
+    // The row is confirmed missing — drop the orphaned buffer.
     await deleteBufferKeys(redis, recordingId);
     return { id: recordingId, applied: 0, casMiss: false, deleted: true };
+  }
+  if (!Number.isSafeInteger(pg) || pg < 0) {
+    // A database/network error is NOT evidence that the recording was deleted.
+    // Preserve its pending views so a later cron/admin flush can retry.
+    logger.warn({ recordingId }, "View buffer flush skipped: viewer count unavailable");
+    return { id: recordingId, applied: 0, casMiss: true, deleted: false };
   }
 
   // Resync the anchor if PG moved underneath us (direct legacy writes, bulk
@@ -203,7 +232,7 @@ async function flushId(redis: RedisClient, recordingId: string): Promise<{
     // Another flusher (or a legacy writer) moved PG between our read and write.
     // Keep the backlog for the next pass and re-anchor to the now-current value.
     const fresh = await readPgViewers(recordingId);
-    if (fresh !== null) await redis.set(baseKey, String(fresh));
+    if (fresh !== null && Number.isSafeInteger(fresh) && fresh >= 0) await redis.set(baseKey, String(fresh));
     return { id: recordingId, applied: 0, casMiss: true, deleted: false };
   }
 
