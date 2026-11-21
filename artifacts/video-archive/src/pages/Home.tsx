@@ -325,7 +325,7 @@ export default function Home() {
 
       {/* Top Performers — Circular avatars */}
       {(topPerformers.length > 0 || performersLoading) && (
-        <section className="border-t border-border/50 px-4 sm:px-6 py-14 relative overflow-hidden">
+        <section className="border-t border-border/50 px-4 sm:px-6 py-14 relative overflow-hidden" section-accent>
           <div className="container mx-auto">
             <div className="flex items-center justify-between mb-8">
               <h2 className="flex items-center gap-2 text-xs uppercase tracking-[0.25em] text-muted-foreground font-semibold">
