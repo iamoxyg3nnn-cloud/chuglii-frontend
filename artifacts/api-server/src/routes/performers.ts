@@ -17,36 +17,165 @@ const CB_UA = "Googlebot/2.1 (+http://www.google.com/bot.html)";
 // Uses the internal /get_edge_hls_url_ajax/ endpoint (same as yt-dlp).
 // Returns { exists, is_live, room_status }.
 // No cookies needed -- works from serverless IPs.
+interface ChaturbateCheckResult {
+  exists: boolean;
+  is_online?: boolean;
+  display_name?: string;
+  avatar_url?: string;
+  room_title?: string;
+  viewer_count?: number;
+  follower_count?: number;
+  last_seen?: string;
+  room_status?: string;
+}
+
+function formatTimeAgo(isoString: string): string {
+  try {
+    const diff = Date.now() - new Date(isoString).getTime();
+    const mins = Math.floor(diff / 60000);
+    if (mins < 1) return "just now";
+    if (mins < 60) return `${mins}m ago`;
+    const hours = Math.floor(mins / 60);
+    if (hours < 24) return `${hours}h ago`;
+    const days = Math.floor(hours / 24);
+    if (days < 30) return `${days}d ago`;
+    const months = Math.floor(days / 30);
+    return `${months}mo ago`;
+  } catch {
+    return isoString;
+  }
+}
+
 const KNOWN_CB_STATUSES = new Set(["public", "private", "group_show", "away", "offline", "password protected"]);
 
 async function checkChaturbateApi(
   username: string,
-): Promise<{ exists: boolean; is_live: boolean; room_status: string } | null> {
+): Promise<ChaturbateCheckResult | null> {
   try {
-    const res = await fetch("https://chaturbate.com/get_edge_hls_url_ajax/", {
-      method: "POST",
-      headers: {
-        "User-Agent": CB_UA,
-        "X-Requested-With": "XMLHttpRequest",
-        Accept: "application/json",
-        "Content-Type": "application/x-www-form-urlencoded",
-      },
-      body: `room_slug=${encodeURIComponent(username)}`,
-    });
-    if (!res.ok) return null;
-    const data = (await res.json()) as {
-      success?: boolean;
-      room_status?: string;
+    const headers = {
+      "User-Agent": UA,
+      Accept: "application/json, text/plain, */*",
+      "Accept-Language": "en-US,en;q=0.9",
+      Referer: `https://www.cb.xxx/${encodeURIComponent(username)}/`,
     };
-    const roomStatus = (data.room_status ?? "").toLowerCase().trim();
-    const exists = !!data.success || KNOWN_CB_STATUSES.has(roomStatus);
-    const is_live =
-      roomStatus === "public" || roomStatus === "group_show" || roomStatus === "private";
-    return {
-      exists,
-      is_live,
-      room_status: roomStatus || "unknown",
-    };
+
+    const [chatVideoRes, bioRes] = await Promise.allSettled([
+      fetch(`https://www.cb.xxx/api/chatvideocontext/${encodeURIComponent(username)}/`, {
+        headers,
+        signal: AbortSignal.timeout(6000),
+      }),
+      fetch(`https://www.cb.xxx/api/biocontext/${encodeURIComponent(username)}/`, {
+        headers,
+        signal: AbortSignal.timeout(6000),
+      }),
+    ]);
+
+    let cData: any = null;
+    let bData: any = null;
+
+    if (chatVideoRes.status === "fulfilled") {
+      const resp = chatVideoRes.value;
+      if (resp.status === 404) {
+        return { exists: false };
+      }
+      if (resp.status === 403) {
+        // Geoblocked or gender-restricted performer (e.g. access-denied)
+        try {
+          const errBody = (await resp.json()) as { code?: string; ts_context?: { roomName?: string } };
+          if (errBody?.code === "access-denied" || errBody?.ts_context?.roomName) {
+            return {
+              exists: true,
+              is_online: false,
+              display_name: username,
+              avatar_url: `https://thumb.live.mmcdn.com/ri/${encodeURIComponent(username)}.jpg`,
+            };
+          }
+        } catch {}
+      }
+      if (resp.ok) {
+        try {
+          cData = await resp.json();
+        } catch {}
+      }
+    }
+
+    if (bioRes.status === "fulfilled" && bioRes.value.ok) {
+      try {
+        bData = await bioRes.value.json();
+      } catch {}
+    }
+
+    if (cData) {
+      const roomStatus = (cData.room_status ?? "").toLowerCase().trim();
+      const isOnline =
+        roomStatus === "public" ||
+        roomStatus === "private" ||
+        roomStatus === "group_show" ||
+        roomStatus === "away";
+      const displayName =
+        (bData?.real_name ?? "").trim() || cData.broadcaster_username || username;
+      const roomTitle = (cData.room_title ?? "").trim() || undefined;
+      const viewerCount =
+        isOnline && typeof cData.num_viewers === "number" ? cData.num_viewers : undefined;
+      const followerCount =
+        typeof bData?.follower_count === "number" ? bData.follower_count : undefined;
+      const lastSeen =
+        bData?.time_since_last_broadcast ||
+        (bData?.last_broadcast ? formatTimeAgo(bData.last_broadcast) : undefined);
+      const avatarUrl =
+        (cData.summary_card_image && typeof cData.summary_card_image === "string" && cData.summary_card_image.trim()) ||
+        bData?.photo_sets?.[0]?.cover_url ||
+        `https://thumb.live.mmcdn.com/ri/${encodeURIComponent(username)}.jpg`;
+
+      return {
+        exists: true,
+        is_online: isOnline,
+        display_name: displayName,
+        avatar_url: avatarUrl,
+        room_title: roomTitle,
+        viewer_count: viewerCount,
+        follower_count: followerCount,
+        last_seen: lastSeen,
+        room_status: roomStatus,
+      };
+    }
+
+    // Fallback: get_edge_hls_url_ajax (yt-dlp endpoint on chaturbate.com)
+    try {
+      const ajaxRes = await fetch("https://chaturbate.com/get_edge_hls_url_ajax/", {
+        method: "POST",
+        headers: {
+          "User-Agent": CB_UA,
+          "X-Requested-With": "XMLHttpRequest",
+          Accept: "application/json",
+          "Content-Type": "application/x-www-form-urlencoded",
+        },
+        body: `room_slug=${encodeURIComponent(username)}`,
+        signal: AbortSignal.timeout(5000),
+      });
+      if (ajaxRes.ok) {
+        const data = (await ajaxRes.json()) as {
+          success?: boolean;
+          room_status?: string;
+        };
+        const roomStatus = (data.room_status ?? "").toLowerCase().trim();
+        const exists = !!data.success || KNOWN_CB_STATUSES.has(roomStatus);
+        if (exists) {
+          const isLive =
+            roomStatus === "public" || roomStatus === "group_show" || roomStatus === "private";
+          return {
+            exists: true,
+            is_online: isLive,
+            display_name: username,
+            avatar_url: `https://thumb.live.mmcdn.com/ri/${encodeURIComponent(username)}.jpg`,
+            room_status: roomStatus,
+          };
+        }
+        return { exists: false };
+      }
+    } catch {}
+
+    return null;
   } catch {
     return null;
   }
@@ -350,19 +479,25 @@ router.get(
 
       // 2. Platform-specific existence check
       if (platform === "chaturbate") {
-        // Use Chaturbate's internal JSON API (no cookies needed)
         const apiResult = await checkChaturbateApi(username);
         if (apiResult) {
           result.exists = apiResult.exists;
-          result.is_online = apiResult.is_live;
-          if (!apiResult.exists && result.in_archive) {
+          if (apiResult.exists) {
+            if (apiResult.is_online !== undefined) result.is_online = apiResult.is_online;
+            if (apiResult.display_name) result.display_name = apiResult.display_name;
+            if (apiResult.avatar_url) result.avatar_url = apiResult.avatar_url;
+            if (apiResult.room_title) result.room_title = apiResult.room_title;
+            if (apiResult.viewer_count !== undefined) result.viewer_count = apiResult.viewer_count;
+            if (apiResult.follower_count !== undefined) result.follower_count = apiResult.follower_count;
+            if (apiResult.last_seen) result.last_seen = apiResult.last_seen;
+          } else if (result.in_archive) {
             result.exists = true;
             result.platform_check_failed = true;
           }
           res.json(result);
           return;
         }
-        // API failed (Chaturbate blocks Vercel IPs via Cloudflare).
+        // API failed (both cb.xxx and chaturbate unreachable).
         // If the performer is in our archive, we know they exist.
         // Otherwise set platform_check_failed so the frontend can show a
         // helpful message instead of "Performer not found".
