@@ -1,5 +1,5 @@
 // Cloudflare Pages Advanced Worker (_worker.js)
-// Handles API routes at the Cloudflare Edge directly with Supabase & Redis,
+// Handles API routes at the Cloudflare Edge directly with Supabase & media proxying,
 // and passes all other asset / SPA routes to env.ASSETS.fetch(request).
 
 const CORS_HEADERS = {
@@ -54,7 +54,54 @@ async function handleApi(request, env, url) {
 
   const path = url.pathname.replace(/\/+$/, "");
 
-  // Common headers for PostgREST
+  // ─── Image & Media Proxy (/api/media) ──────────────────────────────
+  if (path === "/api/media") {
+    const targetUrl = url.searchParams.get("url");
+    if (!targetUrl || (!targetUrl.startsWith("http://") && !targetUrl.startsWith("https://"))) {
+      return errorResponse("Missing or invalid url parameter", 400);
+    }
+
+    try {
+      // Determine appropriate Referer for hotlink-protected hosts
+      let referer = "https://chuglii.in/";
+      if (targetUrl.includes("pixhost.to")) referer = "https://pixhost.to/";
+      else if (targetUrl.includes("catbox.moe")) referer = "https://catbox.moe/";
+      else if (targetUrl.includes("imgpile.com")) referer = "https://imgpile.com/";
+
+      const upstreamRes = await fetch(targetUrl, {
+        headers: {
+          "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
+          "Referer": referer,
+          "Accept": "image/avif,image/webp,image/apng,image/svg+xml,image/*,*/*;q=0.8",
+        },
+        cf: {
+          cacheTtl: 31536000,
+          cacheEverything: true,
+        },
+      });
+
+      if (!upstreamRes.ok) {
+        // Fallback: redirect directly to target if proxying fails
+        return Response.redirect(targetUrl, 302);
+      }
+
+      const contentType = upstreamRes.headers.get("content-type") || "image/jpeg";
+      const headers = new Headers();
+      headers.set("Content-Type", contentType);
+      headers.set("Cache-Control", "public, max-age=31536000, immutable");
+      headers.set("Access-Control-Allow-Origin", "*");
+      headers.set("Vary", "Accept");
+
+      return new Response(upstreamRes.body, {
+        status: 200,
+        headers,
+      });
+    } catch {
+      return Response.redirect(targetUrl, 302);
+    }
+  }
+
+  // ─── Common PostgREST Headers ──────────────────────────────────────
   const postgrestHeaders = {
     "apikey": supabaseKey,
     "Authorization": `Bearer ${supabaseKey}`,
@@ -70,6 +117,36 @@ async function handleApi(request, env, url) {
   // GET /api/ads/stripcash
   if (path === "/api/ads/stripcash") {
     return jsonResponse({ enabled: true, fallback: true });
+  }
+
+  // GET /api/premium/config
+  if (path === "/api/premium/config") {
+    return jsonResponse({
+      ads_enabled: true,
+      ads_target: 5,
+      reward_cooldown_s: 60,
+      grace_minutes: 10,
+      price_usd: 4.99,
+    });
+  }
+
+  // GET /api/user/premium/status
+  if (path === "/api/user/premium/status") {
+    return jsonResponse({
+      is_premium: false,
+      premium_until: null,
+      ads_watched: 0,
+    });
+  }
+
+  // GET /api/user/role
+  if (path === "/api/user/role") {
+    return jsonResponse({ role: "user" });
+  }
+
+  // GET /api/user/profile
+  if (path === "/api/user/profile") {
+    return jsonResponse({ user: null });
   }
 
   // GET /api/stats
@@ -104,6 +181,25 @@ async function handleApi(request, env, url) {
     }
     const tags = await res.json();
     return jsonResponse(tags);
+  }
+
+  // GET /api/recordings/recommendations
+  if (path === "/api/recordings/recommendations") {
+    const limit = Math.min(30, Math.max(1, parseInt(url.searchParams.get("limit") || "16", 10)));
+    const restUrl = `${supabaseUrl}/rest/v1/linked_recordings?select=id,channel_id,username,filename,timestamp,room_title,tags,viewers,resolution,framerate,filesize,duration,gender,thumbnail_url,sprite_url,embed_url,preview_url,instance_id,created_at,updated_at&limit=${limit}&order=timestamp.desc`;
+    const res = await fetch(restUrl, { headers: postgrestHeaders });
+    const data = await res.json();
+    const enriched = (data || []).map(item => ({
+      ...item,
+      site: item.site || (item.instance_id?.includes("node") ? "stripchat" : "chaturbate"),
+    }));
+    return jsonResponse({
+      data: enriched,
+      total: enriched.length,
+      page: 1,
+      limit,
+      totalPages: 1,
+    });
   }
 
   // GET /api/recordings
