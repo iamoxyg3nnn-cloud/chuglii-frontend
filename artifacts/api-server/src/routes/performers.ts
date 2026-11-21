@@ -7,7 +7,7 @@ import { resolveGenderBucket } from "../lib/genders.js";
 import { enrichWithSite } from "../lib/site-resolver.js";
 
 const COOKIES = process.env.COOKIES ?? "";
-const CB_AFFILIATE = process.env.CHATURBATE_AFFILIATE_CODE ?? process.env.AFFILIATE_WM ?? "";
+const CB_AFFILIATE = process.env.CHATURBATE_AFFILIATE_CODE || process.env.AFFILIATE_WM || "";
 const UA =
   "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36";
 // Googlebot UA bypasses Cloudflare for Chaturbate (used only for API calls)

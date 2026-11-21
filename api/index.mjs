@@ -70008,7 +70008,7 @@ var recordings_default = router2;
 var import_express3 = __toESM(require_express2(), 1);
 init_supabase();
 var COOKIES = process.env.COOKIES ?? "";
-var CB_AFFILIATE = process.env.CHATURBATE_AFFILIATE_CODE ?? process.env.AFFILIATE_WM ?? "";
+var CB_AFFILIATE = process.env.CHATURBATE_AFFILIATE_CODE || process.env.AFFILIATE_WM || "";
 var UA = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36";
 var CB_UA = "Googlebot/2.1 (+http://www.google.com/bot.html)";
 function formatTimeAgo(isoString) {
