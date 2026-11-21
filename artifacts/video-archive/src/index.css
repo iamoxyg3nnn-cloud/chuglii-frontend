@@ -567,3 +567,140 @@
   max-width: 100% !important;
   border: 0;
 }
+
+/* ==========================================================================
+   recu.me 18+ splash replica styles
+   ========================================================================== */
+.splash-18 {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: #000000;
+  padding-top: 15%;
+  z-index: 100002;
+  overflow-y: auto;
+  font-family: Arial, Helvetica, sans-serif;
+  color: #666666;
+}
+
+@media screen and (max-width: 768px) {
+  .splash-18 {
+    padding-top: 10%;
+  }
+}
+
+@media screen and (max-width: 450px) {
+  .splash-18 {
+    padding-left: 20px;
+    padding-right: 20px;
+    padding-top: 15%;
+  }
+}
+
+.splash-18 .splash-18__logo {
+  font-size: 44px;
+  font-family: "Montserrat Alternates", sans-serif;
+  line-height: 1.5;
+  font-weight: 700;
+  text-align: center;
+  margin-top: 20px;
+  color: #FFFFFF;
+  text-decoration: none;
+  letter-spacing: normal;
+  display: inline-block;
+}
+
+@media (max-width: 480px) {
+  .splash-18 .splash-18__logo {
+    font-size: 32px;
+  }
+}
+
+.splash-18 .site-promo-title {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  white-space: nowrap;
+  margin-bottom: 20px;
+  gap: 6px;
+}
+
+.splash-18 .site-promo-title span {
+  color: #FFFFFF;
+  font-size: 18px;
+  line-height: 20px;
+  font-family: "Montserrat Alternates", sans-serif;
+  font-weight: 700;
+}
+
+.splash-18 .site-promo-title i.star,
+.splash-18 .site-promo-title span.star {
+  color: #FF9900;
+  font-size: 18px;
+  line-height: 1;
+  font-style: normal;
+}
+
+@media screen and (max-width: 450px) {
+  .splash-18 .site-promo-title span,
+  .splash-18 .site-promo-title i.star,
+  .splash-18 .site-promo-title span.star {
+    font-size: 13px;
+  }
+}
+
+.splash-18 h2 {
+  margin-bottom: 38px;
+  font-family: "Montserrat Alternates", sans-serif;
+  font-size: 14px;
+  line-height: 20px;
+  color: #666666;
+  text-align: center;
+  font-weight: 400;
+}
+
+.splash-18 h2 b {
+  font-weight: 700;
+  color: #888888;
+}
+
+.splash-18 p {
+  text-align: center;
+  font-family: Arial, Helvetica, sans-serif;
+  font-size: 14px;
+  line-height: 20px;
+  color: #666666;
+  margin-bottom: 16px;
+}
+
+.splash-18 #btn-confirm-age,
+.splash-18 .btn-confirm-age {
+  cursor: pointer;
+  border-radius: 4px;
+  font-size: 14px;
+  line-height: 16px;
+  padding: 7px 18px;
+  background-color: transparent !important;
+  border: 1px solid #FF9900 !important;
+  color: #FF9900 !important;
+  text-decoration: none;
+  font-family: Arial, Helvetica, sans-serif;
+  font-weight: 400;
+  transition: background-color 0.15s ease-in-out, color 0.15s ease-in-out, border-color 0.15s ease-in-out;
+  display: inline-block;
+  outline: none;
+}
+
+.splash-18 #btn-confirm-age:hover,
+.splash-18 #btn-confirm-age:active,
+.splash-18 .btn-confirm-age:hover,
+.splash-18 .btn-confirm-age:active {
+  background-color: #FF9900 !important;
+  border-color: #FF9900 !important;
+  color: #000000 !important;
+}
