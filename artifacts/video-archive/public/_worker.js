@@ -301,12 +301,17 @@ async function handleApi(request, env, url) {
     }
   }
 
-  // ─── Serverless Scraper Sync (/api/scraper/sync) ────────────────────
+  // ─── Forward to Dedicated Scraper Worker (/api/scraper/sync) ───────
   if (path === "/api/scraper/sync") {
-    const pages = Math.min(10, Math.max(1, parseInt(url.searchParams.get("pages") || "2", 10)));
-    const category = url.searchParams.get("category") || null;
-    const syncResult = await syncMmsvibex(env, pages, category);
-    return jsonResponse(syncResult);
+    const scraperUrl = `https://chuglii-scraper.maskmails.workers.dev/sync${url.search}`;
+    const scraperRes = await fetch(scraperUrl, {
+      method: request.method,
+      headers: { "Content-Type": "application/json" },
+    });
+    return new Response(scraperRes.body, {
+      status: scraperRes.status,
+      headers: { ...CORS_HEADERS, "Content-Type": "application/json" },
+    });
   }
 
   // ─── Common PostgREST Headers ──────────────────────────────────────
