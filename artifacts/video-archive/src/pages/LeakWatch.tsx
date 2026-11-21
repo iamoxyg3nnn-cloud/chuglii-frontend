@@ -17,7 +17,8 @@ import {
   WarningCircle,
   Sparkle,
   BookmarkSimple,
-  LinkSimple
+  LinkSimple,
+  User
 } from "@phosphor-icons/react";
 
 export default function LeakWatch() {
@@ -43,6 +44,39 @@ export default function LeakWatch() {
       setIsSaved(false);
     }
   }, [id]);
+
+  // Dynamic SEO & OpenGraph Document Meta Tags
+  useEffect(() => {
+    if (!video) return;
+    const prevTitle = document.title;
+    document.title = `${video.title} - Chuglii Leaks`;
+
+    const setMeta = (name: string, content: string, isProp = false) => {
+      let el = document.querySelector(isProp ? `meta[property="${name}"]` : `meta[name="${name}"]`);
+      if (!el) {
+        el = document.createElement("meta");
+        if (isProp) el.setAttribute("property", name);
+        else el.setAttribute("name", name);
+        document.head.appendChild(el);
+      }
+      el.setAttribute("content", content);
+    };
+
+    setMeta("description", `Watch ${video.title} on Chuglii. High quality viral MMS leaks & private video archives.`);
+    setMeta("og:title", `${video.title} | Viral MMS Leak`, true);
+    setMeta("og:description", `Watch ${video.title} - Duration ${video.duration_formatted || "HD"} on Chuglii.`, true);
+    setMeta("og:image", video.clean_thumbnail_url || video.thumbnail_url || "", true);
+    if (video.full_video_url) {
+      setMeta("og:video", video.full_video_url, true);
+      setMeta("og:video:type", "video/mp4", true);
+    }
+    setMeta("twitter:title", video.title);
+    setMeta("twitter:image", video.clean_thumbnail_url || video.thumbnail_url || "");
+
+    return () => {
+      document.title = prevTitle;
+    };
+  }, [video]);
 
   const toggleSave = () => {
     if (!id) return;
@@ -275,9 +309,25 @@ export default function LeakWatch() {
               </div>
             </div>
 
+            {/* Performer / Model section */}
+            {video.actors && video.actors.length > 0 && (
+              <div className="mt-3 flex flex-wrap items-center gap-1.5">
+                <span className="text-xs text-muted-foreground mr-1 flex items-center gap-1">
+                  <User size={13} className="text-rose-400" /> Model / Performer:
+                </span>
+                {video.actors.map((actor) => (
+                  <Link key={actor} href={`/leak?q=${encodeURIComponent(actor)}`}>
+                    <span className="px-2.5 py-1 rounded-lg bg-rose-500/10 hover:bg-rose-500/20 text-xs text-rose-400 font-semibold border border-rose-500/20 transition-colors cursor-pointer">
+                      {actor.replace(/-/g, " ")}
+                    </span>
+                  </Link>
+                ))}
+              </div>
+            )}
+
             {/* Tags section */}
             {video.tags && video.tags.length > 0 && (
-              <div className="mt-5 pt-4 border-t border-border/30 flex flex-wrap items-center gap-1.5">
+              <div className="mt-4 pt-4 border-t border-border/30 flex flex-wrap items-center gap-1.5">
                 <span className="text-xs text-muted-foreground mr-1 flex items-center gap-1">
                   <TagIcon size={13} /> Tags:
                 </span>

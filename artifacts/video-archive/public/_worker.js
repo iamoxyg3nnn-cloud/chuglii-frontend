@@ -27,6 +27,233 @@ function errorResponse(error, status = 500) {
   return jsonResponse({ error: typeof error === "string" ? error : error?.message || "Internal error" }, status);
 }
 
+function escapeXml(unsafe) {
+  if (!unsafe) return "";
+  return String(unsafe)
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&apos;");
+}
+
+function escapeHtml(unsafe) {
+  if (!unsafe) return "";
+  return String(unsafe)
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#039;");
+}
+
+const BOT_REGEX = /bot|crawl|slurp|spider|facebookexternalhit|twitterbot|whatsapp|telegrambot|discordbot|slackbot|googlebot|bingbot|applebot/i;
+
+async function handleSitemap(request, env, url) {
+  const supabaseUrl = env.SUPABASE_URL || "https://supabase.chuglii.in";
+  const supabaseKey = env.SUPABASE_SERVICE_ROLE_KEY || env.SUPABASE_ANON_KEY || "eyJhbGciOiAiSFMyNTYiLCAidHlwIjogIkpXVCJ9.eyJyb2xlIjogImFub24iLCAiaXNzIjogInN1cGFiYXNlIiwgImlhdCI6IDE3MDAwMDAwMDAsICJleHAiOiAyMDE1MzYwMDAwfQ.NSqjip-vQHwHjATurt4ensfmKBHa4Pt5m_dLP909lV8";
+
+  if (url.pathname === "/sitemap.xml") {
+    const sitemapIndex = `<?xml version="1.0" encoding="UTF-8"?>
+<sitemapindex xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+  <sitemap>
+    <loc>${url.origin}/sitemap-leaks.xml</loc>
+    <lastmod>${new Date().toISOString().split("T")[0]}</lastmod>
+  </sitemap>
+</sitemapindex>`;
+    return new Response(sitemapIndex, {
+      headers: {
+        "Content-Type": "application/xml; charset=utf-8",
+        "Cache-Control": "public, max-age=3600, s-maxage=7200",
+      },
+    });
+  }
+
+  if (url.pathname === "/sitemap-leaks.xml") {
+    const res = await fetch(`${supabaseUrl}/rest/v1/rpc/scraper_get_videos`, {
+      method: "POST",
+      headers: {
+        "apikey": supabaseKey,
+        "Authorization": `Bearer ${supabaseKey}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        p_source_site: null,
+        p_tag: null,
+        p_category: "viral-mms",
+        p_search: null,
+        p_sort: "newest",
+        p_limit: 1000,
+        p_offset: 0,
+      }),
+    });
+
+    const videos = res.ok ? await res.json() : [];
+
+    const xml = `<?xml version="1.0" encoding="UTF-8"?>
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9"
+        xmlns:video="http://www.google.com/schemas/sitemap-video/1.1">
+  <url>
+    <loc>${url.origin}/leak</loc>
+    <changefreq>hourly</changefreq>
+    <priority>1.0</priority>
+  </url>
+  ${videos.map((v) => `
+  <url>
+    <loc>${url.origin}/leak/video/${v.id}</loc>
+    <lastmod>${(v.updated_at || v.published_at || new Date().toISOString()).split("T")[0]}</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.8</priority>
+    <video:video>
+      <video:thumbnail_loc>${escapeXml(v.clean_thumbnail_url || v.thumbnail_url || '')}</video:thumbnail_loc>
+      <video:title>${escapeXml(v.title)}</video:title>
+      <video:description>${escapeXml(v.title + " - Watch viral MMS leak and uncut video clip in HD on Chuglii.")}</video:description>
+      ${v.full_video_url ? `<video:content_loc>${escapeXml(v.full_video_url)}</video:content_loc>` : ""}
+      ${v.duration_seconds ? `<video:duration>${v.duration_seconds}</video:duration>` : ""}
+      <video:publication_date>${(v.published_at || new Date().toISOString()).split("T")[0]}</video:publication_date>
+      <video:family_friendly>no</video:family_friendly>
+    </video:video>
+  </url>`).join("")}
+</urlset>`;
+
+    return new Response(xml, {
+      headers: {
+        "Content-Type": "application/xml; charset=utf-8",
+        "Cache-Control": "public, max-age=3600, s-maxage=7200",
+      },
+    });
+  }
+
+  return null;
+}
+
+async function handleSocialEmbed(request, env, url) {
+  const supabaseUrl = env.SUPABASE_URL || "https://supabase.chuglii.in";
+  const supabaseKey = env.SUPABASE_SERVICE_ROLE_KEY || env.SUPABASE_ANON_KEY || "eyJhbGciOiAiSFMyNTYiLCAidHlwIjogIkpXVCJ9.eyJyb2xlIjogImFub24iLCAiaXNzIjogInN1cGFiYXNlIiwgImlhdCI6IDE3MDAwMDAwMDAsICJleHAiOiAyMDE1MzYwMDAwfQ.NSqjip-vQHwHjATurt4ensfmKBHa4Pt5m_dLP909lV8";
+
+  // Match /leak/video/:id or /leak/:id
+  const match = url.pathname.match(/\/leak\/(?:video\/)?([a-f0-9-]+)/i);
+  if (match) {
+    const videoId = match[1];
+    const res = await fetch(`${supabaseUrl}/rest/v1/rpc/scraper_get_video_by_id`, {
+      method: "POST",
+      headers: {
+        "apikey": supabaseKey,
+        "Authorization": `Bearer ${supabaseKey}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ p_id: videoId }),
+    });
+
+    if (res.ok) {
+      const rows = await res.json();
+      if (rows && rows.length > 0) {
+        const video = rows[0];
+        const pageTitle = `${video.title} - Chuglii Leaks`;
+        const pageDesc = `Watch ${video.title} (${video.duration_formatted || "HD"}). Stream thousands of viral MMS leaks and desi clips on Chuglii.`;
+        const thumbUrl = video.clean_thumbnail_url || video.thumbnail_url || `${url.origin}/logo.png`;
+        const videoUrl = video.full_video_url || video.trailer_preview_url || "";
+        const canonical = `${url.origin}/leak/video/${video.id}`;
+
+        const html = `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>${escapeHtml(pageTitle)}</title>
+  <meta name="description" content="${escapeHtml(pageDesc)}" />
+  <link rel="canonical" href="${canonical}" />
+  <!-- OpenGraph -->
+  <meta property="og:site_name" content="Chuglii" />
+  <meta property="og:title" content="${escapeHtml(video.title)}" />
+  <meta property="og:description" content="${escapeHtml(pageDesc)}" />
+  <meta property="og:type" content="video.other" />
+  <meta property="og:url" content="${canonical}" />
+  <meta property="og:image" content="${escapeHtml(thumbUrl)}" />
+  <meta property="og:image:width" content="960" />
+  <meta property="og:image:height" content="540" />
+  ${videoUrl ? `
+  <meta property="og:video" content="${escapeHtml(videoUrl)}" />
+  <meta property="og:video:secure_url" content="${escapeHtml(videoUrl)}" />
+  <meta property="og:video:type" content="video/mp4" />
+  <meta property="og:video:width" content="1280" />
+  <meta property="og:video:height" content="720" />` : ""}
+  <!-- Twitter Card -->
+  <meta name="twitter:card" content="summary_large_image" />
+  <meta name="twitter:title" content="${escapeHtml(video.title)}" />
+  <meta name="twitter:description" content="${escapeHtml(pageDesc)}" />
+  <meta name="twitter:image" content="${escapeHtml(thumbUrl)}" />
+  ${videoUrl ? `
+  <meta name="twitter:player" content="${escapeHtml(videoUrl)}" />
+  <meta name="twitter:player:width" content="1280" />
+  <meta name="twitter:player:height" content="720" />` : ""}
+  <!-- Video Schema.org JSON-LD -->
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": "VideoObject",
+    "name": ${JSON.stringify(video.title)},
+    "description": ${JSON.stringify(pageDesc)},
+    "thumbnailUrl": [${JSON.stringify(thumbUrl)}],
+    "uploadDate": ${JSON.stringify(video.published_at || new Date().toISOString())},
+    "duration": "PT${video.duration_seconds || 0}S",
+    "contentUrl": ${JSON.stringify(videoUrl)}
+  }
+  </script>
+</head>
+<body style="background:#09090b;color:#f4f4f5;font-family:sans-serif;padding:2rem;text-align:center;">
+  <h1>${escapeHtml(video.title)}</h1>
+  <p>${escapeHtml(pageDesc)}</p>
+  <p><a href="${canonical}" style="color:#f43f5e;">Watch Video on Chuglii &rarr;</a></p>
+  <script>window.location.replace("${canonical}");</script>
+</body>
+</html>`;
+
+        return new Response(html, {
+          headers: {
+            "Content-Type": "text/html; charset=utf-8",
+            "Cache-Control": "public, max-age=86400, s-maxage=604800",
+          },
+        });
+      }
+    }
+  }
+
+  // Catalog general share embed
+  if (url.pathname === "/leak" || url.pathname === "/leak/") {
+    const html = `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>Viral MMS Leaks & Video Feed - Chuglii</title>
+  <meta name="description" content="Stream thousands of viral clips, uncut web-series, and exclusive leaked private tapes in HD." />
+  <link rel="canonical" href="${url.origin}/leak" />
+  <meta property="og:site_name" content="Chuglii" />
+  <meta property="og:title" content="Viral MMS Leaks & Private Video Feed | Chuglii" />
+  <meta property="og:description" content="Stream thousands of viral clips, uncut web-series, and exclusive leaked private tapes in HD." />
+  <meta property="og:type" content="website" />
+  <meta property="og:url" content="${url.origin}/leak" />
+  <meta property="og:image" content="${url.origin}/logo.png" />
+  <meta name="twitter:card" content="summary_large_image" />
+  <meta name="twitter:title" content="Viral MMS Leaks & Video Feed - Chuglii" />
+  <meta name="twitter:description" content="Stream thousands of viral clips, uncut web-series, and exclusive leaked private tapes in HD." />
+</head>
+<body style="background:#09090b;color:#f4f4f5;font-family:sans-serif;padding:2rem;text-align:center;">
+  <h1>Viral MMS Leaks & Private Video Feed</h1>
+  <p><a href="${url.origin}/leak" style="color:#f43f5e;">Explore Leaks on Chuglii &rarr;</a></p>
+  <script>window.location.replace("${url.origin}/leak");</script>
+</body>
+</html>`;
+    return new Response(html, {
+      headers: {
+        "Content-Type": "text/html; charset=utf-8",
+        "Cache-Control": "public, max-age=86400, s-maxage=604800",
+      },
+    });
+  }
+
+  return null;
+}
+
 export default {
   async fetch(request, env) {
     const url = new URL(request.url);
@@ -45,7 +272,30 @@ export default {
       }
     }
 
-    // 3. Fallback to Cloudflare Pages static assets & SPA routing
+    // 3. Dynamic Sitemaps (/sitemap.xml, /sitemap-leaks.xml)
+    if (url.pathname === "/sitemap.xml" || url.pathname === "/sitemap-leaks.xml") {
+      try {
+        const sitemapRes = await handleSitemap(request, env, url);
+        if (sitemapRes) return sitemapRes;
+      } catch (err) {
+        return new Response("Sitemap generation error", { status: 500 });
+      }
+    }
+
+    // 4. Edge OpenGraph / Social Bot Metadata injection for Leaks
+    const userAgent = request.headers.get("user-agent") || "";
+    if (BOT_REGEX.test(userAgent)) {
+      if (url.pathname.startsWith("/leak")) {
+        try {
+          const socialResponse = await handleSocialEmbed(request, env, url);
+          if (socialResponse) return socialResponse;
+        } catch (err) {
+          // fallback to assets
+        }
+      }
+    }
+
+    // 5. Fallback to Cloudflare Pages static assets & SPA routing
     return env.ASSETS.fetch(request);
   },
 

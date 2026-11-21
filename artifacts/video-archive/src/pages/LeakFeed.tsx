@@ -16,7 +16,8 @@ import {
   Funnel,
   FilmStrip,
   ArrowClockwise,
-  BookmarkSimple
+  BookmarkSimple,
+  User
 } from "@phosphor-icons/react";
 
 const TAG_TABS = [
@@ -38,6 +39,7 @@ const SORT_OPTIONS: { id: ScrapedSortOption; label: string }[] = [
   { id: "views", label: "Most Viewed" },
   { id: "rating", label: "Highest Rated" },
   { id: "longest", label: "Longest Duration" },
+  { id: "oldest", label: "Oldest First" },
 ];
 
 const ITEMS_PER_PAGE = 24;
@@ -97,6 +99,21 @@ export default function LeakFeed() {
     }, 350);
     return () => clearTimeout(timer);
   }, [searchQuery, initialSearch]);
+
+  // Sync Document Title for SEO
+  useEffect(() => {
+    const prev = document.title;
+    if (debouncedSearch) {
+      document.title = `"${debouncedSearch}" - Viral MMS Leaks - Chuglii`;
+    } else if (activeTag && activeTag !== "All") {
+      document.title = `${activeTag.toUpperCase()} Leaks & Viral Clips - Chuglii`;
+    } else {
+      document.title = "Viral MMS Leaks & Private Video Feed - Chuglii";
+    }
+    return () => {
+      document.title = prev;
+    };
+  }, [debouncedSearch, activeTag]);
 
   // Update URL query params
   const updateQueryParams = useCallback((cat: string, tag: string, page: number, sort: ScrapedSortOption, q: string) => {
@@ -215,7 +232,7 @@ export default function LeakFeed() {
               </div>
             </div>
 
-            {/* Search Input */}
+            {/* Search Input & Quick Suggestions */}
             <div className="mt-6 sm:mt-8 max-w-2xl">
               <div className="relative">
                 <MagnifyingGlass
@@ -226,7 +243,7 @@ export default function LeakFeed() {
                   type="text"
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
-                  placeholder="Search scraped leak titles, models, tags..."
+                  placeholder="Search leak titles, model names, tags..."
                   className="w-full h-10 pl-9 pr-9 rounded-xl bg-card border border-border/60 text-sm placeholder:text-muted-foreground/70 focus:outline-none focus:ring-2 focus:ring-rose-500/40 focus:border-rose-500/50 transition-all shadow-inner"
                 />
                 {searchQuery && (
@@ -237,6 +254,36 @@ export default function LeakFeed() {
                   >
                     <X size={14} />
                   </button>
+                )}
+              </div>
+
+              {/* Active Search Count & Quick Filter Chips */}
+              <div className="flex flex-wrap items-center gap-2 mt-2.5 text-xs">
+                {debouncedSearch ? (
+                  <div className="inline-flex items-center gap-2 px-2.5 py-1 rounded-lg bg-rose-500/10 border border-rose-500/20 text-rose-400 font-medium">
+                    <span>Showing {totalCount.toLocaleString()} clips for &ldquo;{debouncedSearch}&rdquo;</span>
+                    <button onClick={handleClearSearch} className="hover:text-white underline cursor-pointer text-[11px]">
+                      Clear
+                    </button>
+                  </div>
+                ) : (
+                  <div className="flex flex-wrap items-center gap-1.5 text-muted-foreground/80">
+                    <span className="text-[11px] font-medium mr-0.5 text-muted-foreground/60">Popular:</span>
+                    {["Bhabhi", "Desi MMS", "Pakistani", "Indian", "Amateur", "Village", "Web Series"].map((kw) => (
+                      <button
+                        key={kw}
+                        onClick={() => {
+                          setSearchQuery(kw);
+                          setDebouncedSearch(kw);
+                          setCurrentPage(1);
+                          updateQueryParams(activeCategory, activeTag, 1, activeSort, kw);
+                        }}
+                        className="px-2 py-0.5 rounded-md bg-secondary/60 hover:bg-secondary hover:text-foreground text-[11px] transition-colors cursor-pointer border border-border/30"
+                      >
+                        {kw}
+                      </button>
+                    ))}
+                  </div>
                 )}
               </div>
             </div>
@@ -413,6 +460,14 @@ export default function LeakFeed() {
                               {item.title}
                             </h3>
                           </Link>
+
+                          {/* Performer / Actor badge */}
+                          {item.actors && item.actors.length > 0 && (
+                            <div className="flex items-center gap-1 mt-1.5 text-[11px] text-rose-400 font-medium">
+                              <User size={12} className="shrink-0" />
+                              <span className="line-clamp-1 capitalize">{item.actors[0].replace(/-/g, " ")}</span>
+                            </div>
+                          )}
 
                           {/* Tags snippet */}
                           {item.tags && item.tags.length > 0 && (
