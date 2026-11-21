@@ -95,21 +95,42 @@ export function MobileMenu({
               );
             })}
             {/* Leaks Feed link in Mobile Menu */}
-            <Link href="/leak" aria-current={isActiveNavigationRoute("/leak", location) ? "page" : undefined}>
-              <span
-                className={`block px-3 py-2.5 text-sm rounded-lg transition-all duration-150 inline-flex items-center gap-2.5 ${
-                  isActiveNavigationRoute("/leak", location)
-                    ? "text-rose-400 font-medium bg-rose-500/15 border border-rose-500/30"
-                    : "text-rose-400/90 hover:text-rose-300 hover:bg-rose-500/10"
-                }`}
-                onClick={onClose}
-                onMouseEnter={() => prefetchRoute("/leak")}
-                onFocus={() => prefetchRoute("/leak")}
-              >
-                <Flame size={17} weight="fill" className="text-rose-500 animate-pulse" />
-                Leaks
-              </span>
-            </Link>
+            <div className="space-y-1">
+              <Link href="/leak" aria-current={isActiveNavigationRoute("/leak", location) ? "page" : undefined}>
+                <span
+                  className={`w-full px-3 py-2.5 text-sm rounded-lg transition-all duration-150 inline-flex items-center justify-between ${
+                    isActiveNavigationRoute("/leak", location)
+                      ? "text-rose-400 font-medium bg-rose-500/15 border border-rose-500/30"
+                      : "text-rose-400/90 hover:text-rose-300 hover:bg-rose-500/10"
+                  }`}
+                  onClick={onClose}
+                  onMouseEnter={() => prefetchRoute("/leak")}
+                  onFocus={() => prefetchRoute("/leak")}
+                >
+                  <span className="inline-flex items-center gap-2.5">
+                    <Flame size={17} weight="fill" className="text-rose-500 animate-pulse" />
+                    Leaks & MMS
+                  </span>
+                  <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-rose-500/20 text-rose-400 uppercase">
+                    Archive
+                  </span>
+                </span>
+              </Link>
+              <div className="pl-6 pr-2 py-1 grid grid-cols-2 gap-1 text-xs">
+                <Link href="/leak?tag=desi" onClick={onClose} className="px-2 py-1 rounded hover:bg-secondary/50 text-muted-foreground hover:text-foreground flex items-center gap-1.5">
+                  <span className="w-1.5 h-1.5 rounded-full bg-rose-500" /> Desi MMS
+                </Link>
+                <Link href="/leak?tag=bhabhi" onClick={onClose} className="px-2 py-1 rounded hover:bg-secondary/50 text-muted-foreground hover:text-foreground flex items-center gap-1.5">
+                  <span className="w-1.5 h-1.5 rounded-full bg-rose-500" /> Bhabhi
+                </Link>
+                <Link href="/leak?tag=pakistani" onClick={onClose} className="px-2 py-1 rounded hover:bg-secondary/50 text-muted-foreground hover:text-foreground flex items-center gap-1.5">
+                  <span className="w-1.5 h-1.5 rounded-full bg-rose-500" /> Pakistani
+                </Link>
+                <Link href="/leak?tag=viral" onClick={onClose} className="px-2 py-1 rounded hover:bg-secondary/50 text-muted-foreground hover:text-foreground flex items-center gap-1.5">
+                  <span className="w-1.5 h-1.5 rounded-full bg-rose-500" /> Viral Clips
+                </Link>
+              </div>
+            </div>
             <button
               onClick={() => { onClose?.(); onRequestOpen?.(); }}
               onMouseEnter={() => prefetchRoute("/request")}
