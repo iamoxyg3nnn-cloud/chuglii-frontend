@@ -83,6 +83,7 @@ const mockRedis = {
 
 vi.mock("../../lib/redis.js", () => ({
   getRedis: vi.fn(() => mockRedisConnected ? mockRedis : null),
+  getFeatureRedis: vi.fn(() => mockRedisConnected ? mockRedis : null),
   isRedisConnected: vi.fn(() => mockRedisConnected),
   getRedisStatus: vi.fn(() => mockRedisConnected ? "ready" : "none"),
   onRedisReconnect: vi.fn((cb: any) => { return () => {}; }),

@@ -17,8 +17,12 @@ function tryImportRedis(): any {
 // HTTPS Redis bridge available for feature state such as buffered view counts
 // and activity streams; do not use the ephemeral bore.pub TCP URL on Vercel.
 const vercelLocalCacheMode = process.env.VERCEL_CACHE_LOCAL_ONLY === "1";
-const redisUrl = vercelLocalCacheMode ? undefined : process.env.REDIS_URL;
-const httpUrl = process.env.REDIS_HTTP_URL;
+const rawRedisUrl = process.env.REDIS_URL?.trim();
+const rawHttpUrl = process.env.REDIS_HTTP_URL?.trim();
+const isHttpRedisUrl = Boolean(rawRedisUrl && (rawRedisUrl.startsWith("http://") || rawRedisUrl.startsWith("https://")));
+
+const httpUrl = rawHttpUrl || (isHttpRedisUrl ? rawRedisUrl : undefined);
+const redisUrl = vercelLocalCacheMode ? undefined : (!isHttpRedisUrl ? rawRedisUrl : undefined);
 
 let client: any = null;
 let isConnected = false;
@@ -242,7 +246,15 @@ function createHttpRedis(url: string, key: string) {
     // operations with a variadic tail can be split without changing meaning.
     // Use HTTP pipelines to keep this to one request for up to 256 chunks.
     const canonical = cmd.toUpperCase();
-    if (canonical === "DEL" || canonical === "SADD" || canonical === "ZREM") {
+    if (canonical === "DEL") {
+      const keyChunks = chunks(args, MAX_HTTP_ARGS);
+      const replies = await executeBatch(
+        keyChunks.map((chunk) => ({ cmd, args: chunk })),
+      );
+      return replies.reduce((total, value) => total + Number(value ?? 0), 0);
+    }
+
+    if (canonical === "SADD" || canonical === "ZREM") {
       const [key, ...values] = args;
       const tailChunks = chunks(values, MAX_HTTP_ARGS - 1);
       const replies = await executeBatch(
@@ -500,6 +512,14 @@ if (httpUrl) {
 // Feature state (view counters, activity streams, hot rankings, suggestions)
 // can still use the shared self-hosted Redis bridge.
 export function getRedis(): typeof client {
+  const isServerless =
+    vercelLocalCacheMode ||
+    process.env.VERCEL === "1" ||
+    Boolean(process.env.VERCEL_URL) ||
+    process.env.VERCEL_ENV === "production" ||
+    process.env.VERCEL_ENV === "preview";
+
+  if (isServerless && httpMode) return null;
   return vercelLocalCacheMode ? null : client;
 }
 

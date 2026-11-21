@@ -1,6 +1,6 @@
 import { createHash } from "node:crypto";
 import type { NextFunction, Request, Response } from "express";
-import { getRedis, isRedisConnected, onRedisReconnect, redisPublish, redisSubscribe, type PubSubSubscription } from "../lib/redis.js";
+import { getRedis, getFeatureRedis, isRedisConnected, onRedisReconnect, redisPublish, redisSubscribe, type PubSubSubscription } from "../lib/redis.js";
 import { logger } from "../lib/logger.js";
 
 const CACHE_PREFIX = "api:v2";
@@ -728,7 +728,7 @@ export function initInvalidationPubSub(): boolean {
  * invalidation a PEER initiated without re-broadcasting (which would loop).
  */
 async function invalidateTagsLocal(tags: string[]): Promise<void> {
-  const redis = shouldUseSharedResponseCache() ? getRedis() : null;
+  const redis = isRedisConnected() ? getFeatureRedis() : null;
   const keysToDelete = new Set<string>();
   const epoch = stampEpoch();
 
@@ -770,7 +770,7 @@ async function invalidateKeyLocal(cacheKey: string): Promise<void> {
   rememberKeyInvalidation(normalizedKey);
   deleteMemory(normalizedKey);
 
-  const redis = shouldUseSharedResponseCache() ? getRedis() : null;
+  const redis = isRedisConnected() ? getFeatureRedis() : null;
   if (!redis || !isRedisConnected()) return;
   await redis.del(normalizedKey);
 }
@@ -806,7 +806,7 @@ async function invalidatePatternLocal(pattern: string): Promise<number> {
     if (regexes.some((regex) => regex.test(key))) keysToDelete.add(key);
   }
 
-  const redis = shouldUseSharedResponseCache() ? getRedis() : null;
+  const redis = isRedisConnected() ? getFeatureRedis() : null;
   if (redis && isRedisConnected()) {
     for (const candidate of candidates) {
       let cursor = "0";
@@ -861,7 +861,7 @@ export function invalidateOnSuccess(tags: string[]) {
 //   sugg:*                 — the search suggestion snapshot index
 
 async function purgeLocalCache(): Promise<{ deletedKeys: number; invalidatedTags: number }> {
-  const redis = shouldUseSharedResponseCache() ? getRedis() : null;
+  const redis = isRedisConnected() ? getFeatureRedis() : null;
   const invalidatedTags = new Set(memoryTags.keys());
   let deletedKeys = memoryCache.size;
 
