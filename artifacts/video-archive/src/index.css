@@ -362,21 +362,22 @@
 
 
 
-  /* Very subtle texture, only on explicitly tagged sections (never the page background). */
-  .section-pattern {
+  /* Section-only ambient accent. Non-repeating gradients never spill into the page. */
+  .section-accent {
     background-color: hsl(var(--background));
     background-image:
-      linear-gradient(135deg, transparent 49.35%, hsl(var(--foreground) / 0.018) 49.65%, hsl(var(--foreground) / 0.018) 50.35%, transparent 50.65%);
-    background-size: 36px 36px;
-    background-position: center top;
-    background-repeat: repeat;
+      radial-gradient(ellipse 68% 58% at 0% 0%, hsl(var(--primary) / 0.055), transparent 72%),
+      radial-gradient(ellipse 48% 42% at 100% 100%, hsl(var(--primary) / 0.025), transparent 76%);
+    background-repeat: no-repeat;
+    background-position: left top, right bottom;
     background-attachment: scroll;
     background-clip: border-box;
     isolation: isolate;
   }
-  .dark .section-pattern {
+  .dark .section-accent {
     background-image:
-      linear-gradient(135deg, transparent 49.35%, hsl(var(--foreground) / 0.022) 49.65%, hsl(var(--foreground) / 0.022) 50.35%, transparent 50.65%);
+      radial-gradient(ellipse 68% 58% at 0% 0%, hsl(var(--primary) / 0.075), transparent 72%),
+      radial-gradient(ellipse 48% 42% at 100% 100%, hsl(var(--primary) / 0.035), transparent 76%);
   }
   /* Textures remain section-scoped and scroll naturally with their section. */
   .nav-underline {
