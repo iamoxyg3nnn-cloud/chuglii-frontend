@@ -22,7 +22,8 @@ import {
   LinkSimple,
   User,
   Broadcast,
-  ArrowClockwise
+  ArrowClockwise,
+  ArrowSquareOut
 } from "@phosphor-icons/react";
 
 export default function OnlyfansWatch() {
@@ -296,12 +297,41 @@ export default function OnlyfansWatch() {
                 />
               )
             ) : (
-              <div className="flex flex-col items-center justify-center h-full text-center p-6 space-y-3">
-                <WarningCircle size={40} className="text-amber-400" />
-                <div className="text-sm font-semibold">No direct stream available for this entry</div>
-                <p className="text-xs text-muted-foreground max-w-md">
-                  Please try selecting another mirror from the servers below.
-                </p>
+              <div className="relative flex flex-col items-center justify-center h-full text-center p-8 space-y-4 overflow-hidden">
+                {cleanPosterUrl && (
+                  <div
+                    className="absolute inset-0 bg-cover bg-center filter blur-xl opacity-20 scale-105 pointer-events-none"
+                    style={{ backgroundImage: `url(${cleanPosterUrl})` }}
+                  />
+                )}
+                <div className="relative z-10 w-12 h-12 rounded-full bg-amber-500/10 border border-amber-500/20 flex items-center justify-center text-amber-400 shadow-inner">
+                  <WarningCircle size={26} weight="bold" />
+                </div>
+                <div className="relative z-10 space-y-1 max-w-md">
+                  <h3 className="text-base font-semibold text-foreground">Video Stream Unavailable</h3>
+                  <p className="text-xs text-muted-foreground leading-relaxed">
+                    {allServers.length > 0
+                      ? "The current server mirror is unreachable. Please select another mirror from the options below."
+                      : "This entry does not have an active playable video stream."}
+                  </p>
+                </div>
+                <div className="relative z-10 pt-2 flex items-center gap-3">
+                  <Link href="/onlyfans">
+                    <button className="px-4 py-2 rounded-xl text-xs font-medium bg-cyan-500 hover:bg-cyan-400 text-white shadow-md shadow-cyan-500/20 transition-all flex items-center gap-2 cursor-pointer">
+                      <ArrowLeft size={14} /> Browse OnlyFans Catalog
+                    </button>
+                  </Link>
+                  {video?.detail_url && (
+                    <a
+                      href={video.detail_url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="px-4 py-2 rounded-xl text-xs font-medium bg-card border border-border/80 hover:bg-accent text-muted-foreground hover:text-foreground transition-all inline-flex items-center gap-1.5"
+                    >
+                      <ArrowSquareOut size={14} /> Open Original Source
+                    </a>
+                  )}
+                </div>
               </div>
             )}
           </div>
