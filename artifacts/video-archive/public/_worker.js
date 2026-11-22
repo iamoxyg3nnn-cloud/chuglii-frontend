@@ -920,29 +920,37 @@ function extractEarnVidsStream(html) {
       }
 
       // 4. EarnVids Resolver (evsishere.xyz / earnvids / vidhide)
-      // Unpack JW Player packed payload, extract clean hls2 master stream (avoids broken willowgrovelearning SSL)
+      // Proxy full HTML with spoofed Referer: https://supjav.com/ so client browser executes player with its own IP
       if (destObj.hostname.includes("evsishere.xyz") || destObj.hostname.includes("earnvids") || destObj.hostname.includes("vidhide")) {
         try {
           const earnRes = await fetch(targetUrl, {
             headers: {
-              "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
+              "User-Agent": request.headers.get("user-agent") || "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
               "Referer": "https://supjav.com/",
               "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
             },
           });
           if (earnRes.ok) {
-            const earnHtml = await earnRes.text();
-            const earnStream = extractEarnVidsStream(earnHtml);
-            if (earnStream && earnStream.streamUrl) {
-              return new Response(renderCleanHlsPlayer(earnStream.streamUrl, earnStream.title, earnStream.image), {
-                status: 200,
-                headers: {
-                  "Content-Type": "text/html; charset=utf-8",
-                  "Access-Control-Allow-Origin": "*",
-                  "Cache-Control": "no-store",
-                },
-              });
+            let earnHtml = await earnRes.text();
+            earnHtml = earnHtml.replace(/if\s*\(\s*top\.location\.href\s*==\s*location\.href\s*\)\s*\{[^}]*\}/g, "");
+            earnHtml = earnHtml.replace(/top\.location[^;]+;/g, "/* neutral */");
+            earnHtml = earnHtml.replace(/window\.open\([^)]*\)/g, "null");
+
+            const baseTag = `<base href="${destObj.origin}/">`;
+            if (earnHtml.includes("<head>")) {
+              earnHtml = earnHtml.replace("<head>", `<head>${baseTag}`);
+            } else {
+              earnHtml = baseTag + earnHtml;
             }
+
+            return new Response(earnHtml, {
+              status: 200,
+              headers: {
+                "Content-Type": "text/html; charset=utf-8",
+                "Access-Control-Allow-Origin": "*",
+                "Cache-Control": "public, max-age=1800",
+              },
+            });
           }
         } catch (e) {
           console.error("EarnVids resolve error:", e);

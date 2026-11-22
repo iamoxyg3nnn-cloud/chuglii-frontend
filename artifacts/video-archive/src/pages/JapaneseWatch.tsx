@@ -125,8 +125,6 @@ export default function JapaneseWatch() {
         : currentEmbedUrl)
     : null;
 
-  const isVoe = Boolean(activeEmbedUrl && (activeEmbedUrl.includes("voe.sx") || activeEmbedUrl.includes("caseyseemavoid.com")));
-
   useEffect(() => {
     if (!id) return;
     try {
@@ -270,7 +268,6 @@ export default function JapaneseWatch() {
                 src={resolvedEmbedUrl}
                 title={video.title}
                 referrerPolicy={iframeReferrerPolicy(resolvedEmbedUrl)}
-                sandbox={isVoe ? undefined : "allow-scripts allow-same-origin allow-forms allow-presentation"}
                 allow="autoplay *; fullscreen *; picture-in-picture *; encrypted-media *; accelerometer *; gyroscope *; display-capture *; screen-wake-lock *; clipboard-write *"
                 allowFullScreen
                 className="w-full h-full border-none bg-black"
