@@ -716,11 +716,20 @@ function renderCleanHlsPlayer(streamingUrl, title = "", poster = "") {
   ${isHls ? '<script src="https://cdn.jsdelivr.net/npm/hls.js@1.5.8/dist/hls.min.js"></script>' : ''}
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
-    html, body { width: 100%; height: 100%; background: #000; overflow: hidden; display: flex; align-items: center; justify-content: center; }
+    html, body { width: 100%; height: 100%; background: #000; overflow: hidden; display: flex; align-items: center; justify-content: center; position: relative; }
     video { width: 100%; height: 100%; max-height: 100vh; object-fit: contain; background: #000; outline: none; }
+    .control-overlay { position: absolute; top: 12px; right: 12px; z-index: 50; display: flex; align-items: center; gap: 8px; opacity: 0.85; transition: opacity 0.2s ease; }
+    .control-overlay:hover { opacity: 1; }
+    .quality-select { background: rgba(15, 23, 42, 0.85); color: #f8fafc; border: 1px solid rgba(255, 255, 255, 0.25); border-radius: 6px; padding: 5px 10px; font-size: 13px; font-family: system-ui, -apple-system, sans-serif; cursor: pointer; outline: none; backdrop-filter: blur(8px); box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5); }
+    .quality-select option { background: #0f172a; color: #fff; }
   </style>
 </head>
 <body>
+  <div id="quality-wrap" class="control-overlay" style="display: none;">
+    <select id="quality-selector" class="quality-select" title="Select Video Quality">
+      <option value="-1">Auto (Best)</option>
+    </select>
+  </div>
   <video id="player" controls autoplay playsinline ${poster ? `poster="${poster}"` : ""}></video>
   <script>
     (function() {
@@ -736,9 +745,37 @@ function renderCleanHlsPlayer(streamingUrl, title = "", poster = "") {
         });
         hls.loadSource(streamUrl);
         hls.attachMedia(video);
-        hls.on(Hls.Events.MANIFEST_PARSED, function() {
+        hls.on(Hls.Events.MANIFEST_PARSED, function(event, data) {
+          try {
+            var levels = hls.levels;
+            var selector = document.getElementById('quality-selector');
+            var wrap = document.getElementById('quality-wrap');
+            if (levels && levels.length > 1) {
+              wrap.style.display = 'flex';
+              selector.innerHTML = '<option value="-1">Auto (Best)</option>';
+              var sorted = levels.map(function(lvl, idx) {
+                return { idx: idx, height: lvl.height || 0, bitrate: lvl.bitrate || 0 };
+              }).sort(function(a, b) {
+                return b.height !== a.height ? b.height - a.height : b.bitrate - a.bitrate;
+              });
+              sorted.forEach(function(item) {
+                var label = item.height ? (item.height + 'p') : ('Level ' + (item.idx + 1));
+                if (item.height >= 1080) label += ' Full HD';
+                else if (item.height >= 720) label += ' HD';
+                var opt = document.createElement('option');
+                opt.value = item.idx;
+                opt.textContent = label;
+                selector.appendChild(opt);
+              });
+              selector.addEventListener('change', function() {
+                var val = parseInt(selector.value, 10);
+                hls.currentLevel = val;
+              });
+            }
+          } catch(err) {
+            console.warn('Quality selector init error:', err);
+          }
           video.play().catch(function() {
-            // Autoplay blocked by browser policy: play muted then unmute on user interaction
             video.muted = true;
             video.play().catch(function() {});
           });

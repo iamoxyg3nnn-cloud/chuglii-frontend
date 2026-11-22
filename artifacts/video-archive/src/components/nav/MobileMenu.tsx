@@ -18,6 +18,7 @@ import {
   Flame,
   GlobeHemisphereWest,
   FilmStrip,
+  Broadcast,
 } from "@phosphor-icons/react";
 import { NAV_LINKS } from "./DesktopNav";
 import { prefetchRoute } from "@/lib/route-chunks";
@@ -119,6 +120,26 @@ export function MobileMenu({
                   </span>
                   <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-rose-500/20 text-rose-400 uppercase">
                     9.2k
+                  </span>
+                </span>
+              </Link>
+              <Link href="/onlyfans" aria-current={isActiveNavigationRoute("/onlyfans", location) ? "page" : undefined}>
+                <span
+                  className={`w-full px-3 py-2 text-sm rounded-lg transition-all duration-150 inline-flex items-center justify-between ${
+                    isActiveNavigationRoute("/onlyfans", location)
+                      ? "text-cyan-400 font-medium bg-cyan-500/15 border border-cyan-500/30"
+                      : "text-cyan-400/90 hover:text-cyan-300 hover:bg-cyan-500/10"
+                  }`}
+                  onClick={onClose}
+                  onMouseEnter={() => prefetchRoute("/onlyfans")}
+                  onFocus={() => prefetchRoute("/onlyfans")}
+                >
+                  <span className="inline-flex items-center gap-2.5">
+                    <Broadcast size={16} weight="fill" className="text-cyan-400" />
+                    OnlyFans Leaks
+                  </span>
+                  <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-cyan-500/20 text-cyan-400 uppercase">
+                    4K/HD
                   </span>
                 </span>
               </Link>

@@ -1,6 +1,6 @@
 import { Link } from "wouter";
 import { useCallback, memo, useState, useRef } from "react";
-import { PaperPlaneTilt, Flame, GlobeHemisphereWest, FilmStrip, CaretDown } from "@phosphor-icons/react";
+import { PaperPlaneTilt, Flame, GlobeHemisphereWest, FilmStrip, CaretDown, Broadcast } from "@phosphor-icons/react";
 import { prefetchRoute } from "@/lib/route-chunks";
 import { isActiveNavigationRoute } from "@/lib/navigation";
 
@@ -19,6 +19,13 @@ export const SCRAPER_CATEGORIES = [
     href: "/leak?category=viral-mms",
     count: "9.2k",
     icon: Flame,
+  },
+  {
+    id: "onlyfans",
+    name: "OnlyFans Leaks",
+    href: "/onlyfans",
+    count: "4K / HD",
+    icon: Broadcast,
   },
   {
     id: "japanese",
@@ -44,6 +51,7 @@ interface DesktopNavProps {
 export const DesktopNav = memo(function DesktopNav({ location, onRequestOpen }: DesktopNavProps) {
   const isLeakActive =
     isActiveNavigationRoute("/leak", location) ||
+    isActiveNavigationRoute("/onlyfans", location) ||
     isActiveNavigationRoute("/japanese", location) ||
     isActiveNavigationRoute("/myanmar", location);
   const [dropdownOpen, setDropdownOpen] = useState(false);
@@ -55,6 +63,7 @@ export const DesktopNav = memo(function DesktopNav({ location, onRequestOpen }: 
       closeTimeoutRef.current = null;
     }
     prefetchRoute("/leak");
+    prefetchRoute("/onlyfans");
     prefetchRoute("/japanese");
     prefetchRoute("/myanmar");
     setDropdownOpen(true);
@@ -78,30 +87,48 @@ export const DesktopNav = memo(function DesktopNav({ location, onRequestOpen }: 
         onMouseEnter={handleMouseEnter}
         onMouseLeave={handleMouseLeave}
       >
-        <Link href="/leak?category=viral-mms" aria-current={isLeakActive ? "page" : undefined}>
-          <span
-            onFocus={handleMouseEnter}
-            className={`px-3 py-1.5 rounded-lg inline-flex items-center gap-1.5 text-xs font-medium transition-colors cursor-pointer ${
+        <div className="inline-flex items-center">
+          <Link href="/leak?category=viral-mms" aria-current={isLeakActive ? "page" : undefined}>
+            <span
+              onFocus={handleMouseEnter}
+              className={`pl-3 pr-1 py-1.5 rounded-l-lg inline-flex items-center gap-1.5 text-xs font-medium transition-colors cursor-pointer ${
+                isLeakActive
+                  ? "text-rose-400 bg-rose-500/10 font-semibold"
+                  : "text-muted-foreground hover:text-foreground hover:bg-secondary/50"
+              }`}
+            >
+              <Flame size={14} weight={isLeakActive ? "fill" : "regular"} className={isLeakActive ? "text-rose-500" : "text-muted-foreground/70"} />
+              <span>Leaks</span>
+            </span>
+          </Link>
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              setDropdownOpen((prev) => !prev);
+            }}
+            aria-label="Toggle leaks categories menu"
+            aria-expanded={dropdownOpen}
+            className={`pr-2.5 pl-1 py-1.5 rounded-r-lg inline-flex items-center text-xs transition-colors cursor-pointer ${
               isLeakActive
-                ? "text-rose-400 bg-rose-500/10 font-semibold"
+                ? "text-rose-400 bg-rose-500/10"
                 : "text-muted-foreground hover:text-foreground hover:bg-secondary/50"
             }`}
           >
-            <Flame size={14} weight={isLeakActive ? "fill" : "regular"} className={isLeakActive ? "text-rose-500" : "text-muted-foreground/70"} />
-            <span>Leaks</span>
-            <CaretDown size={10} className={`transition-transform duration-150 opacity-60 ${dropdownOpen ? "rotate-180" : ""}`} />
-          </span>
-        </Link>
+            <CaretDown size={10} className={`transition-transform duration-150 opacity-70 ${dropdownOpen ? "rotate-180" : ""}`} />
+          </button>
+        </div>
 
         {/* Clean, Simple Dropdown */}
         {dropdownOpen && (
           <div
-            className="absolute top-full left-0 mt-1 w-48 rounded-lg bg-popover/95 backdrop-blur-sm border border-border/60 shadow-lg py-1 z-50 animate-in fade-in zoom-in-95 duration-100"
+            className="absolute top-full left-0 mt-1 w-52 rounded-xl bg-popover/95 backdrop-blur-md border border-border/60 shadow-xl py-1 z-50 animate-in fade-in zoom-in-95 duration-100"
             role="menu"
           >
             {SCRAPER_CATEGORIES.map((cat) => {
               const Icon = cat.icon;
               const active =
+                (cat.id === "onlyfans" && (isActiveNavigationRoute("/onlyfans", location) || location.includes("/onlyfans"))) ||
                 (cat.id === "japanese" && isActiveNavigationRoute("/japanese", location)) ||
                 (cat.id === "myanmar" && (isActiveNavigationRoute("/myanmar", location) || location.includes("category=myanmar"))) ||
                 (cat.id === "viral-mms" && (isActiveNavigationRoute("/leak", location) || location.includes("category=viral-mms")));
@@ -111,7 +138,7 @@ export const DesktopNav = memo(function DesktopNav({ location, onRequestOpen }: 
                     onClick={() => setDropdownOpen(false)}
                     className={`w-full flex items-center justify-between px-3 py-2 text-xs transition-colors cursor-pointer ${
                       active
-                        ? "text-rose-400 font-medium bg-rose-500/10"
+                        ? "text-rose-400 font-semibold bg-rose-500/10"
                         : "text-foreground/80 hover:text-foreground hover:bg-secondary/60"
                     }`}
                   >
@@ -119,7 +146,9 @@ export const DesktopNav = memo(function DesktopNav({ location, onRequestOpen }: 
                       <Icon size={14} weight={active ? "fill" : "regular"} className={active ? "text-rose-500" : "text-muted-foreground/80"} />
                       <span>{cat.name}</span>
                     </span>
-                    <span className="text-[11px] text-muted-foreground/70 tabular-nums">{cat.count}</span>
+                    <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-muted text-muted-foreground/90 uppercase tracking-tight">
+                      {cat.count}
+                    </span>
                   </span>
                 </Link>
               );

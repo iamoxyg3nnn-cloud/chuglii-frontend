@@ -68,6 +68,8 @@ const JapaneseFeed = lazyWithSkeleton(() => import("@/pages/JapaneseFeed"), <Ske
 const JapaneseWatch = lazyWithSkeleton(() => import("@/pages/JapaneseWatch"), <SkeletonDetailPage />, "JapaneseWatch");
 const MyanmarFeed = lazyWithSkeleton(() => import("@/pages/MyanmarFeed"), <SkeletonGridPage count={12} />, "MyanmarFeed");
 const MyanmarWatch = lazyWithSkeleton(() => import("@/pages/MyanmarWatch"), <SkeletonDetailPage />, "MyanmarWatch");
+const OnlyfansFeed = lazyWithSkeleton(() => import("@/pages/OnlyfansFeed"), <SkeletonGridPage count={12} />, "OnlyfansFeed");
+const OnlyfansWatch = lazyWithSkeleton(() => import("@/pages/OnlyfansWatch"), <SkeletonDetailPage />, "OnlyfansWatch");
 
 const NotFound = lazyWithSkeleton(() => import("@/pages/not-found"), <SkeletonSimplePage rows={3} />, "NotFound");
 
@@ -240,6 +242,8 @@ function Router() {
         <Route path="/japanese" component={JapaneseFeed} />
         <Route path="/myanmar/video/:id" component={MyanmarWatch} />
         <Route path="/myanmar" component={MyanmarFeed} />
+        <Route path="/onlyfans/video/:id" component={OnlyfansWatch} />
+        <Route path="/onlyfans" component={OnlyfansFeed} />
         <Route path="/premium" component={Premium} />
         <Route path="/login" component={Login} />
         <Route path="/signup" component={Signup} />
