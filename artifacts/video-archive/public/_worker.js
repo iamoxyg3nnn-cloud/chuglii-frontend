@@ -730,18 +730,26 @@ function renderCleanHlsPlayer(streamingUrl, title = "", poster = "") {
       if (typeof Hls !== 'undefined' && Hls.isSupported()) {
         var hls = new Hls({
           enableWorker: true,
-          lowLatencyMode: true,
-          backBufferLength: 90
+          lowLatencyMode: false,
+          backBufferLength: 90,
+          maxBufferLength: 30
         });
         hls.loadSource(streamUrl);
         hls.attachMedia(video);
         hls.on(Hls.Events.MANIFEST_PARSED, function() {
-          video.play().catch(function() {});
+          video.play().catch(function() {
+            // Autoplay blocked by browser policy: play muted then unmute on user interaction
+            video.muted = true;
+            video.play().catch(function() {});
+          });
         });
       } else if (video.canPlayType('application/vnd.apple.mpegurl')) {
         video.src = streamUrl;
         video.addEventListener('loadedmetadata', function() {
-          video.play().catch(function() {});
+          video.play().catch(function() {
+            video.muted = true;
+            video.play().catch(function() {});
+          });
         });
       } else {
         video.src = streamUrl;
@@ -825,35 +833,86 @@ function extractPackedStreamInfo(html) {
 }
 
   // ─── Edge HLS Stream Manifest Proxy (/api/player/stream) ───────────
-  // Proxies M3U8 master/variant manifests for FC2Stream and EarnVids with Referer: https://supjav.com/
-  // Rewrites relative variants so they remain proxied, while leaving absolute TS segments (e.g. TikTok CDN) untouched.
+  // Proxies M3U8 master/variant manifests, AES encryption keys, and TS segments for LuluStream, FC2Stream, and EarnVids.
+  // Spoofs User-Agent: Mozilla/5.0 to bypass tnmr.org bot blocking, and adds CORS Access-Control-Allow-Origin: *
   if (path === "/api/player/stream") {
+    let streamUpstreamUrl = url.searchParams.get("url");
     const originParam = url.searchParams.get("origin");
     const pathParam = url.searchParams.get("path");
-    if (!originParam || !pathParam) {
-      return errorResponse("Missing origin or path parameter", 400);
+
+    if (!streamUpstreamUrl && originParam && pathParam) {
+      streamUpstreamUrl = originParam.replace(/\/+$/, "") + "/" + pathParam.replace(/^\/+/, "");
     }
+
+    if (!streamUpstreamUrl || (!streamUpstreamUrl.startsWith("http://") && !streamUpstreamUrl.startsWith("https://"))) {
+      return errorResponse("Missing or invalid stream url parameter", 400);
+    }
+
     try {
-      const streamUpstreamUrl = originParam.replace(/\/+$/, "") + "/" + pathParam.replace(/^\/+/, "");
       const upstreamRes = await fetch(streamUpstreamUrl, {
         headers: {
-          "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
+          "User-Agent": "Mozilla/5.0",
           "Referer": "https://supjav.com/",
         },
       });
+
       if (!upstreamRes.ok) {
         return new Response(upstreamRes.body, { status: upstreamRes.status, headers: CORS_HEADERS });
       }
+
+      const contentType = upstreamRes.headers.get("content-type") || "";
+      const isM3U8 = streamUpstreamUrl.includes(".m3u8") || contentType.includes("mpegurl") || contentType.includes("application/x-mpegURL");
+
+      // For binary TS segments and AES keys, stream directly through with CORS *
+      if (!isM3U8) {
+        return new Response(upstreamRes.body, {
+          status: 200,
+          headers: {
+            "Content-Type": contentType || "application/octet-stream",
+            "Access-Control-Allow-Origin": "*",
+            "Access-Control-Allow-Methods": "GET, HEAD, OPTIONS",
+            "Access-Control-Allow-Headers": "*",
+            "Cache-Control": "public, max-age=86400",
+          },
+        });
+      }
+
+      // For M3U8 playlists (master and variant): rewrite URLs to route through /api/player/stream
       const rawText = await upstreamRes.text();
-      const basePath = pathParam.substring(0, pathParam.lastIndexOf("/") + 1);
+      const parsedUpstream = new URL(streamUpstreamUrl);
+      const upstreamOrigin = parsedUpstream.origin;
+      const upstreamBasePath = parsedUpstream.pathname.substring(0, parsedUpstream.pathname.lastIndexOf("/") + 1);
+
       const rewritten = rawText.split("\n").map((line) => {
         const trimmed = line.trim();
-        if (!trimmed || trimmed.startsWith("#")) return line;
-        if (trimmed.startsWith("http://") || trimmed.startsWith("https://")) {
+        if (!trimmed) return line;
+
+        // Rewrite #EXT-X-KEY URI="..."
+        if (trimmed.startsWith("#EXT-X-KEY:")) {
+          return line.replace(/URI=["']([^"']+)["']/, (match, uri) => {
+            const absoluteUri = uri.startsWith("http://") || uri.startsWith("https://")
+              ? uri
+              : (uri.startsWith("/") ? upstreamOrigin + uri : upstreamOrigin + upstreamBasePath + uri);
+            return `URI="/api/player/stream?url=${encodeURIComponent(absoluteUri)}"`;
+          });
+        }
+
+        if (trimmed.startsWith("#")) return line;
+
+        // Video segments and sub-playlist manifests:
+        // If it's TikTok CDN (which works without proxy and sends CORS *), let it go direct!
+        if (trimmed.includes("tiktokcdn.com")) {
           return line;
         }
-        const resolvedPath = trimmed.startsWith("/") ? trimmed : (basePath + trimmed);
-        return `/api/player/stream?origin=${encodeURIComponent(originParam)}&path=${encodeURIComponent(resolvedPath)}`;
+
+        // For all other hosts (including tnmr.org or relative URLs), route through /api/player/stream:
+        let absoluteSegmentUrl = trimmed;
+        if (!trimmed.startsWith("http://") && !trimmed.startsWith("https://")) {
+          absoluteSegmentUrl = trimmed.startsWith("/")
+            ? upstreamOrigin + trimmed
+            : upstreamOrigin + upstreamBasePath + trimmed;
+        }
+        return `/api/player/stream?url=${encodeURIComponent(absoluteSegmentUrl)}`;
       }).join("\n");
 
       return new Response(rewritten, {
@@ -1071,7 +1130,8 @@ function extractPackedStreamInfo(html) {
             const luluHtml = await luluRes.text();
             const streamInfo = extractPackedStreamInfo(luluHtml);
             if (streamInfo && streamInfo.file) {
-              return new Response(renderCleanHlsPlayer(streamInfo.file, streamInfo.title || "LuluStream", streamInfo.poster), {
+              const proxiedLuluStream = `/api/player/stream?url=${encodeURIComponent(streamInfo.file)}`;
+              return new Response(renderCleanHlsPlayer(proxiedLuluStream, streamInfo.title || "LuluStream", streamInfo.poster), {
                 status: 200,
                 headers: {
                   "Content-Type": "text/html; charset=utf-8",
