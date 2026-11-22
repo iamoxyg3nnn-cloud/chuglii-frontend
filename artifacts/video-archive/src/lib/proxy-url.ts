@@ -40,6 +40,13 @@ const NO_PROXY_HOSTS: string[] = [
   "freeimage.host",
   "buumal.com",
   "img.buumal.com",
+  // OnlyFans leak sources: protect against hotlink blocks by loading direct with no-referrer
+  "influencersgonewild.com",
+  "influencersgonewild.net",
+  "internetchicks.com",
+  "pimpbunny.net",
+  "pimpbunny.com",
+  "sheeshfans.com",
   // NOTE: imgchest.com was removed from this list on 2026-09-26. The old note
   // claimed it "returns 403 when loaded directly" — re-probed against
   // production and that is no longer true: cdn.imgchest.com answers 200 to a

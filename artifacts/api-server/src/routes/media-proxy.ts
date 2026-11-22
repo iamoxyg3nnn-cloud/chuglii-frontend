@@ -1069,14 +1069,18 @@ router.get("/media", async (req, res) => {
     "Accept-Language": "en-US,en;q=0.9",
   };
 
-  // catbox (and its subdomains) reject any third-party Referer — they drop
-  // the connection or answer 200 with an empty body. Omit the Referer for
-  // those hosts so their previews/thumbnails actually come through.
+  // Hosts that reject third-party Referers or require their own origin as Referer
   const NO_REFERER_HOSTS = [
     "catbox.moe",
     "files.catbox.moe",
     "litter.catbox.moe",
     "files.litterbox.catbox.moe",
+    "influencersgonewild.com",
+    "influencersgonewild.net",
+    "internetchicks.com",
+    "pimpbunny.net",
+    "pimpbunny.com",
+    "sheeshfans.com",
   ];
   const upstreamHostname = parsedUrl.hostname;
   if (
@@ -1085,6 +1089,8 @@ router.get("/media", async (req, res) => {
     )
   ) {
     upstreamHeaders["Referer"] = "https://chuglii.in/";
+  } else if (upstreamHostname.includes("influencersgonewild") || upstreamHostname.includes("internetchicks")) {
+    upstreamHeaders["Referer"] = `${parsedUrl.origin}/`;
   }
 
   const rangeHeader = req.headers["range"];

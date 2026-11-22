@@ -668,13 +668,22 @@ async function handleApi(request, env, url) {
     }
 
     try {
+      const targetObj = new URL(targetUrl);
       let referer = "https://chuglii.in/";
-      if (targetUrl.includes("pixhost.to")) referer = "https://pixhost.to/";
-      else if (targetUrl.includes("catbox.moe")) referer = "https://catbox.moe/";
-      else if (targetUrl.includes("imgpile.com")) referer = "https://imgpile.com/";
-      else if (targetUrl.includes("buumal.com")) referer = "https://www.buumal.com/";
+      if (
+        targetObj.hostname.includes("influencersgonewild") ||
+        targetObj.hostname.includes("internetchicks") ||
+        targetObj.hostname.includes("pimpbunny") ||
+        targetObj.hostname.includes("sheeshfans") ||
+        targetObj.hostname.includes("pixhost.to") ||
+        targetObj.hostname.includes("catbox.moe") ||
+        targetObj.hostname.includes("imgpile.com") ||
+        targetObj.hostname.includes("buumal.com")
+      ) {
+        referer = `${targetObj.origin}/`;
+      }
 
-      const upstreamRes = await fetch(targetUrl, {
+      let upstreamRes = await fetch(targetUrl, {
         headers: {
           "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
           "Referer": referer,
@@ -685,6 +694,20 @@ async function handleApi(request, env, url) {
           cacheEverything: true,
         },
       });
+
+      // If upstream failed with 403, retry without Referer header
+      if (!upstreamRes.ok && upstreamRes.status === 403) {
+        upstreamRes = await fetch(targetUrl, {
+          headers: {
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
+            "Accept": "image/avif,image/webp,image/apng,image/svg+xml,image/*,*/*;q=0.8",
+          },
+          cf: {
+            cacheTtl: 31536000,
+            cacheEverything: true,
+          },
+        });
+      }
 
       if (!upstreamRes.ok) {
         return Response.redirect(targetUrl, 302);
@@ -1153,22 +1176,25 @@ function extractPackedStreamInfo(html) {
       }
 
       // 6. LuluStream Resolver (luminscdn.xyz / lulustream.com / luluvdo.com)
-      // Extracts direct HLS stream URL from packed script, serves pure ad-free Hls.js player
+      // Extracts direct HLS stream URL from packed script, serves pure ad-free Hls.js player directly (tnmr.org supports CORS *)
       if (destObj.hostname.includes("luminscdn") || destObj.hostname.includes("lulustream") || destObj.hostname.includes("luluvdo")) {
         try {
-          const luluRes = await fetch(targetUrl, {
-            headers: {
-              "User-Agent": request.headers.get("user-agent") || "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
-              "Referer": "https://supjav.com/",
-              "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
-            },
-          });
+          const clientIp = request.headers.get("cf-connecting-ip") || request.headers.get("x-real-ip") || "";
+          const luluHeaders = {
+            "User-Agent": request.headers.get("user-agent") || "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
+            "Referer": "https://supjav.com/",
+            "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+          };
+          if (clientIp) {
+            luluHeaders["X-Forwarded-For"] = clientIp;
+            luluHeaders["X-Real-IP"] = clientIp;
+          }
+          const luluRes = await fetch(targetUrl, { headers: luluHeaders });
           if (luluRes.ok) {
             const luluHtml = await luluRes.text();
             const streamInfo = extractPackedStreamInfo(luluHtml);
             if (streamInfo && streamInfo.file) {
-              const proxiedLuluStream = `/api/player/stream?url=${encodeURIComponent(streamInfo.file)}`;
-              return new Response(renderCleanHlsPlayer(proxiedLuluStream, streamInfo.title || "LuluStream", streamInfo.poster), {
+              return new Response(renderCleanHlsPlayer(streamInfo.file, streamInfo.title || "LuluStream", streamInfo.poster), {
                 status: 200,
                 headers: {
                   "Content-Type": "text/html; charset=utf-8",

@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { Link } from "wouter";
 import { Play, Eye, ThumbsUp, Clock, BookmarkSimple, Check, Sparkle, Broadcast } from "@phosphor-icons/react";
+import { proxyImageUrl } from "@/lib/proxy-url";
 import type { OnlyfansVideo } from "@/hooks/useOnlyfansVideos";
 
 interface OnlyfansCardProps {
@@ -18,7 +19,7 @@ export function OnlyfansCard({ video, isSaved = false, onToggleSave }: OnlyfansC
     : (video.clean_thumbnail_url || video.thumbnail_url || "/placeholder-thumb.jpg");
 
   const proxiedThumb = thumbUrl.startsWith("http")
-    ? `/api/media?url=${encodeURIComponent(thumbUrl)}`
+    ? (proxyImageUrl(thumbUrl) || thumbUrl)
     : thumbUrl;
 
   const handleSaveClick = (e: React.MouseEvent) => {
@@ -45,6 +46,7 @@ export function OnlyfansCard({ video, isSaved = false, onToggleSave }: OnlyfansC
             src={proxiedThumb}
             alt={video.title}
             loading="lazy"
+            referrerPolicy="no-referrer"
             onError={() => setImageError(true)}
             className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500 ease-out"
           />
