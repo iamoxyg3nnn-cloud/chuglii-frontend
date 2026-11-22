@@ -21,6 +21,7 @@ import adminAdsRouter from "./admin-ads.js";
 import stripcashRouter from "./stripcash.js";
 import sitemapRouter from "./sitemap.js";
 import contentRemovalRouter from "./content-removal.js";
+import playerRouter from "./player.js";
 
 const router: IRouter = Router();
 router.use(healthRouter);
@@ -45,4 +46,5 @@ router.use(adminAdsRouter);
 router.use(stripcashRouter);
 router.use(sitemapRouter);
 router.use(contentRemovalRouter);
+router.use(playerRouter);
 export default router;

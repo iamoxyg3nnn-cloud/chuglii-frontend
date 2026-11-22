@@ -827,6 +827,56 @@ function extractEarnVidsStream(html) {
 
       const destObj = new URL(targetUrl);
 
+      // Buu Mal (Myanmar) Resolver (buumal.com)
+      // Extracts clean direct Cloudflare R2 MP4 stream from Buu Mal video page
+      // Serves pure ad-free responsive video player or JSON stream
+      if (destObj.hostname.includes("buumal.com")) {
+        try {
+          const buuRes = await fetch(targetUrl, {
+            headers: {
+              "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
+              "Referer": "https://www.buumal.com/",
+              "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+            },
+          });
+          if (buuRes.ok) {
+            const buuHtml = await buuRes.text();
+            const sourceMatch = buuHtml.match(/<source\s+src=["']([^"']+)["']/i) || buuHtml.match(/<video[^>]+src=["']([^"']+)["']/i);
+            const titleMatch = buuHtml.match(/<title>([^<]+)<\/title>/i);
+            const posterMatch = buuHtml.match(/<video[^>]+poster=["']([^"']+)["']/i) || buuHtml.match(/<meta\s+property=["']og:image["']\s+content=["']([^"']+)["']/i);
+
+            if (sourceMatch && sourceMatch[1]) {
+              const freshStreamUrl = sourceMatch[1].replace(/&amp;/g, "&");
+              let title = titleMatch ? titleMatch[1].replace(/Buu Mal\s*\(.*?\)/gi, "").trim() : "Myanmar Video";
+              const poster = posterMatch ? posterMatch[1].replace(/&amp;/g, "&") : "";
+
+              const wantJson = url.searchParams.get("format") === "json" || request.headers.get("accept")?.includes("application/json");
+              if (wantJson) {
+                return new Response(JSON.stringify({ streamUrl: freshStreamUrl, title, poster }), {
+                  status: 200,
+                  headers: {
+                    "Content-Type": "application/json",
+                    "Access-Control-Allow-Origin": "*",
+                    "Cache-Control": "no-store",
+                  },
+                });
+              }
+
+              return new Response(renderCleanHlsPlayer(freshStreamUrl, title, poster), {
+                status: 200,
+                headers: {
+                  "Content-Type": "text/html; charset=utf-8",
+                  "Access-Control-Allow-Origin": "*",
+                  "Cache-Control": "no-store",
+                },
+              });
+            }
+          }
+        } catch (e) {
+          console.error("BuuMal resolve error:", e);
+        }
+      }
+
       // 2. Direct lockers (VOE, LuluStream) can be redirected directly
       const isDirectLocker = destObj.hostname.includes("voe.sx") 
         || destObj.hostname.includes("caseyseemavoid.com")

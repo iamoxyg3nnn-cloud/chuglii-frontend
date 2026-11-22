@@ -43,11 +43,7 @@ export default function LeakWatch() {
   const defaultEmbedUrl = rawPayload?.embed_url || (!isDirectMp4 ? (video?.full_video_url || video?.trailer_preview_url) : null);
   const activeEmbedUrl = selectedServerUrl || defaultEmbedUrl;
 
-  const resolvedEmbedUrl = activeEmbedUrl
-    ? (activeEmbedUrl.includes("supremejav.com") || activeEmbedUrl.includes("supjav.php")
-        ? `/api/player?url=${encodeURIComponent(activeEmbedUrl)}`
-        : activeEmbedUrl)
-    : null;
+  const resolvedEmbedUrl = activeEmbedUrl || null;
 
   // Check saved state from localStorage
   useEffect(() => {

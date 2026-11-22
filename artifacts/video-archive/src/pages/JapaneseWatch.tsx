@@ -45,16 +45,16 @@ export default function JapaneseWatch() {
   const rawPayload = video?.raw_payload as any;
   const allServers: Array<{ name: string; embed_url: string }> = rawPayload?.servers || [];
   
-  // Sort priority: VidSpeed (highest uptime, zero sandbox blocks) -> LuluStream -> VOE HD -> FC2Stream -> Streamtape -> EarnVids
+  // Sort priority: LuluStream (cleanest iframe embed, zero CSP restrictions) -> FC2Stream (best uncensored host) -> VOE HD -> Streamtape -> VidSpeed -> EarnVids
   const sortedServers = useMemo(() => {
     const list = [...allServers];
     const rank = (name: string, url: string = "") => {
       const n = (name + " " + url).toLowerCase();
-      if (n.includes("vidspeed") || n.includes("vas") || n.includes("vvaassjjav")) return 0;
-      if (n.includes("lulu") || n.includes("luc") || n.includes("luminscdn")) return 1;
+      if (n.includes("lulu") || n.includes("luc") || n.includes("luminscdn")) return 0;
+      if (n.includes("fc2") || n.includes("fst") || n.includes("fc2stream")) return 1;
       if (n.includes("voe") || n.includes("caseyseemavoid")) return 2;
-      if (n.includes("fc2") || n.includes("fst")) return 3;
-      if (n.includes("streamtape") || n.includes("st")) return 4;
+      if (n.includes("streamtape") || n.includes("st")) return 3;
+      if (n.includes("vidspeed") || n.includes("vas") || n.includes("vvaassjjav")) return 4;
       if (n.includes("earnvids") || n.includes("evs") || n.includes("vidhide")) return 5;
       return 6;
     };
@@ -67,11 +67,11 @@ export default function JapaneseWatch() {
       const n = s.name.toLowerCase();
       const u = (s.embed_url || "").toLowerCase();
       return (
-        n.includes("vidspeed") || n.includes("vas") || u.includes("vvaassjjav") ||
         n.includes("lulu") || n.includes("luc") || u.includes("luminscdn") ||
-        n.includes("voe") || u.includes("voe.sx") || u.includes("caseyseemavoid") ||
         n.includes("fc2") || u.includes("fc2stream") ||
+        n.includes("voe") || u.includes("voe.sx") || u.includes("caseyseemavoid") ||
         n.includes("streamtape") || u.includes("streamtape.com") ||
+        n.includes("vidspeed") || n.includes("vas") || u.includes("vvaassjjav") ||
         n.includes("earnvids") || u.includes("evsishere") || u.includes("vidhide")
       );
     });
@@ -86,10 +86,10 @@ export default function JapaneseWatch() {
     if (video?.full_video_url) {
       const u = video.full_video_url.toLowerCase();
       let label = "Primary Mirror";
-      if (u.includes("vidspeed") || u.includes("vas") || u.includes("vvaassjjav")) label = "VidSpeed";
-      else if (u.includes("lulu") || u.includes("luc") || u.includes("luminscdn")) label = "LuluStream";
+      if (u.includes("lulu") || u.includes("luc") || u.includes("luminscdn")) label = "LuluStream";
+      else if (u.includes("fc2") || u.includes("fc2stream")) label = "FC2Stream";
       else if (u.includes("voe") || u.includes("caseyseemavoid")) label = "VOE HD";
-      else if (u.includes("fc2")) label = "FC2Stream";
+      else if (u.includes("vidspeed") || u.includes("vas") || u.includes("vvaassjjav")) label = "VidSpeed";
       else if (u.includes("streamtape")) label = "Streamtape";
       fallback.push({ name: label, embed_url: video.full_video_url });
     }
@@ -105,25 +105,8 @@ export default function JapaneseWatch() {
   };
 
   const currentEmbedUrl = getCleanEmbedUrl(activeEmbedUrl);
-
-  const needsProxyResolver = (urlStr: string | null) => {
-    if (!urlStr) return false;
-    return (
-      urlStr.includes("supremejav.com") ||
-      urlStr.includes("supjav.php") ||
-      urlStr.includes("vvaassjjav.xyz") ||
-      urlStr.includes("vidspeed") ||
-      urlStr.includes("evsishere.xyz") ||
-      urlStr.includes("earnvids") ||
-      urlStr.includes("vidhide")
-    );
-  };
-
-  const resolvedEmbedUrl = currentEmbedUrl
-    ? (needsProxyResolver(currentEmbedUrl)
-        ? `/api/player?url=${encodeURIComponent(currentEmbedUrl)}`
-        : currentEmbedUrl)
-    : null;
+  // Pure direct embed without routing through non-existent /api/player (prevents SPA site nesting)
+  const resolvedEmbedUrl = currentEmbedUrl || null;
 
   useEffect(() => {
     if (!id) return;

@@ -301,10 +301,11 @@ export default function MyanmarFeed() {
 
               {/* Pagination */}
               {totalPages > 1 && !isSavedMode && (
-                <div className="mt-10">
+                <div className="mt-10 flex justify-center">
                   <AppPagination
+                    itemsCount={total}
+                    itemsPerPage={ITEMS_PER_PAGE}
                     currentPage={currentPage}
-                    totalPages={totalPages}
                     onPageChange={handlePageChange}
                   />
                 </div>

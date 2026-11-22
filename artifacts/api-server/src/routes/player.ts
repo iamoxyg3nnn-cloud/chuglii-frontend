@@ -1,0 +1,102 @@
+import { Router, type IRouter } from "express";
+
+const router: IRouter = Router();
+
+function renderCleanPlayerHtml(streamingUrl: string, title = "", poster = ""): string {
+  const safeTitle = (title || "Chuglii Player").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+  const isHls = streamingUrl.includes(".m3u8") || streamingUrl.includes("/hls/");
+  return `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+  <title>${safeTitle}</title>
+  ${isHls ? '<script src="https://cdn.jsdelivr.net/npm/hls.js@1.5.8/dist/hls.min.js"></script>' : ''}
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    html, body { width: 100%; height: 100%; background: #000; overflow: hidden; display: flex; align-items: center; justify-content: center; }
+    video { width: 100%; height: 100%; max-height: 100vh; object-fit: contain; background: #000; outline: none; }
+  </style>
+</head>
+<body>
+  <video id="player" controls autoplay playsinline ${poster ? `poster="${poster}"` : ""}></video>
+  <script>
+    (function() {
+      var video = document.getElementById('player');
+      var streamUrl = ${JSON.stringify(streamingUrl)};
+      ${isHls ? `
+      if (typeof Hls !== 'undefined' && Hls.isSupported()) {
+        var hls = new Hls({ enableWorker: true, lowLatencyMode: true, backBufferLength: 90 });
+        hls.loadSource(streamUrl);
+        hls.attachMedia(video);
+        hls.on(Hls.Events.MANIFEST_PARSED, function() { video.play().catch(function() {}); });
+      } else if (video.canPlayType('application/vnd.apple.mpegurl')) {
+        video.src = streamUrl;
+        video.addEventListener('loadedmetadata', function() { video.play().catch(function() {}); });
+      } else {
+        video.src = streamUrl;
+      }
+      ` : `
+      video.src = streamUrl;
+      video.play().catch(function() {});
+      `}
+    })();
+  </script>
+</body>
+</html>`;
+}
+
+router.get("/player", async (req, res) => {
+  const targetUrl = typeof req.query.url === "string" ? req.query.url : null;
+  if (!targetUrl || (!targetUrl.startsWith("http://") && !targetUrl.startsWith("https://"))) {
+    res.status(400).json({ error: "Missing or invalid url parameter" });
+    return;
+  }
+
+  try {
+    const destObj = new URL(targetUrl);
+
+    // Buu Mal (Myanmar) Resolver
+    if (destObj.hostname.includes("buumal.com")) {
+      const buuRes = await fetch(targetUrl, {
+        headers: {
+          "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
+          "Referer": "https://www.buumal.com/",
+          "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+        },
+      });
+
+      if (buuRes.ok) {
+        const buuHtml = await buuRes.text();
+        const sourceMatch = buuHtml.match(/<source\s+src=["']([^"']+)["']/i) || buuHtml.match(/<video[^>]+src=["']([^"']+)["']/i);
+        const titleMatch = buuHtml.match(/<title>([^<]+)<\/title>/i);
+        const posterMatch = buuHtml.match(/<video[^>]+poster=["']([^"']+)["']/i) || buuHtml.match(/<meta\s+property=["']og:image["']\s+content=["']([^"']+)["']/i);
+
+        if (sourceMatch && sourceMatch[1]) {
+          const freshStreamUrl = sourceMatch[1].replace(/&amp;/g, "&");
+          let title = titleMatch ? titleMatch[1].replace(/Buu Mal\s*\(.*?\)/gi, "").trim() : "Myanmar Video";
+          const poster = posterMatch ? posterMatch[1].replace(/&amp;/g, "&") : "";
+
+          const wantJson = req.query.format === "json" || req.headers.accept?.includes("application/json");
+          if (wantJson) {
+            res.setHeader("Cache-Control", "no-store");
+            res.json({ streamUrl: freshStreamUrl, title, poster });
+            return;
+          }
+
+          res.setHeader("Content-Type", "text/html; charset=utf-8");
+          res.setHeader("Cache-Control", "no-store");
+          res.send(renderCleanPlayerHtml(freshStreamUrl, title, poster));
+          return;
+        }
+      }
+    }
+
+    // Default redirect to targetUrl if no custom resolver
+    res.redirect(targetUrl);
+  } catch (err) {
+    res.status(500).json({ error: "Failed to resolve stream" });
+  }
+});
+
+export default router;

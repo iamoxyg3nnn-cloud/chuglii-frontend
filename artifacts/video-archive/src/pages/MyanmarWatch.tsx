@@ -1,58 +1,135 @@
-import { useRef, useState, useEffect } from "react";
+import { useRef, useState, useEffect, useCallback } from "react";
 import { useParams, Link, useLocation } from "wouter";
 import { Layout } from "@/components/Layout";
 import { useMyanmarVideoById, useMyanmarRelatedVideos, type MyanmarVideo } from "@/hooks/useMyanmarVideos";
 import { MyanmarCard } from "@/components/MyanmarCard";
 import {
-  Flame,
   ArrowLeft,
   Clock,
   Eye,
-  ThumbsUp,
   Tag as TagIcon,
   ShareNetwork,
   DownloadSimple,
-  Play,
   Check,
   FilmStrip,
   WarningCircle,
   Sparkle,
   BookmarkSimple,
-  LinkSimple
+  LinkSimple,
+  ArrowClockwise,
+  MonitorPlay,
+  Play
 } from "@phosphor-icons/react";
+
+/**
+ * Checks if a presigned AWS/Cloudflare R2 URL has expired based on query parameters.
+ */
+function isUrlExpired(url: string | null | undefined): boolean {
+  if (!url) return true;
+  try {
+    const u = new URL(url);
+    const amzDate = u.searchParams.get("X-Amz-Date");
+    const amzExpires = u.searchParams.get("X-Amz-Expires");
+    if (amzDate && amzExpires) {
+      const year = parseInt(amzDate.slice(0, 4), 10);
+      const month = parseInt(amzDate.slice(4, 6), 10) - 1;
+      const day = parseInt(amzDate.slice(6, 8), 10);
+      const hour = parseInt(amzDate.slice(9, 11), 10);
+      const min = parseInt(amzDate.slice(11, 13), 10);
+      const sec = parseInt(amzDate.slice(13, 15), 10);
+      const signedTime = Date.UTC(year, month, day, hour, min, sec);
+      const expiresMs = parseInt(amzExpires, 10) * 1000;
+      // 2-minute safety window
+      return Date.now() > signedTime + expiresMs - 120_000;
+    }
+  } catch {}
+  return false;
+}
 
 export default function MyanmarWatch() {
   const { id } = useParams<{ id: string }>();
   const [, setLocation] = useLocation();
   const videoRef = useRef<HTMLVideoElement | null>(null);
-  const frameContainerRef = useRef<HTMLDivElement | null>(null);
-  const [frameScale, setFrameScale] = useState(1);
-
-  useEffect(() => {
-    const el = frameContainerRef.current;
-    if (!el) return;
-    const updateScale = () => {
-      const w = el.clientWidth;
-      if (w > 0) {
-        setFrameScale(w / 776);
-      }
-    };
-    updateScale();
-    const observer = new ResizeObserver(updateScale);
-    observer.observe(el);
-    return () => observer.disconnect();
-  }, []);
 
   const [copied, setCopied] = useState(false);
   const [copiedStream, setCopiedStream] = useState(false);
   const [isSaved, setIsSaved] = useState(false);
 
+  // Stream Resolution & Player States
+  const [streamUrl, setStreamUrl] = useState<string | null>(null);
+  const [isResolving, setIsResolving] = useState(false);
+  const [streamError, setStreamError] = useState(false);
+  const [useIframePlayer, setUseIframePlayer] = useState(false);
+  const [playerKey, setPlayerKey] = useState(0);
+
   const { data: video, isLoading, error } = useMyanmarVideoById(id);
   const { data: relatedVideos, isLoading: relatedLoading } = useMyanmarRelatedVideos(id, 8);
 
-  const isDirectMp4 = Boolean(
-    video?.full_video_url && (video.full_video_url.includes(".mp4") || video.video_mime_type === "video/mp4")
-  );
+  // Fetch or re-resolve fresh MP4 stream from /api/player
+  const resolveFreshStream = useCallback(async (force = false) => {
+    if (!video) return;
+
+    const candidateUrl = video.full_video_url;
+
+    // If candidate URL is already fresh and not forced, use it directly
+    if (!force && candidateUrl && !isUrlExpired(candidateUrl)) {
+      setStreamUrl(candidateUrl);
+      setStreamError(false);
+      setIsResolving(false);
+      return;
+    }
+
+    // Otherwise, resolve fresh presigned stream URL via backend resolver
+    if (video.detail_url) {
+      setIsResolving(true);
+      setStreamError(false);
+      try {
+        const res = await fetch(`/api/player?url=${encodeURIComponent(video.detail_url)}&format=json`);
+        if (!res.ok) throw new Error(`Resolver status ${res.status}`);
+        const data = await res.json();
+        if (data && data.streamUrl) {
+          setStreamUrl(data.streamUrl);
+          setStreamError(false);
+          setIsResolving(false);
+          return;
+        }
+      } catch (err) {
+        console.warn("[MyanmarWatch] Failed to resolve fresh stream:", err);
+      }
+
+      // If resolving failed, fallback to candidate URL or switch to clean iframe
+      if (candidateUrl) {
+        setStreamUrl(candidateUrl);
+        setIsResolving(false);
+      } else {
+        setUseIframePlayer(true);
+        setIsResolving(false);
+      }
+    } else if (candidateUrl) {
+      setStreamUrl(candidateUrl);
+      setIsResolving(false);
+    } else {
+      setStreamError(true);
+      setIsResolving(false);
+    }
+  }, [video]);
+
+  // Trigger stream resolution whenever video data changes or playerKey increments
+  useEffect(() => {
+    setUseIframePlayer(false);
+    resolveFreshStream(false);
+  }, [video?.id, playerKey, resolveFreshStream]);
+
+  // Video error recovery handler
+  const handleVideoError = () => {
+    console.warn("[MyanmarWatch] Native video error, resolving fresh stream...");
+    // If not already tried resolving, force resolve fresh stream URL
+    if (video?.detail_url && !isResolving) {
+      resolveFreshStream(true);
+    } else {
+      setStreamError(true);
+    }
+  };
 
   // Check saved state from localStorage
   useEffect(() => {
@@ -88,15 +165,15 @@ export default function MyanmarWatch() {
     setMeta("og:description", `Watch ${video.title} on Chuglii.`, true);
     const ogThumb = video.clean_thumbnail_url || video.thumbnail_url || "";
     setMeta("og:image", ogThumb, true);
-    if (video.full_video_url) {
-      setMeta("og:video", video.full_video_url, true);
+    if (streamUrl || video.full_video_url) {
+      setMeta("og:video", (streamUrl || video.full_video_url)!, true);
       setMeta("og:video:type", "video/mp4", true);
     }
 
     return () => {
       document.title = prevTitle;
     };
-  }, [video]);
+  }, [video, streamUrl]);
 
   const toggleSave = () => {
     if (!id) return;
@@ -123,7 +200,7 @@ export default function MyanmarWatch() {
   };
 
   const handleCopyStream = () => {
-    const stream = video?.detail_url || video?.full_video_url;
+    const stream = streamUrl || video?.full_video_url || video?.detail_url;
     if (stream && navigator.clipboard) {
       navigator.clipboard.writeText(stream);
       setCopiedStream(true);
@@ -163,7 +240,7 @@ export default function MyanmarWatch() {
     );
   }
 
-  const primaryStream = video.full_video_url || video.detail_url;
+  const primaryDownloadUrl = streamUrl || (video.full_video_url && !isUrlExpired(video.full_video_url) ? video.full_video_url : null);
 
   return (
     <Layout>
@@ -200,79 +277,106 @@ export default function MyanmarWatch() {
             </div>
           </div>
 
-          {/* Video Player Cinema Frame - Masks website chrome, displays only video */}
-          <div
-            ref={frameContainerRef}
-            className="relative w-full aspect-[776/480] rounded-2xl overflow-hidden bg-black shadow-2xl border border-border/40"
-          >
-            {video.detail_url ? (
-              <div
-                className="absolute top-0 left-0 bg-black pointer-events-auto"
-                style={{
-                  width: "776px",
-                  height: "480px",
-                  transformOrigin: "top left",
-                  transform: `scale(${frameScale})`,
-                }}
-              >
-                <iframe
-                  key={video.detail_url}
-                  src={video.detail_url}
-                  title={video.title}
-                  referrerPolicy="no-referrer"
-                  allow="autoplay *; fullscreen *; picture-in-picture *; encrypted-media *; accelerometer *; gyroscope *"
-                  allowFullScreen
-                  className="border-none bg-black pointer-events-auto"
-                  style={{
-                    position: "absolute",
-                    top: "-162px",
-                    left: "-56px",
-                    width: "1280px",
-                    height: "750px",
-                  }}
-                />
+          {/* Video Player Cinema Frame - Fully responsive, perfectly sized on mobile and desktop */}
+          <div className="relative aspect-video w-full max-h-[72vh] mx-auto bg-black rounded-2xl overflow-hidden shadow-2xl border border-border/40">
+            {isResolving ? (
+              <div className="w-full h-full flex flex-col items-center justify-center p-6 text-center text-muted-foreground bg-black">
+                <div className="w-10 h-10 border-3 border-rose-500/30 border-t-rose-500 rounded-full animate-spin mb-3" />
+                <p className="text-sm font-medium text-foreground">Loading Video Stream...</p>
+                <p className="text-xs text-muted-foreground mt-1">Connecting to Cloudflare high-speed stream server</p>
               </div>
-            ) : isDirectMp4 && video.full_video_url ? (
+            ) : !useIframePlayer && streamUrl ? (
               <video
                 ref={videoRef}
-                src={video.full_video_url}
+                key={`video-${streamUrl}`}
+                src={streamUrl}
                 poster={video.clean_thumbnail_url || video.thumbnail_url || undefined}
                 controls
+                autoPlay
                 playsInline
-                className="w-full h-full object-contain"
+                preload="metadata"
+                className="w-full h-full object-contain bg-black"
+                onError={handleVideoError}
+              />
+            ) : video.detail_url ? (
+              <iframe
+                key={`clean-iframe-${video.detail_url}-${playerKey}`}
+                src={`/api/player?url=${encodeURIComponent(video.detail_url)}`}
+                title={video.title}
+                referrerPolicy="no-referrer"
+                allow="autoplay *; fullscreen *; picture-in-picture *; encrypted-media *; accelerometer *; gyroscope *"
+                allowFullScreen
+                className="w-full h-full border-none bg-black"
               />
             ) : (
-              <div className="w-full h-full flex flex-col items-center justify-center p-6 text-center text-muted-foreground">
+              <div className="w-full h-full flex flex-col items-center justify-center p-6 text-center text-muted-foreground bg-black">
                 <FilmStrip size={48} className="mb-2 text-muted-foreground/60" />
-                <p className="text-sm">Video stream is currently unavailable.</p>
+                <p className="text-sm font-medium text-foreground">Video stream is temporarily unavailable.</p>
+                <button
+                  onClick={() => resolveFreshStream(true)}
+                  className="mt-4 px-4 py-2 rounded-xl text-xs font-semibold bg-rose-500 text-white hover:bg-rose-600 transition-colors inline-flex items-center gap-1.5 cursor-pointer"
+                >
+                  <ArrowClockwise size={14} /> Retry Stream
+                </button>
               </div>
             )}
           </div>
 
-          {/* Video Action Toolbar */}
+          {/* Video Player Action Toolbar */}
           <div className="mt-4 flex flex-wrap items-center justify-between gap-3">
             <div className="flex flex-wrap items-center gap-2">
-              {video.detail_url && (
+              {/* Reload / Refresh stream */}
+              <button
+                type="button"
+                onClick={() => {
+                  setPlayerKey((k) => k + 1);
+                  resolveFreshStream(true);
+                }}
+                className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-semibold bg-rose-500/20 text-rose-300 hover:bg-rose-500/30 border border-rose-500/40 transition-colors cursor-pointer"
+                title="Reload Video Stream"
+              >
+                <ArrowClockwise size={14} className="text-rose-400" />
+                <span>Reload Stream</span>
+              </button>
+
+              {/* Player Mode Switcher: Native HTML5 vs Cinema Embed */}
+              {video.detail_url && streamUrl && (
                 <button
-                  onClick={() => {
-                    const iframe = document.querySelector('iframe');
-                    if (iframe && video.detail_url) iframe.src = video.detail_url;
-                  }}
-                  className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-semibold bg-rose-500/20 text-rose-300 hover:bg-rose-500/30 border border-rose-500/40 transition-colors"
+                  type="button"
+                  onClick={() => setUseIframePlayer((prev) => !prev)}
+                  className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-medium bg-secondary/80 hover:bg-secondary text-foreground border border-border/40 transition-colors cursor-pointer"
+                  title="Switch Player Engine"
                 >
-                  <Sparkle size={14} className="text-rose-400" />
-                  <span>Reload Player</span>
+                  <MonitorPlay size={14} className="text-muted-foreground" />
+                  <span>{useIframePlayer ? "Use Native Player" : "Use Cinema Embed"}</span>
                 </button>
               )}
 
+              {/* Copy Stream Link */}
               <button
+                type="button"
                 onClick={handleCopyStream}
-                className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-semibold bg-secondary/80 hover:bg-secondary text-foreground border border-border/40 transition-colors"
+                className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-medium bg-secondary/80 hover:bg-secondary text-foreground border border-border/40 transition-colors cursor-pointer"
               >
                 {copiedStream ? <Check size={14} className="text-emerald-400" /> : <LinkSimple size={14} />}
                 <span>{copiedStream ? "Link Copied" : "Copy Link"}</span>
               </button>
 
+              {/* Direct Download Button */}
+              {primaryDownloadUrl && (
+                <a
+                  href={primaryDownloadUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  download={`${video.slug || "myanmar-video"}.mp4`}
+                  className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-medium bg-secondary/80 hover:bg-secondary text-foreground border border-border/40 transition-colors"
+                >
+                  <DownloadSimple size={14} />
+                  <span>Download MP4</span>
+                </a>
+              )}
+
+              {/* Source Page */}
               {video.detail_url && (
                 <a
                   href={video.detail_url}
@@ -280,11 +384,12 @@ export default function MyanmarWatch() {
                   rel="noopener noreferrer"
                   className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-medium text-muted-foreground hover:text-rose-400 transition-colors"
                 >
-                  <span>Source Page &rarr;</span>
+                  <span>Source &rarr;</span>
                 </a>
               )}
             </div>
 
+            {/* Video Stats */}
             <div className="flex items-center gap-4 text-xs text-muted-foreground">
               <span className="flex items-center gap-1">
                 <Eye size={14} />
