@@ -66,6 +66,8 @@ const LeakFeed = lazyWithSkeleton(() => import("@/pages/LeakFeed"), <SkeletonGri
 const LeakWatch = lazyWithSkeleton(() => import("@/pages/LeakWatch"), <SkeletonDetailPage />, "LeakWatch");
 const JapaneseFeed = lazyWithSkeleton(() => import("@/pages/JapaneseFeed"), <SkeletonGridPage count={12} />, "JapaneseFeed");
 const JapaneseWatch = lazyWithSkeleton(() => import("@/pages/JapaneseWatch"), <SkeletonDetailPage />, "JapaneseWatch");
+const MyanmarFeed = lazyWithSkeleton(() => import("@/pages/MyanmarFeed"), <SkeletonGridPage count={12} />, "MyanmarFeed");
+const MyanmarWatch = lazyWithSkeleton(() => import("@/pages/MyanmarWatch"), <SkeletonDetailPage />, "MyanmarWatch");
 
 const NotFound = lazyWithSkeleton(() => import("@/pages/not-found"), <SkeletonSimplePage rows={3} />, "NotFound");
 
@@ -236,6 +238,8 @@ function Router() {
         <Route path="/leak" component={LeakFeed} />
         <Route path="/japanese/video/:id" component={JapaneseWatch} />
         <Route path="/japanese" component={JapaneseFeed} />
+        <Route path="/myanmar/video/:id" component={MyanmarWatch} />
+        <Route path="/myanmar" component={MyanmarFeed} />
         <Route path="/premium" component={Premium} />
         <Route path="/login" component={Login} />
         <Route path="/signup" component={Signup} />

@@ -1,6 +1,6 @@
 import { Link } from "wouter";
 import { useCallback, memo, useState, useRef } from "react";
-import { PaperPlaneTilt, Flame, CaretDown } from "@phosphor-icons/react";
+import { PaperPlaneTilt, Flame, GlobeHemisphereWest, FilmStrip, CaretDown } from "@phosphor-icons/react";
 import { prefetchRoute } from "@/lib/route-chunks";
 import { isActiveNavigationRoute } from "@/lib/navigation";
 
@@ -18,12 +18,21 @@ export const SCRAPER_CATEGORIES = [
     name: "Viral MMS",
     href: "/leak?category=viral-mms",
     count: "9.2k",
+    icon: Flame,
   },
   {
     id: "japanese",
     name: "Japanese (JAV)",
     href: "/japanese",
     count: "Hot",
+    icon: GlobeHemisphereWest,
+  },
+  {
+    id: "myanmar",
+    name: "Myanmar",
+    href: "/myanmar",
+    count: "New",
+    icon: FilmStrip,
   },
 ] as const;
 
@@ -33,7 +42,10 @@ interface DesktopNavProps {
 }
 
 export const DesktopNav = memo(function DesktopNav({ location, onRequestOpen }: DesktopNavProps) {
-  const isLeakActive = isActiveNavigationRoute("/leak", location) || isActiveNavigationRoute("/japanese", location);
+  const isLeakActive =
+    isActiveNavigationRoute("/leak", location) ||
+    isActiveNavigationRoute("/japanese", location) ||
+    isActiveNavigationRoute("/myanmar", location);
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const closeTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
@@ -44,6 +56,7 @@ export const DesktopNav = memo(function DesktopNav({ location, onRequestOpen }: 
     }
     prefetchRoute("/leak");
     prefetchRoute("/japanese");
+    prefetchRoute("/myanmar");
     setDropdownOpen(true);
   };
 
@@ -83,24 +96,29 @@ export const DesktopNav = memo(function DesktopNav({ location, onRequestOpen }: 
         {/* Clean, Simple Dropdown */}
         {dropdownOpen && (
           <div
-            className="absolute top-full left-0 mt-1 w-44 rounded-lg bg-popover/95 backdrop-blur-sm border border-border/60 shadow-lg py-1 z-50 animate-in fade-in zoom-in-95 duration-100"
+            className="absolute top-full left-0 mt-1 w-48 rounded-lg bg-popover/95 backdrop-blur-sm border border-border/60 shadow-lg py-1 z-50 animate-in fade-in zoom-in-95 duration-100"
             role="menu"
           >
             {SCRAPER_CATEGORIES.map((cat) => {
+              const Icon = cat.icon;
               const active =
                 (cat.id === "japanese" && isActiveNavigationRoute("/japanese", location)) ||
+                (cat.id === "myanmar" && (isActiveNavigationRoute("/myanmar", location) || location.includes("category=myanmar"))) ||
                 (cat.id === "viral-mms" && (isActiveNavigationRoute("/leak", location) || location.includes("category=viral-mms")));
               return (
                 <Link key={cat.id} href={cat.href}>
                   <span
                     onClick={() => setDropdownOpen(false)}
-                    className={`w-full flex items-center justify-between px-3 py-1.5 text-xs transition-colors cursor-pointer ${
+                    className={`w-full flex items-center justify-between px-3 py-2 text-xs transition-colors cursor-pointer ${
                       active
                         ? "text-rose-400 font-medium bg-rose-500/10"
                         : "text-foreground/80 hover:text-foreground hover:bg-secondary/60"
                     }`}
                   >
-                    <span>{cat.name}</span>
+                    <span className="inline-flex items-center gap-2">
+                      <Icon size={14} weight={active ? "fill" : "regular"} className={active ? "text-rose-500" : "text-muted-foreground/80"} />
+                      <span>{cat.name}</span>
+                    </span>
                     <span className="text-[11px] text-muted-foreground/70 tabular-nums">{cat.count}</span>
                   </span>
                 </Link>

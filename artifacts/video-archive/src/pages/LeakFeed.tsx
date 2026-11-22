@@ -29,6 +29,7 @@ const TAG_TABS = [
   { id: "viral-mms", label: "Viral Clips" },
   { id: "pakistani", label: "Pakistani" },
   { id: "bangladesi", label: "Bangladeshi" },
+  { id: "myanmar", label: "Myanmar" },
   { id: "web-series", label: "Web Series" },
   { id: "amateur", label: "Amateur" },
   { id: "teen", label: "Teen" },

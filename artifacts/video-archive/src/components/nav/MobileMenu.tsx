@@ -17,6 +17,7 @@ import {
   MoonStars,
   Flame,
   GlobeHemisphereWest,
+  FilmStrip,
 } from "@phosphor-icons/react";
 import { NAV_LINKS } from "./DesktopNav";
 import { prefetchRoute } from "@/lib/route-chunks";
@@ -138,6 +139,26 @@ export function MobileMenu({
                   </span>
                   <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-rose-500/20 text-rose-400 uppercase">
                     Hot
+                  </span>
+                </span>
+              </Link>
+              <Link href="/myanmar" aria-current={isActiveNavigationRoute("/myanmar", location) ? "page" : undefined}>
+                <span
+                  className={`w-full px-3 py-2 text-sm rounded-lg transition-all duration-150 inline-flex items-center justify-between ${
+                    isActiveNavigationRoute("/myanmar", location)
+                      ? "text-rose-400 font-medium bg-rose-500/15 border border-rose-500/30"
+                      : "text-rose-400/90 hover:text-rose-300 hover:bg-rose-500/10"
+                  }`}
+                  onClick={onClose}
+                  onMouseEnter={() => prefetchRoute("/myanmar")}
+                  onFocus={() => prefetchRoute("/myanmar")}
+                >
+                  <span className="inline-flex items-center gap-2.5">
+                    <FilmStrip size={16} weight="fill" className="text-rose-500" />
+                    Myanmar
+                  </span>
+                  <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-rose-500/20 text-rose-400 uppercase">
+                    New
                   </span>
                 </span>
               </Link>
