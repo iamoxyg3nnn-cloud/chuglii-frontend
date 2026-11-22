@@ -67,10 +67,7 @@ export default function OnlyfansWatch() {
       });
     }
 
-    let primaryUrl = video?.full_video_url || "";
-    if (primaryUrl.includes(".influencersgonewild.net/")) {
-      primaryUrl = primaryUrl.replace(/cdn\d+\.influencersgonewild\.net/, "cdn04.influencersgonewild.net");
-    }
+    const primaryUrl = video?.full_video_url || "";
 
     if (primaryUrl && !list.some((m) => m.url === primaryUrl)) {
       list.unshift({
