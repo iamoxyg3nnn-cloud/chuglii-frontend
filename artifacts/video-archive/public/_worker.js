@@ -1176,33 +1176,52 @@ function extractPackedStreamInfo(html) {
       }
 
       // 6. LuluStream Resolver (luminscdn.xyz / lulustream.com / luluvdo.com)
-      // Extracts direct HLS stream URL from packed script, serves pure ad-free Hls.js player directly (tnmr.org supports CORS *)
+      // Proxies LuluStream with Referer: https://supjav.com/, disarms adblock overlays, popup click-traps,
+      // and lets native JW8 player stream directly from tnmr.org without HLS stalls or sandbox errors
       if (destObj.hostname.includes("luminscdn") || destObj.hostname.includes("lulustream") || destObj.hostname.includes("luluvdo")) {
         try {
-          const clientIp = request.headers.get("cf-connecting-ip") || request.headers.get("x-real-ip") || "";
-          const luluHeaders = {
-            "User-Agent": request.headers.get("user-agent") || "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
-            "Referer": "https://supjav.com/",
-            "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
-          };
-          if (clientIp) {
-            luluHeaders["X-Forwarded-For"] = clientIp;
-            luluHeaders["X-Real-IP"] = clientIp;
-          }
-          const luluRes = await fetch(targetUrl, { headers: luluHeaders });
+          const luluRes = await fetch(targetUrl, {
+            headers: {
+              "User-Agent": request.headers.get("user-agent") || "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
+              "Referer": "https://supjav.com/",
+              "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+            },
+          });
           if (luluRes.ok) {
-            const luluHtml = await luluRes.text();
-            const streamInfo = extractPackedStreamInfo(luluHtml);
-            if (streamInfo && streamInfo.file) {
-              return new Response(renderCleanHlsPlayer(streamInfo.file, streamInfo.title || "LuluStream", streamInfo.poster), {
-                status: 200,
-                headers: {
-                  "Content-Type": "text/html; charset=utf-8",
-                  "Access-Control-Allow-Origin": "*",
-                  "Cache-Control": "no-store",
-                },
-              });
+            let luluHtml = await luluRes.text();
+            
+            // 1. Neutralize adblock overlay detection and triggers
+            luluHtml = luluHtml.replace(/showADBOverlay\(\)/g, "/* neutral */");
+            luluHtml = luluHtml.replace(/showGuardOverlay/g, "/* neutral */");
+            luluHtml = luluHtml.replace(/if\s*\(\s*window\.cRAds\s*===\s*undefined\s*\)\s*\{[^}]*\}/g, "");
+            luluHtml = luluHtml.replace(/if\s*\(\s*window\.justDetectAdblock\s*===\s*undefined\s*\)\s*\{[^}]*\}/g, "");
+            luluHtml = luluHtml.replace(/id="adbd"/g, 'id="adbd" style="display:none !important;"');
+
+            // 2. Disarm aggressive ad networks, top-level redirects and popup click-traps
+            luluHtml = luluHtml.replace(/<script[^>]*src=["'][^"']*(?:pop|dnsads)[^"']*["'][^>]*><\/script>/gi, "");
+            luluHtml = luluHtml.replace(/top\.location[^;]+;/g, "/* neutral */");
+            luluHtml = luluHtml.replace(/window\.location\.ancestorOrigins/g, '["https://supjav.com"]');
+            luluHtml = luluHtml.replace(/window\.open\([^)]*\)/g, "null");
+
+            // 3. Inject CSS overlay killswitch
+            const overlayKillCss = '<style>#adbd, .overdiv, .over_player_msg, .guard_overlay { display: none !important; opacity: 0 !important; pointer-events: none !important; }</style>';
+            
+            // 4. Inject <base> tag so relative JW Player assets and scripts load from destination host
+            const baseTag = `<base href="${destObj.origin}/">`;
+            if (luluHtml.includes("<head>")) {
+              luluHtml = luluHtml.replace("<head>", `<head>${baseTag}${overlayKillCss}`);
+            } else {
+              luluHtml = baseTag + overlayKillCss + luluHtml;
             }
+
+            return new Response(luluHtml, {
+              status: 200,
+              headers: {
+                "Content-Type": "text/html; charset=utf-8",
+                "Access-Control-Allow-Origin": "*",
+                "Cache-Control": "no-store",
+              },
+            });
           }
         } catch (e) {
           console.error("LuluStream resolve error:", e);
