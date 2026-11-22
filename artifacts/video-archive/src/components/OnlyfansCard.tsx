@@ -14,9 +14,24 @@ export function OnlyfansCard({ video, isSaved = false, onToggleSave }: OnlyfansC
   const [imageError, setImageError] = useState(false);
   const [justSaved, setJustSaved] = useState(false);
 
-  const thumbUrl = imageError
-    ? "/placeholder-thumb.jpg"
-    : (video.clean_thumbnail_url || video.thumbnail_url || "/placeholder-thumb.jpg");
+  const getRawThumb = (): string => {
+    if (imageError) return "/placeholder-thumb.jpg";
+    const raw = video.clean_thumbnail_url || video.thumbnail_url;
+    if (raw && !raw.startsWith("data:")) {
+      return raw;
+    }
+    // If thumbnail was a base64 placeholder, derive from SheeshFans video post ID
+    if (video.source_post_id) {
+      const pid = parseInt(video.source_post_id, 10);
+      if (!isNaN(pid) && pid > 0) {
+        const folder = Math.floor(pid / 1000) * 1000;
+        return `https://sheeshfans.com/contents/videos_screenshots/${folder}/${pid}/preview.jpg`;
+      }
+    }
+    return "/placeholder-thumb.jpg";
+  };
+
+  const thumbUrl = getRawThumb();
 
   const proxiedThumb = thumbUrl.startsWith("http")
     ? (proxyImageUrl(thumbUrl) || thumbUrl)
@@ -33,7 +48,8 @@ export function OnlyfansCard({ video, isSaved = false, onToggleSave }: OnlyfansC
   };
 
   const modelName = video.actors?.[0] || video.raw_payload?.model || "";
-  const mirrors = video.raw_payload?.mirrors || [];
+  const rawServers = video.raw_payload?.servers || video.raw_payload?.mirrors || [];
+  const mirrorCount = rawServers.length > 0 ? rawServers.length : (video.full_video_url ? 1 : 0);
   const quality = video.quality_label || "1080p Full HD";
   const is4K = quality.includes("4K") || (video.quality_score && video.quality_score >= 2000);
   const is1080p = quality.includes("1080p") || (video.quality_score && video.quality_score >= 1000 && video.quality_score < 2000);
@@ -67,9 +83,9 @@ export function OnlyfansCard({ video, isSaved = false, onToggleSave }: OnlyfansC
               {is4K ? "4K UHD" : is1080p ? "1080p FHD" : quality}
             </span>
 
-            {mirrors.length > 1 && (
+            {mirrorCount > 1 && (
               <span className="px-1.5 py-0.5 rounded-md bg-black/70 backdrop-blur-md text-[10px] font-medium text-cyan-300 border border-cyan-500/30">
-                {mirrors.length} mirrors
+                {mirrorCount} mirrors
               </span>
             )}
           </div>

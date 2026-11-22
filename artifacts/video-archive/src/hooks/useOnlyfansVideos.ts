@@ -28,14 +28,29 @@ export interface OnlyfansVideo {
   scraped_at: string;
   raw_payload?: {
     source_site?: string;
+    source?: string;
     model?: string;
+    models?: string[];
+    servers?: Array<{
+      name?: string;
+      server?: string;
+      embed_url?: string;
+      url?: string;
+      type?: string;
+      quality_score?: number;
+      quality_label?: string;
+      headers?: Record<string, string>;
+    }>;
     mirrors?: Array<{
-      server: string;
-      url: string;
+      server?: string;
+      name?: string;
+      url?: string;
+      embed_url?: string;
       quality_score?: number;
       quality_label?: string;
     }>;
     headers?: Record<string, string>;
+    [key: string]: any;
   };
 }
 

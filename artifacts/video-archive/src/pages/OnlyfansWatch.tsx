@@ -1,7 +1,8 @@
 import { useRef, useState, useEffect, useMemo } from "react";
 import { useParams, Link, useLocation } from "wouter";
 import { Layout } from "@/components/Layout";
-import { iframeReferrerPolicy } from "@/lib/video-hosts";
+import { iframeReferrerPolicy, detectHostLabel } from "@/lib/video-hosts";
+import { proxyImageUrl } from "@/lib/proxy-url";
 import { useOnlyfansVideoById, useOnlyfansRelatedVideos, type OnlyfansVideo } from "@/hooks/useOnlyfansVideos";
 import { OnlyfansCard } from "@/components/OnlyfansCard";
 import {
@@ -43,31 +44,89 @@ export default function OnlyfansWatch() {
   const { data: relatedVideos, isLoading: relatedLoading } = useOnlyfansRelatedVideos(id, 8);
 
   const rawPayload = video?.raw_payload as any;
-  const mirrors: Array<{ server: string; url: string; quality_score?: number; quality_label?: string }> =
-    rawPayload?.mirrors || [];
 
   // Build complete list of streaming servers
   const allServers = useMemo(() => {
-    const list = [...mirrors];
-    if (video?.full_video_url && !list.some((m) => m.url === video.full_video_url)) {
-      list.unshift({
-        server: "Primary Stream",
-        url: video.full_video_url,
-        quality_score: video.quality_score || 1080,
-        quality_label: video.quality_label || "1080p Full HD",
+    const rawList: any[] = rawPayload?.servers || rawPayload?.mirrors || [];
+    const list: Array<{ server: string; url: string; quality_score?: number; quality_label?: string }> = [];
+
+    for (const item of rawList) {
+      let u = item.embed_url || item.url || "";
+      if (!u) continue;
+      // Normalize dead influencersgonewild cdn hostnames to active cdn04
+      if (u.includes(".influencersgonewild.net/")) {
+        u = u.replace(/cdn\d+\.influencersgonewild\.net/, "cdn04.influencersgonewild.net");
+      }
+      const label = item.name || item.server || detectHostLabel(u);
+      list.push({
+        server: label,
+        url: u,
+        quality_score: item.quality_score,
+        quality_label: item.quality_label,
       });
     }
+
+    let primaryUrl = video?.full_video_url || "";
+    if (primaryUrl.includes(".influencersgonewild.net/")) {
+      primaryUrl = primaryUrl.replace(/cdn\d+\.influencersgonewild\.net/, "cdn04.influencersgonewild.net");
+    }
+
+    if (primaryUrl && !list.some((m) => m.url === primaryUrl)) {
+      list.unshift({
+        server: "Primary Stream",
+        url: primaryUrl,
+        quality_score: video?.quality_score || 1080,
+        quality_label: video?.quality_label || "1080p Full HD",
+      });
+    }
+
     return list;
-  }, [mirrors, video]);
+  }, [rawPayload, video]);
 
   const activeUrl = selectedServerUrl || (allServers.length > 0 ? allServers[0].url : video?.full_video_url);
 
-  // Check if active URL is a direct MP4 file
+  // Check if active URL is a true direct MP4 video file
   const isDirectMp4 = useMemo(() => {
     if (!activeUrl) return false;
     const u = activeUrl.toLowerCase();
-    return u.endsWith(".mp4") || u.includes(".mp4?") || video?.video_mime_type === "video/mp4";
-  }, [activeUrl, video]);
+    // Exclude iframe locker and embed patterns
+    if (
+      u.includes("/embed/") ||
+      u.includes("/e/") ||
+      u.includes("voe.sx") ||
+      u.includes("streamtape") ||
+      u.includes("playmogo") ||
+      u.includes("bysezejataos") ||
+      u.includes("dood")
+    ) {
+      return false;
+    }
+    return u.endsWith(".mp4") || u.includes(".mp4?") || u.includes("/video.mp4");
+  }, [activeUrl]);
+
+  // If direct MP4 from influencersgonewild, proxy through /api/player/stream with Referer & Range support
+  const directPlaybackUrl = useMemo(() => {
+    if (!activeUrl) return "";
+    if (isDirectMp4 && activeUrl.includes("influencersgonewild")) {
+      return `/api/player/stream?url=${encodeURIComponent(activeUrl)}`;
+    }
+    return activeUrl;
+  }, [activeUrl, isDirectMp4]);
+
+  const cleanPosterUrl = useMemo(() => {
+    const raw = video?.clean_thumbnail_url || video?.thumbnail_url;
+    if (raw && !raw.startsWith("data:")) {
+      return raw.startsWith("http") ? (proxyImageUrl(raw) || raw) : raw;
+    }
+    if (video?.source_post_id) {
+      const pid = parseInt(video.source_post_id, 10);
+      if (!isNaN(pid) && pid > 0) {
+        const folder = Math.floor(pid / 1000) * 1000;
+        return `https://sheeshfans.com/contents/videos_screenshots/${folder}/${pid}/preview.jpg`;
+      }
+    }
+    return undefined;
+  }, [video]);
 
   // Check if URL needs proxy or specific referrer policy
   const refPolicy = useMemo(() => {
@@ -209,12 +268,20 @@ export default function OnlyfansWatch() {
             {activeUrl ? (
               isDirectMp4 ? (
                 <video
-                  key={`${activeUrl}-${playerKey}`}
-                  src={activeUrl}
-                  poster={video.clean_thumbnail_url || video.thumbnail_url || undefined}
+                  key={`${directPlaybackUrl}-${playerKey}`}
+                  src={directPlaybackUrl}
+                  poster={cleanPosterUrl}
                   controls
                   playsInline
                   autoPlay={false}
+                  onError={() => {
+                    // Auto-fallback to next server mirror if direct stream errors
+                    const curIdx = allServers.findIndex((s) => s.url === activeUrl);
+                    if (curIdx >= 0 && curIdx < allServers.length - 1) {
+                      setSelectedServerUrl(allServers[curIdx + 1].url);
+                      setPlayerKey((k) => k + 1);
+                    }
+                  }}
                   className="w-full h-full object-contain"
                 />
               ) : (

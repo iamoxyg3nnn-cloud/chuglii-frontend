@@ -909,31 +909,59 @@ function extractPackedStreamInfo(html) {
     }
 
     try {
+      const targetObj = new URL(streamUpstreamUrl);
+      let referer = "https://supjav.com/";
+      if (targetObj.hostname.includes("influencersgonewild")) {
+        referer = "https://influencersgonewild.com/";
+      } else if (targetObj.hostname.includes("sheeshfans")) {
+        referer = "https://sheeshfans.com/";
+      } else if (targetObj.hostname.includes("internetchicks")) {
+        referer = "https://internetchicks.com/";
+      } else if (targetObj.hostname.includes("pimpbunny")) {
+        referer = "https://pimpbunny.net/";
+      }
+
+      const reqHeaders = {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
+        "Referer": referer,
+      };
+
+      const rangeHeader = request.headers.get("Range");
+      if (rangeHeader) {
+        reqHeaders["Range"] = rangeHeader;
+      }
+
       const upstreamRes = await fetch(streamUpstreamUrl, {
-        headers: {
-          "User-Agent": "Mozilla/5.0",
-          "Referer": "https://supjav.com/",
-        },
+        headers: reqHeaders,
       });
 
-      if (!upstreamRes.ok) {
+      if (!upstreamRes.ok && upstreamRes.status !== 206) {
         return new Response(upstreamRes.body, { status: upstreamRes.status, headers: CORS_HEADERS });
       }
 
       const contentType = upstreamRes.headers.get("content-type") || "";
       const isM3U8 = streamUpstreamUrl.includes(".m3u8") || contentType.includes("mpegurl") || contentType.includes("application/x-mpegURL");
 
-      // For binary TS segments and AES keys, stream directly through with CORS *
+      // For binary TS segments, AES keys, and direct MP4 streams: forward Range and status 206/200 with CORS
       if (!isM3U8) {
+        const resHeaders = new Headers();
+        resHeaders.set("Content-Type", contentType || (streamUpstreamUrl.includes(".mp4") ? "video/mp4" : "application/octet-stream"));
+        resHeaders.set("Access-Control-Allow-Origin", "*");
+        resHeaders.set("Access-Control-Allow-Methods", "GET, HEAD, OPTIONS");
+        resHeaders.set("Access-Control-Allow-Headers", "*");
+        resHeaders.set("Accept-Ranges", "bytes");
+
+        if (upstreamRes.headers.get("Content-Range")) {
+          resHeaders.set("Content-Range", upstreamRes.headers.get("Content-Range"));
+        }
+        if (upstreamRes.headers.get("Content-Length")) {
+          resHeaders.set("Content-Length", upstreamRes.headers.get("Content-Length"));
+        }
+        resHeaders.set("Cache-Control", upstreamRes.status === 206 ? "no-store" : "public, max-age=86400");
+
         return new Response(upstreamRes.body, {
-          status: 200,
-          headers: {
-            "Content-Type": contentType || "application/octet-stream",
-            "Access-Control-Allow-Origin": "*",
-            "Access-Control-Allow-Methods": "GET, HEAD, OPTIONS",
-            "Access-Control-Allow-Headers": "*",
-            "Cache-Control": "public, max-age=86400",
-          },
+          status: upstreamRes.status,
+          headers: resHeaders,
         });
       }
 
