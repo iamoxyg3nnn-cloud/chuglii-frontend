@@ -45,17 +45,17 @@ export default function JapaneseWatch() {
   const rawPayload = video?.raw_payload as any;
   const allServers: Array<{ name: string; embed_url: string }> = rawPayload?.servers || [];
   
-  // Sort priority: LuluStream (cleanest iframe embed, zero CSP restrictions) -> FC2Stream (best uncensored host) -> VOE HD -> Streamtape -> VidSpeed -> EarnVids
+  // Sort priority: VOE HD (flawless direct player) -> VidSpeed (instant clean HLS) -> FC2Stream (clean HLS) -> LuluStream (clean HLS) -> EarnVids -> Streamtape
   const sortedServers = useMemo(() => {
     const list = [...allServers];
     const rank = (name: string, url: string = "") => {
       const n = (name + " " + url).toLowerCase();
-      if (n.includes("lulu") || n.includes("luc") || n.includes("luminscdn")) return 0;
-      if (n.includes("fc2") || n.includes("fst") || n.includes("fc2stream")) return 1;
-      if (n.includes("voe") || n.includes("caseyseemavoid")) return 2;
-      if (n.includes("streamtape") || n.includes("st")) return 3;
-      if (n.includes("vidspeed") || n.includes("vas") || n.includes("vvaassjjav")) return 4;
-      if (n.includes("earnvids") || n.includes("evs") || n.includes("vidhide")) return 5;
+      if (n.includes("voe") || n.includes("caseyseemavoid")) return 0;
+      if (n.includes("vidspeed") || n.includes("vas") || n.includes("vvaassjjav")) return 1;
+      if (n.includes("fc2") || n.includes("fst") || n.includes("fc2stream")) return 2;
+      if (n.includes("lulu") || n.includes("luc") || n.includes("luminscdn")) return 3;
+      if (n.includes("earnvids") || n.includes("evs") || n.includes("vidhide")) return 4;
+      if (n.includes("streamtape") || n.includes("st")) return 5;
       return 6;
     };
     return list.sort((a, b) => rank(a.name, a.embed_url) - rank(b.name, b.embed_url));

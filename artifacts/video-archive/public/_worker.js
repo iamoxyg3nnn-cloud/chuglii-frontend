@@ -756,8 +756,28 @@ function renderCleanHlsPlayer(streamingUrl, title = "", poster = "") {
 </html>`;
 }
 
-// ─── EarnVids Unpacker & Stream Extractor ────────────────────────────
-function extractEarnVidsStream(html) {
+// ─── Universal Dean Edwards Unpacker & Stream Extractor ─────────────
+function unpackDeanEdwards(p, a, c, k) {
+  const chars = "0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ";
+  const encode = (n) => {
+    if (n === 0) return "0";
+    let res = "";
+    while (n > 0) {
+      res = chars[n % a] + res;
+      n = Math.floor(n / a);
+    }
+    return res;
+  };
+  while (c--) {
+    if (k[c]) {
+      const rep = encode(c);
+      p = p.replace(new RegExp('\\b' + rep + '\\b', 'g'), k[c]);
+    }
+  }
+  return p;
+}
+
+function extractPackedStreamInfo(html) {
   try {
     const match = html.match(/eval\(function\(p,a,c,k,e,d\)[\s\S]*?return p\}\('(.*?)',(\d+),(\d+),'(.*?)'\.split\('\|'\)/);
     if (!match) return null;
@@ -765,36 +785,91 @@ function extractEarnVidsStream(html) {
     const a = parseInt(aStr, 10);
     const c = parseInt(cStr, 10);
     const k = kStr.split('|');
-    function baseN(num, b) {
-      const digits = '0123456789abcdefghijklmnopqrstuvwxyz';
-      let res = '';
-      while (num > 0) {
-        res = digits[num % b] + res;
-        num = Math.floor(num / b);
-      }
-      return res || '0';
+    const unpacked = unpackDeanEdwards(p, a, c, k);
+
+    const titleMatch = unpacked.match(/title\s*:\s*["']([^"']+)["']/i);
+    const imgMatch = unpacked.match(/image\s*:\s*["']([^"']+)["']/i);
+    const title = titleMatch ? titleMatch[1] : "";
+    const poster = imgMatch ? imgMatch[1] : "";
+
+    // 1. Check for links object (FC2Stream / EarnVids / VidHide)
+    const linksMatch = unpacked.match(/var\s+links\s*=\s*(\{[\s\S]*?\});/);
+    if (linksMatch) {
+      const rawJson = linksMatch[1];
+      const hls4 = rawJson.match(/["']hls4["']\s*:\s*["']([^"']+)["']/);
+      const hls2 = rawJson.match(/["']hls2["']\s*:\s*["']([^"']+)["']/);
+      return {
+        type: "links",
+        hls4: hls4 ? hls4[1] : null,
+        hls2: hls2 ? hls2[1] : null,
+        title,
+        poster,
+      };
     }
-    let unpacked = p;
-    for (let i = c - 1; i >= 0; i--) {
-      const key = baseN(i, a);
-      const val = k[i] || key;
-      unpacked = unpacked.replace(new RegExp('\\b' + key + '\\b', 'g'), val);
+
+    // 2. Check for jwplayer sources (LuluStream / LuluVDO)
+    const srcMatch = unpacked.match(/sources\s*:\s*\[\{\s*file\s*:\s*["']([^"']+)["']/i);
+    if (srcMatch) {
+      return {
+        type: "sources",
+        file: srcMatch[1],
+        title,
+        poster,
+      };
     }
-    const hls2Match = unpacked.match(/"hls2"\s*:\s*"([^"]+)"/);
-    const hls4Match = unpacked.match(/"hls4"\s*:\s*"([^"]+)"/);
-    const titleMatch = unpacked.match(/title\s*:\s*"([^"]+)"/);
-    const imgMatch = unpacked.match(/image\s*:\s*"([^"]+)"/);
-    const stream = (hls2Match && hls2Match[1]) || (hls4Match && hls4Match[1]);
-    if (!stream) return null;
-    return {
-      streamUrl: stream,
-      title: titleMatch ? titleMatch[1] : "",
-      image: imgMatch ? imgMatch[1] : ""
-    };
+
+    return null;
   } catch (e) {
     return null;
   }
 }
+
+  // ─── Edge HLS Stream Manifest Proxy (/api/player/stream) ───────────
+  // Proxies M3U8 master/variant manifests for FC2Stream and EarnVids with Referer: https://supjav.com/
+  // Rewrites relative variants so they remain proxied, while leaving absolute TS segments (e.g. TikTok CDN) untouched.
+  if (path === "/api/player/stream") {
+    const originParam = url.searchParams.get("origin");
+    const pathParam = url.searchParams.get("path");
+    if (!originParam || !pathParam) {
+      return errorResponse("Missing origin or path parameter", 400);
+    }
+    try {
+      const streamUpstreamUrl = originParam.replace(/\/+$/, "") + "/" + pathParam.replace(/^\/+/, "");
+      const upstreamRes = await fetch(streamUpstreamUrl, {
+        headers: {
+          "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
+          "Referer": "https://supjav.com/",
+        },
+      });
+      if (!upstreamRes.ok) {
+        return new Response(upstreamRes.body, { status: upstreamRes.status, headers: CORS_HEADERS });
+      }
+      const rawText = await upstreamRes.text();
+      const basePath = pathParam.substring(0, pathParam.lastIndexOf("/") + 1);
+      const rewritten = rawText.split("\n").map((line) => {
+        const trimmed = line.trim();
+        if (!trimmed || trimmed.startsWith("#")) return line;
+        if (trimmed.startsWith("http://") || trimmed.startsWith("https://")) {
+          return line;
+        }
+        const resolvedPath = trimmed.startsWith("/") ? trimmed : (basePath + trimmed);
+        return `/api/player/stream?origin=${encodeURIComponent(originParam)}&path=${encodeURIComponent(resolvedPath)}`;
+      }).join("\n");
+
+      return new Response(rewritten, {
+        status: 200,
+        headers: {
+          "Content-Type": "application/vnd.apple.mpegurl",
+          "Access-Control-Allow-Origin": "*",
+          "Access-Control-Allow-Methods": "GET, HEAD, OPTIONS",
+          "Access-Control-Allow-Headers": "*",
+          "Cache-Control": "public, max-age=3600",
+        },
+      });
+    } catch (err) {
+      return errorResponse("Stream proxy error: " + (err.message || err), 502);
+    }
+  }
 
   // ─── Edge Video Player Proxy (/api/player) ─────────────────────────
   if (path === "/api/player") {
@@ -919,8 +994,39 @@ function extractEarnVidsStream(html) {
         }
       }
 
-      // 4. EarnVids Resolver (evsishere.xyz / earnvids / vidhide)
-      // Proxy full HTML with spoofed Referer: https://supjav.com/ so client browser executes player with its own IP
+      // 4. FC2Stream Resolver (fc2stream.tv)
+      // Extracts hls4 stream, proxies manifest through /api/player/stream, streams TikTok CDN directly
+      if (destObj.hostname.includes("fc2stream")) {
+        try {
+          const fc2Res = await fetch(targetUrl, {
+            headers: {
+              "User-Agent": request.headers.get("user-agent") || "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
+              "Referer": "https://supjav.com/",
+              "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+            },
+          });
+          if (fc2Res.ok) {
+            const fc2Html = await fc2Res.text();
+            const streamInfo = extractPackedStreamInfo(fc2Html);
+            if (streamInfo && streamInfo.hls4) {
+              const streamProxyUrl = `/api/player/stream?origin=${encodeURIComponent(destObj.origin)}&path=${encodeURIComponent(streamInfo.hls4)}`;
+              return new Response(renderCleanHlsPlayer(streamProxyUrl, streamInfo.title || "FC2Stream", streamInfo.poster), {
+                status: 200,
+                headers: {
+                  "Content-Type": "text/html; charset=utf-8",
+                  "Access-Control-Allow-Origin": "*",
+                  "Cache-Control": "no-store",
+                },
+              });
+            }
+          }
+        } catch (e) {
+          console.error("FC2Stream resolve error:", e);
+        }
+      }
+
+      // 5. EarnVids Resolver (evsishere.xyz / earnvids / vidhide)
+      // Extracts hls4 stream, proxies manifest through /api/player/stream, streams TikTok CDN directly
       if (destObj.hostname.includes("evsishere.xyz") || destObj.hostname.includes("earnvids") || destObj.hostname.includes("vidhide")) {
         try {
           const earnRes = await fetch(targetUrl, {
@@ -931,33 +1037,56 @@ function extractEarnVidsStream(html) {
             },
           });
           if (earnRes.ok) {
-            let earnHtml = await earnRes.text();
-            earnHtml = earnHtml.replace(/if\s*\(\s*top\.location\.href\s*==\s*location\.href\s*\)\s*\{[^}]*\}/g, "");
-            earnHtml = earnHtml.replace(/top\.location[^;]+;/g, "/* neutral */");
-            earnHtml = earnHtml.replace(/window\.open\([^)]*\)/g, "null");
-
-            const baseTag = `<base href="${destObj.origin}/">`;
-            if (earnHtml.includes("<head>")) {
-              earnHtml = earnHtml.replace("<head>", `<head>${baseTag}`);
-            } else {
-              earnHtml = baseTag + earnHtml;
+            const earnHtml = await earnRes.text();
+            const streamInfo = extractPackedStreamInfo(earnHtml);
+            if (streamInfo && streamInfo.hls4) {
+              const streamProxyUrl = `/api/player/stream?origin=${encodeURIComponent(destObj.origin)}&path=${encodeURIComponent(streamInfo.hls4)}`;
+              return new Response(renderCleanHlsPlayer(streamProxyUrl, streamInfo.title || "EarnVids", streamInfo.poster), {
+                status: 200,
+                headers: {
+                  "Content-Type": "text/html; charset=utf-8",
+                  "Access-Control-Allow-Origin": "*",
+                  "Cache-Control": "no-store",
+                },
+              });
             }
-
-            return new Response(earnHtml, {
-              status: 200,
-              headers: {
-                "Content-Type": "text/html; charset=utf-8",
-                "Access-Control-Allow-Origin": "*",
-                "Cache-Control": "public, max-age=1800",
-              },
-            });
           }
         } catch (e) {
           console.error("EarnVids resolve error:", e);
         }
       }
 
-      // 5. Streamtape Resolver: Proxy HTML with spoofed Referer and disarm rogue download triggers
+      // 6. LuluStream Resolver (luminscdn.xyz / lulustream.com / luluvdo.com)
+      // Extracts direct HLS stream URL from packed script, serves pure ad-free Hls.js player
+      if (destObj.hostname.includes("luminscdn") || destObj.hostname.includes("lulustream") || destObj.hostname.includes("luluvdo")) {
+        try {
+          const luluRes = await fetch(targetUrl, {
+            headers: {
+              "User-Agent": request.headers.get("user-agent") || "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
+              "Referer": "https://supjav.com/",
+              "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+            },
+          });
+          if (luluRes.ok) {
+            const luluHtml = await luluRes.text();
+            const streamInfo = extractPackedStreamInfo(luluHtml);
+            if (streamInfo && streamInfo.file) {
+              return new Response(renderCleanHlsPlayer(streamInfo.file, streamInfo.title || "LuluStream", streamInfo.poster), {
+                status: 200,
+                headers: {
+                  "Content-Type": "text/html; charset=utf-8",
+                  "Access-Control-Allow-Origin": "*",
+                  "Cache-Control": "no-store",
+                },
+              });
+            }
+          }
+        } catch (e) {
+          console.error("LuluStream resolve error:", e);
+        }
+      }
+
+      // 7. Streamtape Resolver: Proxy HTML with spoofed Referer and disarm rogue download triggers
       if (destObj.hostname.includes("streamtape.com")) {
         try {
           const stRes = await fetch(targetUrl, {
