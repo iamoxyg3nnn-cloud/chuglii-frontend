@@ -1,6 +1,7 @@
 import { useRef, useState, useEffect } from "react";
 import { useParams, Link, useLocation } from "wouter";
 import { Layout } from "@/components/Layout";
+import { iframeReferrerPolicy } from "@/lib/video-hosts";
 import { useJapaneseVideoById, useJapaneseRelatedVideos, type JapaneseVideo } from "@/hooks/useJapaneseVideos";
 import { JapaneseCard } from "@/components/JapaneseCard";
 import {
@@ -233,9 +234,8 @@ export default function JapaneseWatch() {
               <iframe
                 src={resolvedEmbedUrl}
                 title={video.title}
-                referrerPolicy="no-referrer"
-                sandbox="allow-scripts allow-same-origin allow-forms allow-presentation"
-                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share; fullscreen"
+                referrerPolicy={iframeReferrerPolicy(resolvedEmbedUrl)}
+                allow="autoplay *; fullscreen *; picture-in-picture *; encrypted-media *; accelerometer *; gyroscope *; display-capture *; screen-wake-lock *; clipboard-write *"
                 allowFullScreen
                 className="w-full h-full border-none bg-black"
               />
