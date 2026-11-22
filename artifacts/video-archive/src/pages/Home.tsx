@@ -139,7 +139,7 @@ export default function Home() {
           >
             <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground/60" />
             <input
-              type="text"
+              type="search"
               placeholder="Search performers, recordings, or tags…"
               className="w-full h-10 bg-background/80 dark:bg-card/80 border border-border/60 hover:border-border focus:border-primary/60 rounded-lg pl-10 pr-24 text-sm outline-none transition-all duration-200 placeholder:text-muted-foreground/40 focus:ring-2 focus:ring-primary/10 focus:border-primary/50"
               value={search}

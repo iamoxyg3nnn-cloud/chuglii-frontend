@@ -43,7 +43,7 @@ try {
     await page.getByRole("main").waitFor();
     await page.getByRole("search", { name: /search the recording archive/i }).waitFor();
 
-    const search = page.getByRole("searchbox", { name: /search recordings/i });
+    const search = page.getByRole("searchbox", { name: /search recordings/i }).or(page.getByRole("textbox", { name: /search recordings/i })).first();
     await search.fill("cinematic archive");
     await page.getByRole("button", { name: /search archive/i }).click();
     await page.waitForURL(/\/browse\?search=cinematic%20archive$/);
