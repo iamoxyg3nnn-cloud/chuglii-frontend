@@ -1,4 +1,4 @@
-import { useRef, useState, useEffect } from "react";
+import { useRef, useState, useEffect, useMemo } from "react";
 import { useParams, Link, useLocation } from "wouter";
 import { Layout } from "@/components/Layout";
 import { iframeReferrerPolicy } from "@/lib/video-hosts";
@@ -20,7 +20,8 @@ import {
   BookmarkSimple,
   LinkSimple,
   User,
-  GlobeHemisphereWest
+  GlobeHemisphereWest,
+  ArrowClockwise
 } from "@phosphor-icons/react";
 
 export default function JapaneseWatch() {
@@ -31,6 +32,12 @@ export default function JapaneseWatch() {
   const [copiedStream, setCopiedStream] = useState(false);
   const [isSaved, setIsSaved] = useState(false);
   const [selectedServerUrl, setSelectedServerUrl] = useState<string | null>(null);
+  const [playerKey, setPlayerKey] = useState(0);
+
+  // Reset selected server mirror whenever navigating to a different video
+  useEffect(() => {
+    setSelectedServerUrl(null);
+  }, [id]);
 
   const { data: video, isLoading, error } = useJapaneseVideoById(id);
   const { data: relatedVideos, isLoading: relatedLoading } = useJapaneseRelatedVideos(id, 8);
@@ -38,31 +45,56 @@ export default function JapaneseWatch() {
   const rawPayload = video?.raw_payload as any;
   const allServers: Array<{ name: string; embed_url: string }> = rawPayload?.servers || [];
   
-  // Sort priority: VOE HD -> VidSpeed -> LuluStream
-  const sortedServers = [...allServers].sort((a, b) => {
-    const rank = (name: string) => {
-      const n = name.toLowerCase();
-      if (n.includes("voe")) return 0;
-      if (n.includes("vidspeed") || n.includes("vas")) return 1;
-      if (n.includes("lulu") || n.includes("luc")) return 2;
-      return 3;
+  // Sort priority: VidSpeed (highest uptime, zero sandbox blocks) -> LuluStream -> VOE HD -> FC2Stream -> Streamtape -> EarnVids
+  const sortedServers = useMemo(() => {
+    const list = [...allServers];
+    const rank = (name: string, url: string = "") => {
+      const n = (name + " " + url).toLowerCase();
+      if (n.includes("vidspeed") || n.includes("vas") || n.includes("vvaassjjav")) return 0;
+      if (n.includes("lulu") || n.includes("luc") || n.includes("luminscdn")) return 1;
+      if (n.includes("voe") || n.includes("caseyseemavoid")) return 2;
+      if (n.includes("fc2") || n.includes("fst")) return 3;
+      if (n.includes("streamtape") || n.includes("st")) return 4;
+      if (n.includes("earnvids") || n.includes("evs") || n.includes("vidhide")) return 5;
+      return 6;
     };
-    return rank(a.name) - rank(b.name);
-  });
+    return list.sort((a, b) => rank(a.name, a.embed_url) - rank(b.name, b.embed_url));
+  }, [allServers]);
 
-  // Keep only active, zero-error streaming mirrors (VOE HD, VidSpeed, LuluStream)
-  // Filters out Streamtape (hard-locked to supjav.com via anti-hotlink 404)
-  // and EarnVids (CDN tokens strictly hashed to client IP resulting in 403 loading lock)
-  const workingServers = sortedServers.filter((s) => {
-    const n = s.name.toLowerCase();
-    const u = s.embed_url.toLowerCase();
-    return (
-      n.includes("voe") || u.includes("voe.sx") || u.includes("caseyseemavoid") ||
-      n.includes("vidspeed") || n.includes("vas") || u.includes("vvaassjjav") ||
-      n.includes("lulu") || n.includes("luc") || u.includes("luminscdn")
-    );
-  });
-  const servers = workingServers.length > 0 ? workingServers : sortedServers;
+  // Keep all active streaming mirrors
+  const workingServers = useMemo(() => {
+    return sortedServers.filter((s) => {
+      const n = s.name.toLowerCase();
+      const u = (s.embed_url || "").toLowerCase();
+      return (
+        n.includes("vidspeed") || n.includes("vas") || u.includes("vvaassjjav") ||
+        n.includes("lulu") || n.includes("luc") || u.includes("luminscdn") ||
+        n.includes("voe") || u.includes("voe.sx") || u.includes("caseyseemavoid") ||
+        n.includes("fc2") || u.includes("fc2stream") ||
+        n.includes("streamtape") || u.includes("streamtape.com") ||
+        n.includes("earnvids") || u.includes("evsishere") || u.includes("vidhide")
+      );
+    });
+  }, [sortedServers]);
+
+  const effectiveServers = workingServers.length > 0 ? workingServers : sortedServers;
+
+  // Fallback to video.full_video_url if raw_payload.servers is empty
+  const servers = useMemo(() => {
+    if (effectiveServers.length > 0) return effectiveServers;
+    const fallback: Array<{ name: string; embed_url: string }> = [];
+    if (video?.full_video_url) {
+      const u = video.full_video_url.toLowerCase();
+      let label = "Primary Mirror";
+      if (u.includes("vidspeed") || u.includes("vas") || u.includes("vvaassjjav")) label = "VidSpeed";
+      else if (u.includes("lulu") || u.includes("luc") || u.includes("luminscdn")) label = "LuluStream";
+      else if (u.includes("voe") || u.includes("caseyseemavoid")) label = "VOE HD";
+      else if (u.includes("fc2")) label = "FC2Stream";
+      else if (u.includes("streamtape")) label = "Streamtape";
+      fallback.push({ name: label, embed_url: video.full_video_url });
+    }
+    return fallback;
+  }, [effectiveServers, video?.full_video_url]);
 
   const defaultEmbedUrl = servers[0]?.embed_url || rawPayload?.embed_url || video?.full_video_url || video?.trailer_preview_url;
   const activeEmbedUrl = selectedServerUrl || defaultEmbedUrl;
@@ -232,6 +264,7 @@ export default function JapaneseWatch() {
           <div className="relative aspect-video w-full max-h-[70vh] mx-auto bg-black rounded-2xl overflow-hidden shadow-2xl border border-border/30">
             {resolvedEmbedUrl ? (
               <iframe
+                key={`${resolvedEmbedUrl}-${playerKey}`}
                 src={resolvedEmbedUrl}
                 title={video.title}
                 referrerPolicy={iframeReferrerPolicy(resolvedEmbedUrl)}
@@ -258,27 +291,44 @@ export default function JapaneseWatch() {
           </div>
 
           {/* Multi-Server Mirror Switcher */}
-          {servers && servers.length > 1 && (
-            <div className="mt-3 flex flex-wrap items-center gap-2 p-3 rounded-xl bg-card/60 border border-border/40 text-xs">
-              <span className="text-muted-foreground font-medium flex items-center gap-1">
-                <Sparkle size={14} className="text-rose-400" /> Server Mirrors:
-              </span>
-              {servers.map((srv, idx) => {
-                const isSelected = activeEmbedUrl === srv.embed_url;
-                return (
-                  <button
-                    key={srv.name + idx}
-                    onClick={() => setSelectedServerUrl(srv.embed_url)}
-                    className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors cursor-pointer ${
-                      isSelected
-                        ? "bg-rose-500 text-white shadow-sm"
-                        : "bg-secondary/70 hover:bg-secondary text-muted-foreground hover:text-foreground border border-border/30"
-                    }`}
-                  >
-                    {srv.name}
-                  </button>
-                );
-              })}
+          {servers && servers.length > 0 && (
+            <div className="mt-3 flex flex-wrap items-center justify-between gap-2.5 p-3 rounded-xl bg-card/60 border border-border/40 text-xs shadow-xs">
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="text-muted-foreground font-semibold flex items-center gap-1.5">
+                  <Sparkle size={14} className="text-rose-400" /> Video Host / Server:
+                </span>
+                {servers.map((srv, idx) => {
+                  const isSelected = activeEmbedUrl === srv.embed_url;
+                  return (
+                    <button
+                      key={srv.name + idx}
+                      onClick={() => {
+                        setSelectedServerUrl(srv.embed_url);
+                        setPlayerKey((k) => k + 1);
+                      }}
+                      className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer flex items-center gap-1.5 ${
+                        isSelected
+                          ? "bg-rose-500 text-white shadow-md shadow-rose-500/25 ring-1 ring-rose-400"
+                          : "bg-secondary/70 hover:bg-secondary text-muted-foreground hover:text-foreground border border-border/30 hover:border-border"
+                      }`}
+                    >
+                      {isSelected && <Check size={12} weight="bold" className="text-white" />}
+                      <span>{srv.name}</span>
+                    </button>
+                  );
+                })}
+              </div>
+
+              {/* Quick reload button */}
+              <button
+                type="button"
+                onClick={() => setPlayerKey((k) => k + 1)}
+                className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-medium bg-secondary/60 hover:bg-secondary text-muted-foreground hover:text-foreground border border-border/30 transition-colors cursor-pointer"
+                title="Reload Current Host Player"
+              >
+                <ArrowClockwise size={13} />
+                <span>Reload</span>
+              </button>
             </div>
           )}
 
