@@ -34,9 +34,12 @@ try {
     const response = await page.goto(baseURL, { waitUntil: "domcontentloaded" });
     assert.ok(response && response.ok(), `${viewport.name}: homepage response is successful`);
 
-    // The site intentionally blocks the page behind its age-confirmation dialog.
-    // Dismiss it in the isolated browser context to exercise the actual homepage.
-    await page.getByRole("button", { name: /I am 18 or older.*Enter/i }).click();
+    // The site may conditionally show an age-confirmation dialog.
+    // Dismiss it if present in the isolated browser context to exercise the actual homepage.
+    const ageButton = page.getByRole("button", { name: /I am 18 or older.*Enter/i });
+    if (await ageButton.isVisible({ timeout: 2000 }).catch(() => false)) {
+      await ageButton.click();
+    }
     await page.getByRole("main").waitFor();
     await page.getByRole("search", { name: /search the recording archive/i }).waitFor();
 
