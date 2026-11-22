@@ -31,6 +31,9 @@ export function detectHostLabel(url: string): string {
     if (hostname.includes("anonmp4")) return "AnonMP4";
     if (hostname.includes("udrop")) return "UDrop";
     if (hostname.includes("vidmoly")) return "VidMoly";
+    if (hostname.includes("pimpbunny")) return "PimpBunny";
+    if (hostname.includes("sheeshfans")) return "SheeshFans";
+    if (hostname.includes("influencersgonewild")) return "InfluencersGoneWild";
     return hostname.replace(/^www\./, "");
   } catch {
     return "Server";
