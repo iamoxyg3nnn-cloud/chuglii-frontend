@@ -92,6 +92,45 @@ router.get("/player", async (req, res) => {
       }
     }
 
+    // SupJav and Partner Lockers (FC2Stream, LuluStream, EarnVids, Streamtape)
+    // Proxy with spoofed Referer: https://supjav.com/ to bypass domain restrictions
+    if (
+      destObj.hostname.includes("fc2stream") ||
+      destObj.hostname.includes("luminscdn") ||
+      destObj.hostname.includes("evsishere") ||
+      destObj.hostname.includes("earnvids") ||
+      destObj.hostname.includes("vidhide") ||
+      destObj.hostname.includes("streamtape")
+    ) {
+      const upstreamRes = await fetch(targetUrl, {
+        headers: {
+          "User-Agent": (req.headers["user-agent"] as string) || "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
+          Referer: "https://supjav.com/",
+          Accept: "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+        },
+      });
+
+      if (upstreamRes.ok) {
+        let body = await upstreamRes.text();
+        body = body.replace(/top\.location[^;]+;/g, "/* neutral */");
+        body = body.replace(/window\.location\.ancestorOrigins/g, '["https://supjav.com"]');
+        body = body.replace(/window\["CWmUGiWrLe"\]\(\)/g, "");
+        body = body.replace(/window\.open\([^)]*\)/g, "null");
+
+        const baseTag = `<base href="${destObj.origin}/">`;
+        if (body.includes("<head>")) {
+          body = body.replace("<head>", `<head>${baseTag}`);
+        } else {
+          body = baseTag + body;
+        }
+
+        res.setHeader("Content-Type", "text/html; charset=utf-8");
+        res.setHeader("Cache-Control", "public, max-age=1800");
+        res.send(body);
+        return;
+      }
+    }
+
     // Default redirect to targetUrl if no custom resolver
     res.redirect(targetUrl);
   } catch (err) {

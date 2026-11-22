@@ -105,8 +105,27 @@ export default function JapaneseWatch() {
   };
 
   const currentEmbedUrl = getCleanEmbedUrl(activeEmbedUrl);
-  // Pure direct embed without routing through non-existent /api/player (prevents SPA site nesting)
-  const resolvedEmbedUrl = currentEmbedUrl || null;
+
+  // Determine if host requires edge referer spoofing / unblocking proxy
+  const needsEdgeProxy = (urlStr: string | null) => {
+    if (!urlStr) return false;
+    const u = urlStr.toLowerCase();
+    // VOE HD works best directly (its anti-proxy script blocks proxies, but embeds cleanly directly)
+    if (u.includes("voe.sx") || u.includes("caseyseemavoid.com")) return false;
+    // Direct raw MP4 files (not streamtape) can play directly
+    if (u.endsWith(".mp4") && !u.includes("streamtape")) return false;
+    // All other hosts (FC2Stream, LuluStream, EarnVids, VidSpeed, Streamtape) MUST go through /api/player
+    // to bypass domain restrictions (Referer spoofing), CSP frame-ancestors, and rogue download triggers
+    return true;
+  };
+
+  const resolvedEmbedUrl = currentEmbedUrl
+    ? (needsEdgeProxy(currentEmbedUrl)
+        ? `/api/player?url=${encodeURIComponent(currentEmbedUrl)}`
+        : currentEmbedUrl)
+    : null;
+
+  const isVoe = Boolean(activeEmbedUrl && (activeEmbedUrl.includes("voe.sx") || activeEmbedUrl.includes("caseyseemavoid.com")));
 
   useEffect(() => {
     if (!id) return;
@@ -251,6 +270,7 @@ export default function JapaneseWatch() {
                 src={resolvedEmbedUrl}
                 title={video.title}
                 referrerPolicy={iframeReferrerPolicy(resolvedEmbedUrl)}
+                sandbox={isVoe ? undefined : "allow-scripts allow-same-origin allow-forms allow-presentation"}
                 allow="autoplay *; fullscreen *; picture-in-picture *; encrypted-media *; accelerometer *; gyroscope *; display-capture *; screen-wake-lock *; clipboard-write *"
                 allowFullScreen
                 className="w-full h-full border-none bg-black"

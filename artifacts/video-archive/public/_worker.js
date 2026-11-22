@@ -877,10 +877,9 @@ function extractEarnVidsStream(html) {
         }
       }
 
-      // 2. Direct lockers (VOE, LuluStream) can be redirected directly
+      // 2. Direct lockers (VOE only - never checks Referer)
       const isDirectLocker = destObj.hostname.includes("voe.sx") 
-        || destObj.hostname.includes("caseyseemavoid.com")
-        || destObj.hostname.includes("luminscdn.xyz");
+        || destObj.hostname.includes("caseyseemavoid.com");
 
       if (isDirectLocker) {
         return Response.redirect(targetUrl, 302);
@@ -950,9 +949,43 @@ function extractEarnVidsStream(html) {
         }
       }
 
-      // 5. Streamtape: Redirect directly to full embed URL (do NOT strip filename as it causes 404)
+      // 5. Streamtape Resolver: Proxy HTML with spoofed Referer and disarm rogue download triggers
       if (destObj.hostname.includes("streamtape.com")) {
-        return Response.redirect(targetUrl, 302);
+        try {
+          const stRes = await fetch(targetUrl, {
+            headers: {
+              "User-Agent": request.headers.get("user-agent") || "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
+              "Referer": "https://supjav.com/",
+              "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+            },
+          });
+          if (stRes.ok) {
+            let stHtml = await stRes.text();
+            // Disarm Streamtape adblock click-traps, top-level redirects, and rogue downloads
+            stHtml = stHtml.replace(/top\.location[^;]+;/g, "/* neutral */");
+            stHtml = stHtml.replace(/window\.location\.ancestorOrigins/g, '["https://supjav.com"]');
+            stHtml = stHtml.replace(/window\["CWmUGiWrLe"\]\(\)/g, "");
+            stHtml = stHtml.replace(/window\.open\([^)]*\)/g, "null");
+
+            const baseTag = `<base href="https://streamtape.com/">`;
+            if (stHtml.includes("<head>")) {
+              stHtml = stHtml.replace("<head>", `<head>${baseTag}`);
+            } else {
+              stHtml = baseTag + stHtml;
+            }
+
+            return new Response(stHtml, {
+              status: 200,
+              headers: {
+                "Content-Type": "text/html; charset=utf-8",
+                "Access-Control-Allow-Origin": "*",
+                "Cache-Control": "public, max-age=1800",
+              },
+            });
+          }
+        } catch (e) {
+          console.error("Streamtape proxy error:", e);
+        }
       }
 
       // 6. Generic Fallback Proxy (EarnVids / evsishere / legacy):
