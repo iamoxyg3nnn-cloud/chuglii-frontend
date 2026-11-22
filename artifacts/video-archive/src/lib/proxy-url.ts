@@ -38,6 +38,8 @@ const NO_PROXY_HOSTS: string[] = [
   // Loading directly avoids the server proxy 502 for expired URLs.
   "iili.io",
   "freeimage.host",
+  "buumal.com",
+  "img.buumal.com",
   // NOTE: imgchest.com was removed from this list on 2026-09-26. The old note
   // claimed it "returns 403 when loaded directly" — re-probed against
   // production and that is no longer true: cdn.imgchest.com answers 200 to a

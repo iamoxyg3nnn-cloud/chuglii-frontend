@@ -70,7 +70,7 @@ export default function MyanmarWatch() {
     setMeta("og:title", `${video.title} | Myanmar Video`, true);
     setMeta("og:description", `Watch ${video.title} on Chuglii.`, true);
     const ogThumb = video.clean_thumbnail_url || video.thumbnail_url || "";
-    setMeta("og:image", ogThumb.startsWith("http") ? `/api/media?url=${encodeURIComponent(ogThumb)}` : ogThumb, true);
+    setMeta("og:image", ogThumb, true);
     if (video.full_video_url) {
       setMeta("og:video", video.full_video_url, true);
       setMeta("og:video:type", "video/mp4", true);
@@ -105,24 +105,8 @@ export default function MyanmarWatch() {
     }
   };
 
-  const handleCopyStream = async () => {
-    if (!video) return;
-    try {
-      if (video.detail_url) {
-        const res = await fetch(`/api/player?url=${encodeURIComponent(video.detail_url)}&format=json`);
-        if (res.ok) {
-          const data = await res.json();
-          if (data?.stream_url && navigator.clipboard) {
-            await navigator.clipboard.writeText(data.stream_url);
-            setCopiedStream(true);
-            setTimeout(() => setCopiedStream(false), 2000);
-            return;
-          }
-        }
-      }
-    } catch {}
-
-    const stream = video.full_video_url;
+  const handleCopyStream = () => {
+    const stream = video?.detail_url || video?.full_video_url;
     if (stream && navigator.clipboard) {
       navigator.clipboard.writeText(stream);
       setCopiedStream(true);
@@ -162,10 +146,7 @@ export default function MyanmarWatch() {
     );
   }
 
-  const primaryStream = video.full_video_url;
-  const resolvedPlayerUrl = video.detail_url
-    ? `/api/player?url=${encodeURIComponent(video.detail_url)}`
-    : null;
+  const primaryStream = video.full_video_url || video.detail_url;
 
   return (
     <Layout>
@@ -202,18 +183,27 @@ export default function MyanmarWatch() {
             </div>
           </div>
 
-          {/* Video Player Container */}
+          {/* Video Player Cinema Frame - Masks website chrome, displays only video */}
           <div className="relative aspect-video w-full rounded-2xl overflow-hidden bg-black shadow-2xl border border-border/40">
-            {resolvedPlayerUrl ? (
-              <iframe
-                key={resolvedPlayerUrl}
-                src={resolvedPlayerUrl}
-                title={video.title}
-                referrerPolicy="no-referrer"
-                allow="autoplay *; fullscreen *; picture-in-picture *; encrypted-media *; accelerometer *; gyroscope *; display-capture *; screen-wake-lock *; clipboard-write *"
-                allowFullScreen
-                className="w-full h-full border-none bg-black"
-              />
+            {video.detail_url ? (
+              <div className="relative w-full h-full overflow-hidden bg-black">
+                <iframe
+                  key={video.detail_url}
+                  src={video.detail_url}
+                  title={video.title}
+                  referrerPolicy="no-referrer"
+                  allow="autoplay *; fullscreen *; picture-in-picture *; encrypted-media *; accelerometer *; gyroscope *"
+                  allowFullScreen
+                  className="w-full border-none bg-black pointer-events-auto"
+                  style={{
+                    position: "absolute",
+                    top: "-52px",
+                    left: "0",
+                    width: "100%",
+                    height: "calc(100% + 140px)",
+                  }}
+                />
+              </div>
             ) : isDirectMp4 && video.full_video_url ? (
               <video
                 ref={videoRef}
@@ -234,11 +224,11 @@ export default function MyanmarWatch() {
           {/* Video Action Toolbar */}
           <div className="mt-4 flex flex-wrap items-center justify-between gap-3">
             <div className="flex flex-wrap items-center gap-2">
-              {resolvedPlayerUrl && (
+              {video.detail_url && (
                 <button
                   onClick={() => {
                     const iframe = document.querySelector('iframe');
-                    if (iframe) iframe.src = resolvedPlayerUrl;
+                    if (iframe && video.detail_url) iframe.src = video.detail_url;
                   }}
                   className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-semibold bg-rose-500/20 text-rose-300 hover:bg-rose-500/30 border border-rose-500/40 transition-colors"
                 >
@@ -252,7 +242,7 @@ export default function MyanmarWatch() {
                 className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-semibold bg-secondary/80 hover:bg-secondary text-foreground border border-border/40 transition-colors"
               >
                 {copiedStream ? <Check size={14} className="text-emerald-400" /> : <LinkSimple size={14} />}
-                <span>{copiedStream ? "Direct Stream URL Copied" : "Copy Direct Stream"}</span>
+                <span>{copiedStream ? "Link Copied" : "Copy Link"}</span>
               </button>
 
               {video.detail_url && (
