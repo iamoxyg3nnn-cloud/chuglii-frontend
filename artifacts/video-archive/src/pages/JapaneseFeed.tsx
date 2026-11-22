@@ -66,6 +66,21 @@ export default function JapaneseFeed() {
     } catch {}
   }, []);
 
+  // Sync state if URL query params change externally (browser back/forward)
+  useEffect(() => {
+    const params = new URLSearchParams(searchString);
+    const cat = params.get("category") || "All";
+    const tag = params.get("tag") || "All";
+    const p = parseInt(params.get("page") || "1", 10);
+    const s = (params.get("sort") as JapaneseSortOption) || "newest";
+    const q = params.get("q") || "";
+    setActiveTab(cat !== "All" ? cat : tag);
+    setCurrentPage(p);
+    setActiveSort(s);
+    setSearchQuery(q);
+    setDebouncedSearch(q);
+  }, [searchString]);
+
   const updateUrl = useCallback(
     (opts: { tab?: string; page?: number; sort?: JapaneseSortOption; q?: string }) => {
       const p = new URLSearchParams();
@@ -162,24 +177,67 @@ export default function JapaneseFeed() {
               </p>
             </div>
 
-            {/* Search Input Bar */}
-            <div className="w-full md:w-80">
+            {/* Search Input Bar & Quick Chips */}
+            <div className="w-full md:w-96">
               <div className="relative">
                 <MagnifyingGlass size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-muted-foreground" />
                 <input
                   type="text"
-                  placeholder="Search code (FC2PPV...), actor, tag..."
+                  placeholder="Search code (FC2, ROYD, MISM), actor, tag..."
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
-                  className="w-full pl-9 pr-9 py-2.5 rounded-xl bg-secondary/80 border border-border/40 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-rose-500/50 transition-all"
+                  className="w-full pl-9 pr-9 py-2.5 rounded-xl bg-secondary/80 border border-border/40 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-rose-500/50 transition-all shadow-inner"
                 />
                 {searchQuery && (
                   <button
-                    onClick={() => setSearchQuery("")}
-                    className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                    onClick={() => {
+                      setSearchQuery("");
+                      setDebouncedSearch("");
+                      setCurrentPage(1);
+                      updateUrl({ q: "", page: 1 });
+                    }}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground cursor-pointer"
                   >
                     <X size={14} />
                   </button>
+                )}
+              </div>
+
+              {/* Active Search Count & Quick Filter Chips */}
+              <div className="flex flex-wrap items-center gap-1.5 mt-2.5 text-xs">
+                {debouncedSearch ? (
+                  <div className="inline-flex items-center gap-2 px-2.5 py-1 rounded-lg bg-rose-500/10 border border-rose-500/20 text-rose-400 font-medium text-[11px]">
+                    <span>Showing {totalCount.toLocaleString()} releases for &ldquo;{debouncedSearch}&rdquo;</span>
+                    <button
+                      onClick={() => {
+                        setSearchQuery("");
+                        setDebouncedSearch("");
+                        setCurrentPage(1);
+                        updateUrl({ q: "", page: 1 });
+                      }}
+                      className="hover:text-white underline cursor-pointer"
+                    >
+                      Clear
+                    </button>
+                  </div>
+                ) : (
+                  <div className="flex flex-wrap items-center gap-1.5 text-muted-foreground/80">
+                    <span className="text-[11px] font-medium mr-0.5 text-muted-foreground/60">Popular:</span>
+                    {["FC2-PPV", "Uncensored", "Amateur", "Squirting", "Slim", "Decensored"].map((kw) => (
+                      <button
+                        key={kw}
+                        onClick={() => {
+                          setSearchQuery(kw);
+                          setDebouncedSearch(kw);
+                          setCurrentPage(1);
+                          updateUrl({ q: kw, page: 1 });
+                        }}
+                        className="px-2 py-0.5 rounded-md bg-secondary/60 hover:bg-secondary hover:text-foreground text-[11px] transition-colors cursor-pointer border border-border/30"
+                      >
+                        {kw}
+                      </button>
+                    ))}
+                  </div>
                 )}
               </div>
             </div>
