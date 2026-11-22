@@ -49,8 +49,8 @@ export function useScrapedVideos(options: UseScrapedVideosOptions = {}) {
     queryFn: async () => {
       const sb = await getSupabase();
       
-      const p_tag = tag && tag !== "All" ? tag : null;
-      const p_category = category && category !== "All" ? category : null;
+      const p_tag = tag && tag.toLowerCase() !== "all" ? tag.trim().toLowerCase() : null;
+      const p_category = category && !["all", "viral-mms"].includes(category.toLowerCase()) ? category.trim().toLowerCase() : null;
       const p_search = search && search.trim().length > 0 ? search.trim() : null;
 
       // Parallel fetch items and total count

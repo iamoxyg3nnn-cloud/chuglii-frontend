@@ -25,8 +25,9 @@ const TAG_TABS = [
   { id: "desi", label: "Desi MMS" },
   { id: "bhabhi", label: "Bhabhi" },
   { id: "indian", label: "Indian" },
-  { id: "viral", label: "Viral Clips" },
+  { id: "viral-mms", label: "Viral Clips" },
   { id: "pakistani", label: "Pakistani" },
+  { id: "bangladesi", label: "Bangladeshi" },
   { id: "web-series", label: "Web Series" },
   { id: "amateur", label: "Amateur" },
   { id: "teen", label: "Teen" },
@@ -50,7 +51,7 @@ export default function LeakFeed() {
 
   // Parse query params from URL
   const queryParams = new URLSearchParams(searchString);
-  const initialCategory = queryParams.get("category") || "indian";
+  const initialCategory = queryParams.get("category") || "viral-mms";
   const initialTag = queryParams.get("tag") || "All";
   const initialPage = parseInt(queryParams.get("page") || "1", 10);
   const initialSort = (queryParams.get("sort") as ScrapedSortOption) || "newest";
@@ -73,10 +74,22 @@ export default function LeakFeed() {
     } catch {}
   }, []);
 
+  // Update URL query params
+  const updateQueryParams = useCallback((cat: string, tag: string, page: number, sort: ScrapedSortOption, q: string) => {
+    const params = new URLSearchParams();
+    if (cat && !["all", "viral-mms"].includes(cat.toLowerCase())) params.set("category", cat);
+    if (tag && tag.toLowerCase() !== "all") params.set("tag", tag);
+    if (page > 1) params.set("page", page.toString());
+    if (sort && sort !== "newest") params.set("sort", sort);
+    if (q && q.trim().length > 0) params.set("q", q.trim());
+    const str = params.toString();
+    setLocation(str ? `/leak?${str}` : "/leak", { replace: true });
+  }, [setLocation]);
+
   // Sync state if URL query params change externally
   useEffect(() => {
     const params = new URLSearchParams(searchString);
-    const cat = params.get("category") || "indian";
+    const cat = params.get("category") || "viral-mms";
     const tag = params.get("tag") || "All";
     const p = parseInt(params.get("page") || "1", 10);
     const s = (params.get("sort") as ScrapedSortOption) || "newest";
@@ -89,16 +102,17 @@ export default function LeakFeed() {
     setDebouncedSearch(q);
   }, [searchString]);
 
-  // Debounce search input
+  // Debounce search input and keep URL in sync
   useEffect(() => {
     const timer = setTimeout(() => {
       setDebouncedSearch(searchQuery);
       if (searchQuery !== initialSearch) {
         setCurrentPage(1);
+        updateQueryParams(activeCategory, activeTag, 1, activeSort, searchQuery);
       }
-    }, 350);
+    }, 400);
     return () => clearTimeout(timer);
-  }, [searchQuery, initialSearch]);
+  }, [searchQuery, initialSearch, activeCategory, activeTag, activeSort, updateQueryParams]);
 
   // Sync Document Title for SEO
   useEffect(() => {
@@ -114,18 +128,6 @@ export default function LeakFeed() {
       document.title = prev;
     };
   }, [debouncedSearch, activeTag]);
-
-  // Update URL query params
-  const updateQueryParams = useCallback((cat: string, tag: string, page: number, sort: ScrapedSortOption, q: string) => {
-    const params = new URLSearchParams();
-    if (cat && cat !== "all") params.set("category", cat);
-    if (tag && tag !== "All") params.set("tag", tag);
-    if (page > 1) params.set("page", page.toString());
-    if (sort && sort !== "newest") params.set("sort", sort);
-    if (q && q.trim().length > 0) params.set("q", q.trim());
-    const str = params.toString();
-    setLocation(str ? `/leak?${str}` : "/leak");
-  }, [setLocation]);
 
   const handleTagClick = (tag: string) => {
     setActiveTag(tag);
@@ -148,10 +150,11 @@ export default function LeakFeed() {
   };
 
   // Query Hook - filtered by the parent scraper category & internal tag
-  const queryTag = activeTag === "Saved" || activeTag === "All" ? undefined : activeTag;
+  const queryCategory = activeCategory && !["all", "viral-mms"].includes(activeCategory.toLowerCase()) ? activeCategory : undefined;
+  const queryTag = activeTag === "Saved" || activeTag === "All" || activeTag === "viral-mms" ? undefined : activeTag;
 
   const { data, isLoading, isFetching, refetch } = useScrapedVideos({
-    category: activeCategory,
+    category: queryCategory,
     tag: queryTag,
     search: debouncedSearch || undefined,
     sort: activeSort,
@@ -269,7 +272,7 @@ export default function LeakFeed() {
                 ) : (
                   <div className="flex flex-wrap items-center gap-1.5 text-muted-foreground/80">
                     <span className="text-[11px] font-medium mr-0.5 text-muted-foreground/60">Popular:</span>
-                    {["Bhabhi", "Desi MMS", "Pakistani", "Indian", "Amateur", "Village", "Web Series"].map((kw) => (
+                    {["Bhabhi", "Desi", "Pakistani", "Indian", "Bangladeshi", "Web Series", "College", "Amateur", "Village"].map((kw) => (
                       <button
                         key={kw}
                         onClick={() => {

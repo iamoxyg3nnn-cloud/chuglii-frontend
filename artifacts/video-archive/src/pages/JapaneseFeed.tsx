@@ -19,12 +19,13 @@ import {
 
 const JAV_TABS = [
   { id: "All", label: "All Japanese" },
-  { id: "uncensored", label: "Uncensored" },
+  { id: "uncensored-jav", label: "Uncensored" },
+  { id: "censored-jav", label: "Censored JAV" },
   { id: "amateur", label: "Amateur / FC2" },
+  { id: "reducing-mosaic", label: "Decensored / AI" },
   { id: "fc2ppv", label: "FC2-PPV" },
   { id: "chinese-subtitles", label: "Chinese Sub" },
   { id: "english-subtitles", label: "English Sub" },
-  { id: "reducing-mosaic", label: "Decensored / AI" },
   { id: "popular", label: "Popular" },
   { id: "Saved", label: "Saved" },
 ];
