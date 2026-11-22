@@ -803,6 +803,24 @@ function renderCleanHlsPlayer(streamingUrl, title = "", poster = "") {
             video.play().catch(function() {});
           });
         });
+        hls.on(Hls.Events.ERROR, function(event, data) {
+          if (data && data.fatal) {
+            switch (data.type) {
+              case Hls.ErrorTypes.NETWORK_ERROR:
+                console.warn("HLS Network error, reloading stream...", data);
+                hls.startLoad();
+                break;
+              case Hls.ErrorTypes.MEDIA_ERROR:
+                console.warn("HLS Media error, recovering...", data);
+                hls.recoverMediaError();
+                break;
+              default:
+                console.error("HLS fatal error:", data);
+                hls.destroy();
+                break;
+            }
+          }
+        });
       } else if (video.canPlayType('application/vnd.apple.mpegurl')) {
         video.src = streamUrl;
         video.addEventListener('loadedmetadata', function() {
@@ -876,7 +894,8 @@ function extractPackedStreamInfo(html) {
     }
 
     // 2. Check for jwplayer sources (LuluStream / LuluVDO)
-    const srcMatch = unpacked.match(/sources\s*:\s*\[\{\s*file\s*:\s*["']([^"']+)["']/i);
+    const srcMatch = unpacked.match(/sources\s*:\s*\[\s*\{\s*["']?file["']?\s*:\s*["']([^"']+)["']/i)
+      || unpacked.match(/["']?file["']?\s*:\s*["']([^"']+\.m3u8[^"']*)["']/i);
     if (srcMatch) {
       return {
         type: "sources",
@@ -1204,45 +1223,57 @@ function extractPackedStreamInfo(html) {
       }
 
       // 6. LuluStream Resolver (luminscdn.xyz / lulustream.com / luluvdo.com)
-      // Proxies LuluStream with Referer: https://supjav.com/, disarms adblock overlays, popup click-traps,
-      // and lets native JW8 player stream directly from tnmr.org without HLS stalls or sandbox errors
+      // Extracts direct HLS stream URL with client IP binding, serves pure ad-free Hls.js player directly (tnmr.org supports CORS *)
       if (destObj.hostname.includes("luminscdn") || destObj.hostname.includes("lulustream") || destObj.hostname.includes("luluvdo")) {
         try {
-          const luluRes = await fetch(targetUrl, {
-            headers: {
-              "User-Agent": request.headers.get("user-agent") || "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
-              "Referer": "https://supjav.com/",
-              "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
-            },
-          });
+          const clientIp = request.headers.get("cf-connecting-ip")
+            || request.headers.get("x-real-ip")
+            || (request.headers.get("x-forwarded-for") || "").split(",")[0].trim()
+            || "";
+          const luluHeaders = {
+            "User-Agent": request.headers.get("user-agent") || "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
+            "Referer": "https://supjav.com/",
+            "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+          };
+          if (clientIp) {
+            luluHeaders["X-Forwarded-For"] = clientIp;
+            luluHeaders["X-Real-IP"] = clientIp;
+            luluHeaders["CF-Connecting-IP"] = clientIp;
+          }
+          const luluRes = await fetch(targetUrl, { headers: luluHeaders });
           if (luluRes.ok) {
-            let luluHtml = await luluRes.text();
-            
-            // 1. Neutralize adblock overlay detection and triggers
-            luluHtml = luluHtml.replace(/showADBOverlay\(\)/g, "/* neutral */");
-            luluHtml = luluHtml.replace(/showGuardOverlay/g, "/* neutral */");
-            luluHtml = luluHtml.replace(/if\s*\(\s*window\.cRAds\s*===\s*undefined\s*\)\s*\{[^}]*\}/g, "");
-            luluHtml = luluHtml.replace(/if\s*\(\s*window\.justDetectAdblock\s*===\s*undefined\s*\)\s*\{[^}]*\}/g, "");
-            luluHtml = luluHtml.replace(/id="adbd"/g, 'id="adbd" style="display:none !important;"');
-
-            // 2. Disarm aggressive ad networks, top-level redirects and popup click-traps
-            luluHtml = luluHtml.replace(/<script[^>]*src=["'][^"']*(?:pop|dnsads)[^"']*["'][^>]*><\/script>/gi, "");
-            luluHtml = luluHtml.replace(/top\.location[^;]+;/g, "/* neutral */");
-            luluHtml = luluHtml.replace(/window\.location\.ancestorOrigins/g, '["https://supjav.com"]');
-            luluHtml = luluHtml.replace(/window\.open\([^)]*\)/g, "null");
-
-            // 3. Inject CSS overlay killswitch
-            const overlayKillCss = '<style>#adbd, .overdiv, .over_player_msg, .guard_overlay { display: none !important; opacity: 0 !important; pointer-events: none !important; }</style>';
-            
-            // 4. Inject <base> tag so relative JW Player assets and scripts load from destination host
-            const baseTag = `<base href="${destObj.origin}/">`;
-            if (luluHtml.includes("<head>")) {
-              luluHtml = luluHtml.replace("<head>", `<head>${baseTag}${overlayKillCss}`);
-            } else {
-              luluHtml = baseTag + overlayKillCss + luluHtml;
+            const luluHtml = await luluRes.text();
+            const streamInfo = extractPackedStreamInfo(luluHtml);
+            if (streamInfo && streamInfo.file) {
+              return new Response(renderCleanHlsPlayer(streamInfo.file, streamInfo.title || "LuluStream", streamInfo.poster), {
+                status: 200,
+                headers: {
+                  "Content-Type": "text/html; charset=utf-8",
+                  "Access-Control-Allow-Origin": "*",
+                  "Cache-Control": "no-store",
+                },
+              });
             }
 
-            return new Response(luluHtml, {
+            // Fallback: Sanitized native player without syntax errors or frame busters
+            let sanitized = luluHtml;
+            sanitized = sanitized.replace(/var\s+DT_IN_FRAME\s*=\s*[^;]+;/g, "var DT_IN_FRAME = false;");
+            sanitized = sanitized.replace(/function\s+stoppp\s*\([^)]*\)\s*\{[\s\S]*?\}/g, "function stoppp(){}");
+            sanitized = sanitized.replace(/function\s+showADBOverlay\s*\(\)\s*\{[\s\S]*?\}/g, "function showADBOverlay(){}");
+            sanitized = sanitized.replace(/function\s+showGuardOverlay\s*\([^)]*\)\s*\{[\s\S]*?\}/g, "function showGuardOverlay(){}");
+            sanitized = sanitized.replace(/top\.location[^;]+;/g, "/* neutral */");
+            sanitized = sanitized.replace(/window\.open\([^)]*\)/g, "null");
+            sanitized = sanitized.replace(/<script[^>]*src=["'][^"']*(?:pop|dnsads|adsco)[^"']*["'][^>]*><\/script>/gi, "");
+
+            const overlayKillCss = '<style>#adbd, .overdiv, .over_player_msg, .guard_overlay { display: none !important; opacity: 0 !important; pointer-events: none !important; }</style>';
+            const baseTag = `<base href="${destObj.origin}/">`;
+            if (sanitized.includes("<head>")) {
+              sanitized = sanitized.replace("<head>", `<head>${baseTag}${overlayKillCss}`);
+            } else {
+              sanitized = baseTag + overlayKillCss + sanitized;
+            }
+
+            return new Response(sanitized, {
               status: 200,
               headers: {
                 "Content-Type": "text/html; charset=utf-8",
