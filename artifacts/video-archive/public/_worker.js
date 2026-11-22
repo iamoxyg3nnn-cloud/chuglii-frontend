@@ -672,6 +672,7 @@ async function handleApi(request, env, url) {
       if (targetUrl.includes("pixhost.to")) referer = "https://pixhost.to/";
       else if (targetUrl.includes("catbox.moe")) referer = "https://catbox.moe/";
       else if (targetUrl.includes("imgpile.com")) referer = "https://imgpile.com/";
+      else if (targetUrl.includes("buumal.com")) referer = "https://www.buumal.com/";
 
       const upstreamRes = await fetch(targetUrl, {
         headers: {
@@ -904,7 +905,60 @@ function extractEarnVidsStream(html) {
         return Response.redirect(targetUrl, 302);
       }
 
-      // 6. Generic Fallback Proxy (EarnVids / evsishere / legacy):
+      // 6. Buu Mal Resolver (buumal.com - Myanmar leaks)
+      // Extracts fresh Cloudflare R2 presigned MP4 stream, renders clean native video player (zero website chrome)
+      if (destObj.hostname.includes("buumal.com")) {
+        try {
+          const buuRes = await fetch(targetUrl, {
+            headers: {
+              "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
+              "Referer": "https://www.buumal.com/",
+              "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+            },
+          });
+          if (buuRes.ok) {
+            const buuHtml = await buuRes.text();
+            const streamMatch = buuHtml.match(/<source\s+[^>]*src=["']([^"']+)["']/i) ||
+                                buuHtml.match(/src=["'](https:\/\/[^"']+\.r2\.cloudflarestorage\.com\/[^"']+)["']/i);
+            if (streamMatch && streamMatch[1]) {
+              const freshStreamUrl = streamMatch[1].replace(/&amp;/g, "&");
+              const titleMatch = buuHtml.match(/<title>([^<]+)<\/title>/i);
+              const posterMatch = buuHtml.match(/poster=["']([^"']+)["']/i);
+              const pageTitle = titleMatch ? titleMatch[1].replace(/\|.*$/, "").replace(/Buu\s*Mal\s*\(.*?\)/gi, "").trim() : "Myanmar Video";
+              const poster = posterMatch ? posterMatch[1] : "";
+
+              if (url.searchParams.get("format") === "json") {
+                return new Response(JSON.stringify({
+                  success: true,
+                  stream_url: freshStreamUrl,
+                  title: pageTitle,
+                  poster: poster,
+                }), {
+                  status: 200,
+                  headers: {
+                    "Content-Type": "application/json",
+                    "Access-Control-Allow-Origin": "*",
+                    "Cache-Control": "public, max-age=1800",
+                  },
+                });
+              }
+
+              return new Response(renderCleanHlsPlayer(freshStreamUrl, pageTitle, poster), {
+                status: 200,
+                headers: {
+                  "Content-Type": "text/html; charset=utf-8",
+                  "Access-Control-Allow-Origin": "*",
+                  "Cache-Control": "public, max-age=1800",
+                },
+              });
+            }
+          }
+        } catch (e) {
+          console.error("BuuMal resolve error:", e);
+        }
+      }
+
+      // 7. Generic Fallback Proxy (EarnVids / evsishere / legacy):
       // Edge worker proxies the HTML with spoofed Referer: https://supjav.com/ and injects <base>
       let referer = "https://supjav.com/";
       if (targetUrl.includes("mmsvibex")) referer = "https://mmsvibex.life/";

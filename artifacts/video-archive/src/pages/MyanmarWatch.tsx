@@ -29,8 +29,6 @@ export default function MyanmarWatch() {
   const [copied, setCopied] = useState(false);
   const [copiedStream, setCopiedStream] = useState(false);
   const [isSaved, setIsSaved] = useState(false);
-  const [streamError, setStreamError] = useState(false);
-  const [forceEmbed, setForceEmbed] = useState(false);
 
   const { data: video, isLoading, error } = useMyanmarVideoById(id);
   const { data: relatedVideos, isLoading: relatedLoading } = useMyanmarRelatedVideos(id, 8);
@@ -71,7 +69,8 @@ export default function MyanmarWatch() {
     setMeta("description", `Watch ${video.title} on Chuglii. High quality Myanmar leaks & private video archives.`);
     setMeta("og:title", `${video.title} | Myanmar Video`, true);
     setMeta("og:description", `Watch ${video.title} on Chuglii.`, true);
-    setMeta("og:image", video.clean_thumbnail_url || video.thumbnail_url || "", true);
+    const ogThumb = video.clean_thumbnail_url || video.thumbnail_url || "";
+    setMeta("og:image", ogThumb.startsWith("http") ? `/api/media?url=${encodeURIComponent(ogThumb)}` : ogThumb, true);
     if (video.full_video_url) {
       setMeta("og:video", video.full_video_url, true);
       setMeta("og:video:type", "video/mp4", true);
@@ -106,8 +105,24 @@ export default function MyanmarWatch() {
     }
   };
 
-  const handleCopyStream = () => {
-    const stream = video?.full_video_url;
+  const handleCopyStream = async () => {
+    if (!video) return;
+    try {
+      if (video.detail_url) {
+        const res = await fetch(`/api/player?url=${encodeURIComponent(video.detail_url)}&format=json`);
+        if (res.ok) {
+          const data = await res.json();
+          if (data?.stream_url && navigator.clipboard) {
+            await navigator.clipboard.writeText(data.stream_url);
+            setCopiedStream(true);
+            setTimeout(() => setCopiedStream(false), 2000);
+            return;
+          }
+        }
+      }
+    } catch {}
+
+    const stream = video.full_video_url;
     if (stream && navigator.clipboard) {
       navigator.clipboard.writeText(stream);
       setCopiedStream(true);
@@ -148,6 +163,9 @@ export default function MyanmarWatch() {
   }
 
   const primaryStream = video.full_video_url;
+  const resolvedPlayerUrl = video.detail_url
+    ? `/api/player?url=${encodeURIComponent(video.detail_url)}`
+    : null;
 
   return (
     <Layout>
@@ -186,27 +204,24 @@ export default function MyanmarWatch() {
 
           {/* Video Player Container */}
           <div className="relative aspect-video w-full rounded-2xl overflow-hidden bg-black shadow-2xl border border-border/40">
-            {!forceEmbed && !streamError && isDirectMp4 && video.full_video_url ? (
+            {resolvedPlayerUrl ? (
+              <iframe
+                key={resolvedPlayerUrl}
+                src={resolvedPlayerUrl}
+                title={video.title}
+                referrerPolicy="no-referrer"
+                allow="autoplay *; fullscreen *; picture-in-picture *; encrypted-media *; accelerometer *; gyroscope *; display-capture *; screen-wake-lock *; clipboard-write *"
+                allowFullScreen
+                className="w-full h-full border-none bg-black"
+              />
+            ) : isDirectMp4 && video.full_video_url ? (
               <video
                 ref={videoRef}
                 src={video.full_video_url}
                 poster={video.clean_thumbnail_url || video.thumbnail_url || undefined}
                 controls
                 playsInline
-                onError={() => {
-                  console.warn("Direct MP4 stream expired or unavailable, failing over to embed player...");
-                  setStreamError(true);
-                }}
                 className="w-full h-full object-contain"
-              />
-            ) : video.detail_url ? (
-              <iframe
-                src={video.detail_url}
-                title={video.title}
-                referrerPolicy="no-referrer"
-                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share; fullscreen"
-                allowFullScreen
-                className="w-full h-full border-none bg-black"
               />
             ) : (
               <div className="w-full h-full flex flex-col items-center justify-center p-6 text-center text-muted-foreground">
@@ -219,29 +234,26 @@ export default function MyanmarWatch() {
           {/* Video Action Toolbar */}
           <div className="mt-4 flex flex-wrap items-center justify-between gap-3">
             <div className="flex flex-wrap items-center gap-2">
-              {/* Mirror / Player Switcher */}
-              {video.detail_url && isDirectMp4 && (
+              {resolvedPlayerUrl && (
                 <button
                   onClick={() => {
-                    setForceEmbed(!forceEmbed);
-                    if (streamError) setStreamError(false);
+                    const iframe = document.querySelector('iframe');
+                    if (iframe) iframe.src = resolvedPlayerUrl;
                   }}
                   className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-semibold bg-rose-500/20 text-rose-300 hover:bg-rose-500/30 border border-rose-500/40 transition-colors"
                 >
                   <Sparkle size={14} className="text-rose-400" />
-                  <span>{forceEmbed || streamError ? "Try Direct MP4" : "Switch to Embed Player"}</span>
+                  <span>Reload Player</span>
                 </button>
               )}
 
-              {primaryStream && (
-                <button
-                  onClick={handleCopyStream}
-                  className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-semibold bg-secondary/80 hover:bg-secondary text-foreground border border-border/40 transition-colors"
-                >
-                  {copiedStream ? <Check size={14} className="text-emerald-400" /> : <LinkSimple size={14} />}
-                  <span>{copiedStream ? "Direct Stream URL Copied" : "Copy Direct Stream"}</span>
-                </button>
-              )}
+              <button
+                onClick={handleCopyStream}
+                className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-semibold bg-secondary/80 hover:bg-secondary text-foreground border border-border/40 transition-colors"
+              >
+                {copiedStream ? <Check size={14} className="text-emerald-400" /> : <LinkSimple size={14} />}
+                <span>{copiedStream ? "Direct Stream URL Copied" : "Copy Direct Stream"}</span>
+              </button>
 
               {video.detail_url && (
                 <a

@@ -10,16 +10,30 @@ interface MyanmarCardProps {
 }
 
 export function MyanmarCard({ video, isSaved = false, onToggleSave }: MyanmarCardProps) {
-  const [imageError, setImageError] = useState(false);
+  const [useFallback, setUseFallback] = useState(false);
+  const [failed, setFailed] = useState(false);
   const [justSaved, setJustSaved] = useState(false);
 
-  const thumbUrl = imageError
-    ? "/placeholder-thumb.jpg"
-    : (video.clean_thumbnail_url || video.thumbnail_url || "/placeholder-thumb.jpg");
+  const rawThumb = video.clean_thumbnail_url || video.thumbnail_url || "";
 
-  const proxiedThumb = thumbUrl.startsWith("http")
-    ? `/api/media?url=${encodeURIComponent(thumbUrl)}`
-    : thumbUrl;
+  // 1. Proxied edge URL with spoofed Referer: https://www.buumal.com/
+  // 2. Direct upstream URL with referrerPolicy="no-referrer"
+  // 3. Static fallback placeholder
+  const imageSrc = failed
+    ? "/placeholder-thumb.jpg"
+    : useFallback
+    ? (rawThumb || "/placeholder-thumb.jpg")
+    : rawThumb
+    ? (rawThumb.startsWith("http") ? `/api/media?url=${encodeURIComponent(rawThumb)}` : rawThumb)
+    : "/placeholder-thumb.jpg";
+
+  const handleImageError = () => {
+    if (!useFallback && rawThumb) {
+      setUseFallback(true);
+    } else {
+      setFailed(true);
+    }
+  };
 
   const handleSaveClick = (e: React.MouseEvent) => {
     e.preventDefault();
@@ -39,11 +53,12 @@ export function MyanmarCard({ video, isSaved = false, onToggleSave }: MyanmarCar
       <Link href={`/myanmar/video/${video.id}`}>
         <div className="relative aspect-[16/10] w-full overflow-hidden bg-muted/40 cursor-pointer">
           <img
-            src={proxiedThumb}
+            src={imageSrc}
             alt={video.title}
             loading="lazy"
             decoding="async"
-            onError={() => setImageError(true)}
+            referrerPolicy="no-referrer"
+            onError={handleImageError}
             className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
           />
 
