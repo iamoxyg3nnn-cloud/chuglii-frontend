@@ -34,10 +34,10 @@ try {
     const response = await page.goto(baseURL, { waitUntil: "domcontentloaded" });
     assert.ok(response && response.ok(), `${viewport.name}: homepage response is successful`);
 
-    // The site may conditionally show an age-confirmation dialog.
+    // The site may show an age-confirmation dialog.
     // Dismiss it if present in the isolated browser context to exercise the actual homepage.
-    const ageButton = page.getByRole("button", { name: /I am 18 or older.*Enter/i });
-    if (await ageButton.isVisible({ timeout: 2000 }).catch(() => false)) {
+    const ageButton = page.locator("#btn-confirm-age, button:has-text('over 18')").first();
+    if (await ageButton.isVisible({ timeout: 5000 }).catch(() => false)) {
       await ageButton.click();
     }
     await page.getByRole("main").waitFor();
