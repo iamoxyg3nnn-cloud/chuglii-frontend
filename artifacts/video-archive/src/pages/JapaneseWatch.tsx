@@ -112,9 +112,12 @@ export default function JapaneseWatch() {
     const u = urlStr.toLowerCase();
     // VOE HD works best directly (its anti-proxy script blocks proxies, but embeds cleanly directly)
     if (u.includes("voe.sx") || u.includes("caseyseemavoid.com")) return false;
+    // LuluStream (luminscdn / lulustream / luluvdo) strictly binds HLS tokens to client TCP socket IP.
+    // Must embed directly with referrerpolicy="no-referrer" so client's browser generates and plays token directly without 403 / infinite stalls
+    if (u.includes("luminscdn") || u.includes("lulustream") || u.includes("luluvdo")) return false;
     // Direct raw MP4 files (not streamtape) can play directly
     if (u.endsWith(".mp4") && !u.includes("streamtape")) return false;
-    // All other hosts (FC2Stream, LuluStream, EarnVids, VidSpeed, Streamtape) MUST go through /api/player
+    // All other hosts (FC2Stream, EarnVids, VidSpeed, Streamtape) MUST go through /api/player
     // to bypass domain restrictions (Referer spoofing), CSP frame-ancestors, and rogue download triggers
     return true;
   };

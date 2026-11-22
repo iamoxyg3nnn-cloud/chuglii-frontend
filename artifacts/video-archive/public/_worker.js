@@ -937,7 +937,7 @@ function extractPackedStreamInfo(html) {
       } else if (targetObj.hostname.includes("internetchicks")) {
         referer = "https://internetchicks.com/";
       } else if (targetObj.hostname.includes("pimpbunny")) {
-        referer = "https://pimpbunny.net/";
+        referer = "https://pimpbunny.com/";
       }
 
       const reqHeaders = {
@@ -1223,68 +1223,10 @@ function extractPackedStreamInfo(html) {
       }
 
       // 6. LuluStream Resolver (luminscdn.xyz / lulustream.com / luluvdo.com)
-      // Extracts direct HLS stream URL with client IP binding, serves pure ad-free Hls.js player directly (tnmr.org supports CORS *)
+      // LuluStream strictly binds HLS stream tokens to client TCP socket IP ($remote_addr).
+      // Redirect directly to target embed so client's real browser negotiates and plays token directly without 403 / infinite stalls
       if (destObj.hostname.includes("luminscdn") || destObj.hostname.includes("lulustream") || destObj.hostname.includes("luluvdo")) {
-        try {
-          const clientIp = request.headers.get("cf-connecting-ip")
-            || request.headers.get("x-real-ip")
-            || (request.headers.get("x-forwarded-for") || "").split(",")[0].trim()
-            || "";
-          const luluHeaders = {
-            "User-Agent": request.headers.get("user-agent") || "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
-            "Referer": "https://supjav.com/",
-            "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
-          };
-          if (clientIp) {
-            luluHeaders["X-Forwarded-For"] = clientIp;
-            luluHeaders["X-Real-IP"] = clientIp;
-            luluHeaders["CF-Connecting-IP"] = clientIp;
-          }
-          const luluRes = await fetch(targetUrl, { headers: luluHeaders });
-          if (luluRes.ok) {
-            const luluHtml = await luluRes.text();
-            const streamInfo = extractPackedStreamInfo(luluHtml);
-            if (streamInfo && streamInfo.file) {
-              return new Response(renderCleanHlsPlayer(streamInfo.file, streamInfo.title || "LuluStream", streamInfo.poster), {
-                status: 200,
-                headers: {
-                  "Content-Type": "text/html; charset=utf-8",
-                  "Access-Control-Allow-Origin": "*",
-                  "Cache-Control": "no-store",
-                },
-              });
-            }
-
-            // Fallback: Sanitized native player without syntax errors or frame busters
-            let sanitized = luluHtml;
-            sanitized = sanitized.replace(/var\s+DT_IN_FRAME\s*=\s*[^;]+;/g, "var DT_IN_FRAME = false;");
-            sanitized = sanitized.replace(/function\s+stoppp\s*\([^)]*\)\s*\{[\s\S]*?\}/g, "function stoppp(){}");
-            sanitized = sanitized.replace(/function\s+showADBOverlay\s*\(\)\s*\{[\s\S]*?\}/g, "function showADBOverlay(){}");
-            sanitized = sanitized.replace(/function\s+showGuardOverlay\s*\([^)]*\)\s*\{[\s\S]*?\}/g, "function showGuardOverlay(){}");
-            sanitized = sanitized.replace(/top\.location[^;]+;/g, "/* neutral */");
-            sanitized = sanitized.replace(/window\.open\([^)]*\)/g, "null");
-            sanitized = sanitized.replace(/<script[^>]*src=["'][^"']*(?:pop|dnsads|adsco)[^"']*["'][^>]*><\/script>/gi, "");
-
-            const overlayKillCss = '<style>#adbd, .overdiv, .over_player_msg, .guard_overlay { display: none !important; opacity: 0 !important; pointer-events: none !important; }</style>';
-            const baseTag = `<base href="${destObj.origin}/">`;
-            if (sanitized.includes("<head>")) {
-              sanitized = sanitized.replace("<head>", `<head>${baseTag}${overlayKillCss}`);
-            } else {
-              sanitized = baseTag + overlayKillCss + sanitized;
-            }
-
-            return new Response(sanitized, {
-              status: 200,
-              headers: {
-                "Content-Type": "text/html; charset=utf-8",
-                "Access-Control-Allow-Origin": "*",
-                "Cache-Control": "no-store",
-              },
-            });
-          }
-        } catch (e) {
-          console.error("LuluStream resolve error:", e);
-        }
+        return Response.redirect(targetUrl, 302);
       }
 
       // 7. Streamtape Resolver: Proxy HTML with spoofed Referer and disarm rogue download triggers
