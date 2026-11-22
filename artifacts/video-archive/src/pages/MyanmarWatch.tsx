@@ -25,6 +25,23 @@ export default function MyanmarWatch() {
   const { id } = useParams<{ id: string }>();
   const [, setLocation] = useLocation();
   const videoRef = useRef<HTMLVideoElement | null>(null);
+  const frameContainerRef = useRef<HTMLDivElement | null>(null);
+  const [frameScale, setFrameScale] = useState(1);
+
+  useEffect(() => {
+    const el = frameContainerRef.current;
+    if (!el) return;
+    const updateScale = () => {
+      const w = el.clientWidth;
+      if (w > 0) {
+        setFrameScale(w / 776);
+      }
+    };
+    updateScale();
+    const observer = new ResizeObserver(updateScale);
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, []);
 
   const [copied, setCopied] = useState(false);
   const [copiedStream, setCopiedStream] = useState(false);
@@ -184,9 +201,20 @@ export default function MyanmarWatch() {
           </div>
 
           {/* Video Player Cinema Frame - Masks website chrome, displays only video */}
-          <div className="relative aspect-video w-full rounded-2xl overflow-hidden bg-black shadow-2xl border border-border/40">
+          <div
+            ref={frameContainerRef}
+            className="relative w-full aspect-[776/480] rounded-2xl overflow-hidden bg-black shadow-2xl border border-border/40"
+          >
             {video.detail_url ? (
-              <div className="relative w-full h-full overflow-hidden bg-black">
+              <div
+                className="absolute top-0 left-0 bg-black pointer-events-auto"
+                style={{
+                  width: "776px",
+                  height: "480px",
+                  transformOrigin: "top left",
+                  transform: `scale(${frameScale})`,
+                }}
+              >
                 <iframe
                   key={video.detail_url}
                   src={video.detail_url}
@@ -194,13 +222,13 @@ export default function MyanmarWatch() {
                   referrerPolicy="no-referrer"
                   allow="autoplay *; fullscreen *; picture-in-picture *; encrypted-media *; accelerometer *; gyroscope *"
                   allowFullScreen
-                  className="w-full border-none bg-black pointer-events-auto"
+                  className="border-none bg-black pointer-events-auto"
                   style={{
                     position: "absolute",
-                    top: "-52px",
-                    left: "0",
-                    width: "100%",
-                    height: "calc(100% + 140px)",
+                    top: "-162px",
+                    left: "-56px",
+                    width: "1280px",
+                    height: "750px",
                   }}
                 />
               </div>
