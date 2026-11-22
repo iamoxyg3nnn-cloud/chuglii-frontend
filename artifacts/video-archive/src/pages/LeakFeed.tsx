@@ -3,6 +3,7 @@ import { Link, useLocation, useSearch } from "wouter";
 import { Layout } from "@/components/Layout";
 import { useScrapedVideos, type ScrapedVideo, type ScrapedSortOption } from "@/hooks/useScrapedVideos";
 import { AppPagination } from "@/components/ui/app-pagination";
+import { LeakCard, LeakCardSkeleton } from "@/components/LeakCard";
 import {
   Flame,
   Play,
@@ -166,25 +167,21 @@ export default function LeakFeed() {
   const totalCount = data?.total || 0;
   const totalPages = data?.totalPages || 1;
 
-  // Client-side filter for Saved tab
-  const videos = Array.isArray(rawVideos)
+  // Client-side filter for Saved tab and guarantee unique IDs in the feed
+  const filteredVideos = Array.isArray(rawVideos)
     ? (activeTag === "Saved" ? rawVideos.filter((v) => savedIds.includes(v.id)) : rawVideos)
     : [];
+  const videos = Array.from(new Map(filteredVideos.map((v) => [v.id, v])).values());
 
-  // Active hover preview state
-  const [hoveredVideoId, setHoveredVideoId] = useState<string | null>(null);
-  const hoverTimeoutRef = useRef<NodeJS.Timeout | null>(null);
-
-  const handleMouseEnter = (id: string) => {
-    if (hoverTimeoutRef.current) clearTimeout(hoverTimeoutRef.current);
-    hoverTimeoutRef.current = setTimeout(() => {
-      setHoveredVideoId(id);
-    }, 200);
-  };
-
-  const handleMouseLeave = () => {
-    if (hoverTimeoutRef.current) clearTimeout(hoverTimeoutRef.current);
-    setHoveredVideoId(null);
+  const handleToggleSave = (id: string) => {
+    let next: string[];
+    if (savedIds.includes(id)) {
+      next = savedIds.filter((x) => x !== id);
+    } else {
+      next = [id, ...savedIds];
+    }
+    setSavedIds(next);
+    localStorage.setItem("chuglii_saved_leaks", JSON.stringify(next));
   };
 
   return (
@@ -359,13 +356,13 @@ export default function LeakFeed() {
           </div>
         </section>
 
-        {/* Video Grid Section matching Browse grid */}
+        {/* Video Grid Section matching Homepage / Browse grid */}
         <section className="px-4 sm:px-6 lg:px-8 py-8">
           <div className="container mx-auto max-w-7xl">
             {isLoading ? (
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-x-4 gap-y-8">
                 {Array.from({ length: 12 }).map((_, i) => (
-                  <div key={i} className="aspect-video bg-muted/40 rounded-xl animate-pulse" />
+                  <LeakCardSkeleton key={i} />
                 ))}
               </div>
             ) : videos.length === 0 ? (
@@ -392,120 +389,15 @@ export default function LeakFeed() {
                 )}
               </div>
             ) : (
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-5 sm:gap-6">
-                {videos.map((item) => {
-                  const isHovered = hoveredVideoId === item.id;
-                  const isSaved = savedIds.includes(item.id);
-
-                  return (
-                    <div
-                      key={item.id}
-                      className="group flex flex-col bg-card/40 border border-border/40 hover:border-rose-500/50 hover:shadow-xl rounded-2xl overflow-hidden transition-all duration-200"
-                      onMouseEnter={() => handleMouseEnter(item.id)}
-                      onMouseLeave={handleMouseLeave}
-                    >
-                      {/* Media container */}
-                      <Link href={`/leak/video/${item.id}`}>
-                        <div className="relative aspect-video w-full bg-muted/60 overflow-hidden cursor-pointer">
-                          {isHovered && item.trailer_preview_url ? (
-                            <video
-                              src={item.trailer_preview_url}
-                              autoPlay
-                              muted
-                              loop
-                              playsInline
-                              className="w-full h-full object-cover transition-opacity duration-200"
-                            />
-                          ) : (
-                            <img
-                              src={item.clean_thumbnail_url || item.thumbnail_url || undefined}
-                              alt={item.title}
-                              loading="lazy"
-                              className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
-                            />
-                          )}
-
-                          {/* Duration Badge */}
-                          {item.duration_formatted && (
-                            <div className="absolute bottom-2 right-2 px-1.5 py-0.5 rounded-md bg-black/80 backdrop-blur-xs text-[11px] font-semibold text-white tracking-wide">
-                              {item.duration_formatted}
-                            </div>
-                          )}
-
-                          {/* MP4 Stream Available indicator */}
-                          {item.full_video_url && (
-                            <div className="absolute top-2 left-2 px-1.5 py-0.5 rounded-md bg-rose-500/90 text-white text-[10px] font-bold uppercase tracking-wider shadow-sm">
-                              HD Stream
-                            </div>
-                          )}
-
-                          {/* Hover Play Icon overlay */}
-                          <div className="absolute inset-0 bg-black/20 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-                            <div className="w-10 h-10 rounded-full bg-rose-500/90 text-white flex items-center justify-center shadow-lg transform scale-75 group-hover:scale-100 transition-transform">
-                              <Play size={18} weight="fill" className="ml-0.5" />
-                            </div>
-                          </div>
-
-                          {/* Saved icon badge */}
-                          {isSaved && (
-                            <div className="absolute top-2 right-2 p-1 rounded-md bg-rose-500 text-white shadow-sm">
-                              <BookmarkSimple size={12} weight="fill" />
-                            </div>
-                          )}
-                        </div>
-                      </Link>
-
-                      {/* Content Card Body */}
-                      <div className="p-3.5 flex flex-col flex-1 justify-between gap-2">
-                        <div>
-                          <Link href={`/leak/video/${item.id}`}>
-                            <h3 className="font-semibold text-sm line-clamp-2 text-foreground group-hover:text-rose-400 transition-colors cursor-pointer leading-snug">
-                              {item.title}
-                            </h3>
-                          </Link>
-
-                          {/* Performer / Actor badge */}
-                          {item.actors && item.actors.length > 0 && (
-                            <div className="flex items-center gap-1 mt-1.5 text-[11px] text-rose-400 font-medium">
-                              <User size={12} className="shrink-0" />
-                              <span className="line-clamp-1 capitalize">{item.actors[0].replace(/-/g, " ")}</span>
-                            </div>
-                          )}
-
-                          {/* Tags snippet */}
-                          {item.tags && item.tags.length > 0 && (
-                            <div className="flex flex-wrap gap-1 mt-2">
-                              {item.tags.slice(0, 3).map((t) => (
-                                <button
-                                  key={t}
-                                  onClick={(e) => {
-                                    e.preventDefault();
-                                    handleTagClick(t);
-                                  }}
-                                  className="text-[10px] text-muted-foreground hover:text-rose-400 px-1.5 py-0.5 rounded bg-secondary/80 transition-colors"
-                                >
-                                  #{t}
-                                </button>
-                              ))}
-                            </div>
-                          )}
-                        </div>
-
-                        {/* Card Footer: views & rating */}
-                        <div className="flex items-center justify-between text-[11px] text-muted-foreground pt-2 border-t border-border/30">
-                          <span className="flex items-center gap-1 font-medium">
-                            <Eye size={12} /> {item.views_raw || "0 views"}
-                          </span>
-                          {item.rating_raw && (
-                            <span className="flex items-center gap-1 text-emerald-400 font-semibold">
-                              <ThumbsUp size={11} weight="fill" /> {item.rating_raw}
-                            </span>
-                          )}
-                        </div>
-                      </div>
-                    </div>
-                  );
-                })}
+              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-x-4 gap-y-8 animate-fade-in-up">
+                {videos.map((item) => (
+                  <LeakCard
+                    key={item.id}
+                    video={item}
+                    isSaved={savedIds.includes(item.id)}
+                    onToggleSave={handleToggleSave}
+                  />
+                ))}
               </div>
             )}
 

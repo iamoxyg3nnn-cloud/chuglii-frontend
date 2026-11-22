@@ -146,9 +146,10 @@ export default function JapaneseFeed() {
   });
 
   const rawVideos = data?.items || [];
-  const displayVideos = isSavedTab
+  const filteredVideos = isSavedTab
     ? rawVideos.filter((v) => savedIds.includes(v.id))
     : rawVideos;
+  const displayVideos = Array.from(new Map(filteredVideos.map((v) => [v.id, v])).values());
 
   const totalCount = isSavedTab ? savedIds.length : (data?.total || 0);
   const totalPages = isSavedTab

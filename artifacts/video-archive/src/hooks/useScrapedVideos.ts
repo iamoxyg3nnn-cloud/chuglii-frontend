@@ -75,7 +75,8 @@ export function useScrapedVideos(options: UseScrapedVideosOptions = {}) {
       if (itemsResp.error) throw itemsResp.error;
       if (countResp.error) throw countResp.error;
 
-      const items = (itemsResp.data as ScrapedVideo[]) || [];
+      const rawItems = (itemsResp.data as ScrapedVideo[]) || [];
+      const items = Array.from(new Map(rawItems.map((v) => [v.id, v])).values());
       const total = Number(countResp.data || 0);
       const totalPages = Math.ceil(total / limit);
 

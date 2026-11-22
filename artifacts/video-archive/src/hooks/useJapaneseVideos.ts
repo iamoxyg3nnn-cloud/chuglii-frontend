@@ -79,7 +79,8 @@ export function useJapaneseVideos(options: UseJapaneseVideosOptions = {}) {
       if (itemsResp.error) throw itemsResp.error;
       if (countResp.error) throw countResp.error;
 
-      const items = (itemsResp.data as JapaneseVideo[]) || [];
+      const rawItems = (itemsResp.data as JapaneseVideo[]) || [];
+      const items = Array.from(new Map(rawItems.map((v) => [v.id, v])).values());
       const total = Number(countResp.data || 0);
       const totalPages = Math.ceil(total / limit);
 
