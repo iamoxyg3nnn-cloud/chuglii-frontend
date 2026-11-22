@@ -234,6 +234,7 @@ export default function JapaneseWatch() {
                 src={resolvedEmbedUrl}
                 title={video.title}
                 referrerPolicy="no-referrer"
+                sandbox="allow-scripts allow-same-origin allow-forms allow-presentation"
                 allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share; fullscreen"
                 allowFullScreen
                 className="w-full h-full border-none bg-black"
