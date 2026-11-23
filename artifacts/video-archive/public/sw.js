@@ -24,7 +24,10 @@ const TTL = {
 
 const IMAGE_EXTENSIONS = /\.(jpg|jpeg|png|webp|gif|avif|svg)(\?|$)/i;
 const MEDIA_EXTENSIONS = /\.(jpg|jpeg|png|webp|gif|avif|svg|mp4|webm|mov)(\?|$)/i;
-const CACHEABLE_TYPES = /^(image\/|video\/|application\/octet-stream)/i;
+// Only cache image/static media in SW. Large/progressive videos and Range
+// requests are risky to cache here (signed URLs, storage, Range slicing).
+const VIDEO_EXTENSIONS = /\.(mp4|webm|mov|m4v|m3u8)(\?|$)/i;
+const CACHEABLE_TYPES = /^(image\/|application\/octet-stream)/i;
 
 // ─── TTL detection ──────────────────────────────────────────────────────────
 
@@ -295,10 +298,13 @@ self.addEventListener("fetch", (event) => {
   // cross-origin media we do a plain pass-through and let the browser handle
   // timing/retries itself. The IDB blob cache (image-cache.ts) still caches
   // cross-origin images client-side for repeat visits.
+  const pathAndQuery = url.pathname + url.search;
+  const isVideoLike = VIDEO_EXTENSIONS.test(pathAndQuery) || url.pathname.startsWith("/api/player/stream");
   const isMediaRequest =
-    request.destination === "image" ||
-    IMAGE_EXTENSIONS.test(url.pathname) ||
-    (url.pathname.endsWith("/api/media") && MEDIA_EXTENSIONS.test(url.search));
+    !isVideoLike &&
+    (request.destination === "image" ||
+      IMAGE_EXTENSIONS.test(url.pathname) ||
+      (url.pathname.endsWith("/api/media") && MEDIA_EXTENSIONS.test(url.search)));
 
   if (isMediaRequest && url.origin === self.location.origin) {
     event.respondWith(mediaCacheFirst(request));

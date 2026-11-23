@@ -242,7 +242,8 @@ function Router() {
         <Route path="/japanese" component={JapaneseFeed} />
         <Route path="/myanmar/video/:id" component={MyanmarWatch} />
         <Route path="/myanmar" component={MyanmarFeed} />
-        <Route path="/onlyfans/video/:id" component={OnlyfansWatch} />
+        <Route path="/onlyfans/:site/video/:id" component={OnlyfansWatch} />
+        <Route path="/onlyfans/:site" component={OnlyfansFeed} />
         <Route path="/onlyfans" component={OnlyfansFeed} />
         <Route path="/premium" component={Premium} />
         <Route path="/login" component={Login} />

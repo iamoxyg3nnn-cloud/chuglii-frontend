@@ -49,14 +49,30 @@ export interface OnlyfansVideo {
       quality_score?: number;
       quality_label?: string;
     }>;
+    screenshots?: string[];
+    gallery?: string[];
     headers?: Record<string, string>;
     [key: string]: any;
   };
 }
 
 export type OnlyfansSortOption = "newest" | "views" | "rating" | "quality" | "oldest";
+export const ONLYFANS_SITES = ["internetchicks", "influencersgonewild", "sheeshfans", "pimpbunny"] as const;
+export type OnlyfansSite = (typeof ONLYFANS_SITES)[number];
+
+export const ONLYFANS_SITE_LABELS: Record<OnlyfansSite, string> = {
+  internetchicks: "Internet Chicks",
+  influencersgonewild: "Influencers Gone Wild",
+  sheeshfans: "SheeshFans",
+  pimpbunny: "PimpBunny",
+};
+
+export function isOnlyfansSite(site: string | undefined): site is OnlyfansSite {
+  return Boolean(site && (ONLYFANS_SITES as readonly string[]).includes(site));
+}
 
 export interface UseOnlyfansVideosOptions {
+  site?: OnlyfansSite;
   tag?: string;
   category?: string;
   search?: string;
@@ -66,23 +82,26 @@ export interface UseOnlyfansVideosOptions {
 }
 
 export function useOnlyfansVideos(options: UseOnlyfansVideosOptions = {}) {
-  const { tag, category, search, sort = "newest", limit = 24, page = 1 } = options;
+  const { site, tag, category, search, sort = "newest", limit = 24, page = 1 } = options;
   const offset = Math.max(0, (page - 1) * limit);
 
-  const queryKey = ["onlyfans-videos", { tag, category, search, sort, limit, page }];
+  const queryKey = ["onlyfans-videos", { site, tag, category, search, sort, limit, page }];
 
   return useQuery({
     queryKey,
+    enabled: Boolean(site),
     queryFn: async () => {
+      if (!site) return { items: [], total: 0, page, totalPages: 0, limit };
       const sb = await getSupabase();
       
       const p_tag = tag && tag.toLowerCase() !== "all" ? tag.trim().toLowerCase() : null;
       const p_category = category && !["all", "onlyfans"].includes(category.toLowerCase()) ? category.trim().toLowerCase() : null;
       const p_search = search && search.trim().length > 0 ? search.trim() : null;
 
+      // Use canonical OnlyFans RPCs. Per-source pimpbunny table has duplicate/dirty rows.
       const [itemsResp, countResp] = await Promise.all([
-        sb.rpc("scraper_get_onlyfans_videos", {
-          p_source_site: null,
+        sb.rpc(`scraper_get_onlyfans_videos`, {
+          p_source_site: site,
           p_tag,
           p_category,
           p_search,
@@ -90,8 +109,8 @@ export function useOnlyfansVideos(options: UseOnlyfansVideosOptions = {}) {
           p_limit: limit,
           p_offset: offset,
         }),
-        sb.rpc("scraper_count_onlyfans_videos", {
-          p_source_site: null,
+        sb.rpc(`scraper_count_onlyfans_videos`, {
+          p_source_site: site,
           p_tag,
           p_category,
           p_search,
@@ -102,12 +121,11 @@ export function useOnlyfansVideos(options: UseOnlyfansVideosOptions = {}) {
       if (countResp.error) throw countResp.error;
 
       const rawItems = (itemsResp.data as OnlyfansVideo[]) || [];
-      const items = Array.from(new Map(rawItems.map((v) => [v.id, v])).values());
       const total = Number(countResp.data || 0);
       const totalPages = Math.ceil(total / limit);
 
       return {
-        items,
+        items: rawItems,
         total,
         page,
         totalPages,
@@ -118,31 +136,32 @@ export function useOnlyfansVideos(options: UseOnlyfansVideosOptions = {}) {
   });
 }
 
-export function useOnlyfansVideoById(id: string | undefined) {
+export function useOnlyfansVideoById(site: OnlyfansSite | undefined, id: string | undefined) {
   return useQuery({
-    queryKey: ["onlyfans-video-detail", id],
-    enabled: Boolean(id),
+    queryKey: ["onlyfans-video-detail", site, id],
+    enabled: Boolean(site && id),
     queryFn: async (): Promise<OnlyfansVideo | null> => {
-      if (!id) return null;
+      if (!site || !id) return null;
       const sb = await getSupabase();
-      const { data, error } = await sb.rpc("scraper_get_onlyfans_video_by_id", { p_id: id });
+      const { data, error } = await sb.rpc(`scraper_get_onlyfans_video_by_id`, { p_id: id });
       if (error) throw error;
       const list = (data as OnlyfansVideo[]) || [];
-      return list.length > 0 ? list[0] : null;
+      const match = list.find((v) => !site || v.source_site === site) || list[0] || null;
+      return match;
     },
     staleTime: 1000 * 60 * 10,
   });
 }
 
-export function useOnlyfansRelatedVideos(id: string | undefined, limit: number = 8) {
+export function useOnlyfansRelatedVideos(site: OnlyfansSite | undefined, id: string | undefined, limit: number = 8) {
   return useQuery({
-    queryKey: ["onlyfans-related-videos", id, limit],
-    enabled: Boolean(id),
+    queryKey: ["onlyfans-related-videos", site, id, limit],
+    enabled: Boolean(site && id),
     queryFn: async (): Promise<OnlyfansVideo[]> => {
-      if (!id) return [];
+      if (!site || !id) return [];
       const sb = await getSupabase();
-      const { data, error } = await sb.rpc("scraper_get_onlyfans_videos", {
-        p_source_site: null,
+      const { data, error } = await sb.rpc(`scraper_get_onlyfans_videos`, {
+        p_source_site: site,
         p_tag: null,
         p_category: null,
         p_search: null,

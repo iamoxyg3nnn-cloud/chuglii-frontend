@@ -1,9 +1,16 @@
 import { useRef, useState, useEffect, useMemo } from "react";
 import { useParams, Link, useLocation } from "wouter";
 import { Layout } from "@/components/Layout";
+import { VideoPlayer } from "@/components/VideoPlayer";
 import { iframeReferrerPolicy, detectHostLabel } from "@/lib/video-hosts";
 import { proxyImageUrl } from "@/lib/proxy-url";
-import { useOnlyfansVideoById, useOnlyfansRelatedVideos, type OnlyfansVideo } from "@/hooks/useOnlyfansVideos";
+import {
+  useOnlyfansVideoById,
+  useOnlyfansRelatedVideos,
+  isOnlyfansSite,
+  ONLYFANS_SITE_LABELS,
+  type OnlyfansVideo,
+} from "@/hooks/useOnlyfansVideos";
 import { OnlyfansCard } from "@/components/OnlyfansCard";
 import {
   ArrowLeft,
@@ -23,11 +30,66 @@ import {
   User,
   Broadcast,
   ArrowClockwise,
-  ArrowSquareOut
+  ArrowSquareOut,
+  CaretDown
 } from "@phosphor-icons/react";
 
+/**
+ * Several historical IGW CDN hostnames no longer resolve. cdn04 serves the
+ * same video paths, so normalize every host before handing the URL to the
+ * player (or to the stream proxy).
+ */
+function normalizeStreamUrl(url: string): string {
+  return url.replace(/cdn\d+\.influencersgonewild\.net/gi, "cdn04.influencersgonewild.net");
+}
+
+function isDirectMediaUrl(url: string): boolean {
+  try {
+    return /\.(mp4|webm)\/?$/i.test(new URL(url, window.location.origin).pathname);
+  } catch {
+    return /\.(mp4|webm)(?:\?|$)/i.test(url);
+  }
+}
+
+function formatQualityLabel(raw: unknown, url?: string): string {
+  const text = String(raw || "").trim();
+  // Some stored records accidentally contain full URLs as quality labels.
+  const fromUrl = (value: string) => {
+    try {
+      const u = new URL(value, window.location.origin);
+      const m = u.pathname.match(/(?<!\d)(2160|1440|1080|720|480|360)p?(?!\d)/i);
+      if (m) return `${m[1]}p`;
+      const slugQ = u.pathname.match(/\/(2160p|1440p|1080p|720p|480p|360p|4k)\/?$/i);
+      if (slugQ) return slugQ[1].toUpperCase().replace("4K", "4K");
+    } catch {}
+    const m = value.match(/(?<!\d)(2160|1440|1080|720|480|360)p?(?!\d)/i);
+    return m ? `${m[1]}p` : "";
+  };
+
+  if (/^https?:\/\//i.test(text)) return fromUrl(text) || "Original";
+  if (/\b(2160|1440|1080|720|480|360)p?\b/i.test(text)) return fromUrl(text) || text;
+  const fromMedia = url ? fromUrl(url) : "";
+  if (fromMedia) return fromMedia;
+  return text || "Original";
+}
+
+/** Hosts that require a spoofed Referer / Range-capable proxy for direct MP4s. */
+function needsStreamProxy(url: string): boolean {
+  const u = url.toLowerCase();
+  // PimpBunny direct get_file URLs must load from browser with no-referrer;
+  // worker proxy gets Bunny-Shield blocked and redirecting through it leaks referer.
+  if (u.includes("pimpbunny.com/get_file/")) return false;
+  return (
+    u.includes("influencersgonewild") ||
+    u.includes("sheeshfans") ||
+    u.includes("pimpbunny") ||
+    u.includes("internetchicks")
+  );
+}
+
 export default function OnlyfansWatch() {
-  const { id } = useParams<{ id: string }>();
+  const { site: routeSite, id } = useParams<{ site: string; id: string }>();
+  const site = isOnlyfansSite(routeSite) ? routeSite : undefined;
   const [, setLocation] = useLocation();
 
   const [copied, setCopied] = useState(false);
@@ -35,14 +97,23 @@ export default function OnlyfansWatch() {
   const [isSaved, setIsSaved] = useState(false);
   const [selectedServerUrl, setSelectedServerUrl] = useState<string | null>(null);
   const [playerKey, setPlayerKey] = useState(0);
+  const [pimpbunnyEmbedStalled, setPimpbunnyEmbedStalled] = useState(false);
+  const [pimpbunnyEmbedLoaded, setPimpbunnyEmbedLoaded] = useState(false);
+  const [pbResolvedServers, setPbResolvedServers] = useState<Array<{ server: string; url: string; quality_score?: number; quality_label?: string }>>([]);
+  const pbResolveAttempted = useRef<string | null>(null);
+  const videoPlayerRef = useRef<HTMLVideoElement>(null);
+  const pendingQualitySwitch = useRef<{ time: number; resume: boolean } | null>(null);
+  const autoQualityApplied = useRef<string | null>(null);
 
   // Reset selected server whenever navigating to a different video
   useEffect(() => {
     setSelectedServerUrl(null);
+    setPbResolvedServers([]);
+    pbResolveAttempted.current = null;
   }, [id]);
 
-  const { data: video, isLoading, error } = useOnlyfansVideoById(id);
-  const { data: relatedVideos, isLoading: relatedLoading } = useOnlyfansRelatedVideos(id, 8);
+  const { data: video, isLoading, error } = useOnlyfansVideoById(site, id);
+  const { data: relatedVideos, isLoading: relatedLoading } = useOnlyfansRelatedVideos(site, id, 8);
 
   const rawPayload = video?.raw_payload as any;
 
@@ -51,41 +122,69 @@ export default function OnlyfansWatch() {
     const rawList: any[] = rawPayload?.servers || rawPayload?.mirrors || [];
     const list: Array<{ server: string; url: string; quality_score?: number; quality_label?: string }> = [];
 
+    const pushUnique = (item: { server: string; url: string; quality_score?: number; quality_label?: string }) => {
+      if (!item.url || list.some((m) => m.url === item.url)) return;
+      list.push(item);
+    };
+
     for (const item of rawList) {
       let u = item.embed_url || item.url || "";
       if (!u) continue;
-      // Normalize dead influencersgonewild cdn hostnames to active cdn04
-      if (u.includes(".influencersgonewild.net/")) {
-        u = u.replace(/cdn\d+\.influencersgonewild\.net/, "cdn04.influencersgonewild.net");
-      }
-      const label = item.name || item.server || detectHostLabel(u);
-      list.push({
-        server: label,
-        url: u,
-        quality_score: item.quality_score,
-        quality_label: item.quality_label,
-      });
+      u = normalizeStreamUrl(u);
+      const isPimpBunnySourcePlayer = video?.source_site === "pimpbunny" && /\/embed\//i.test(u);
+      const qLabel = isPimpBunnySourcePlayer ? "Source player" : formatQualityLabel(item.quality_label || item.name || item.server, u);
+      const label = isPimpBunnySourcePlayer
+        ? "PimpBunny source player"
+        : (video?.source_site === "pimpbunny" ? `PimpBunny ${qLabel}` : (item.name || item.server || detectHostLabel(u)));
+      pushUnique({ server: label, url: u, quality_score: item.quality_score, quality_label: qLabel });
     }
 
-    const primaryUrl = video?.full_video_url || "";
+    // Prefer fresh on-demand PimpBunny renditions when available.
+    if (pbResolvedServers.length > 0) {
+      for (const s of pbResolvedServers) {
+        const u = normalizeStreamUrl(s.url);
+        const qLabel = formatQualityLabel(s.quality_label || s.server, u);
+        pushUnique({ server: s.server || `PimpBunny ${qLabel}`, url: u, quality_score: s.quality_score, quality_label: qLabel });
+      }
+    }
 
+    const primaryUrl = normalizeStreamUrl(video?.full_video_url || "");
     if (primaryUrl && !list.some((m) => m.url === primaryUrl)) {
+      const primaryLabel =
+        video?.source_site === "pimpbunny" && /\/embed\//i.test(primaryUrl)
+          ? "Source player"
+          : formatQualityLabel(video?.quality_label, primaryUrl) || "1080p Full HD";
       list.unshift({
-        server: "Primary Stream",
+        server: video?.source_site === "pimpbunny" && !/\/embed\//i.test(primaryUrl) ? `PimpBunny ${primaryLabel}` : "Primary Stream",
         url: primaryUrl,
         quality_score: video?.quality_score || 1080,
-        quality_label: video?.quality_label || "1080p Full HD",
+        quality_label: primaryLabel,
       });
     }
 
-    return list;
-  }, [rawPayload, video]);
+    const DEAD_FIRST_HOSTS = ["streamtape", "vidoza"];
+    const isDemoted = (url: string) => DEAD_FIRST_HOSTS.some((h) => url.toLowerCase().includes(h));
+    const ranked = [...list.filter((s) => !isDemoted(s.url)), ...list.filter((s) => isDemoted(s.url))];
+    // Sort direct PimpBunny renditions by quality desc, keep embed/source-player last.
+    if (video?.source_site === "pimpbunny") {
+      const direct = ranked.filter((s) => isDirectMediaUrl(s.url)).sort((a, b) => (b.quality_score || 0) - (a.quality_score || 0));
+      const other = ranked.filter((s) => !isDirectMediaUrl(s.url));
+      return [...direct, ...other];
+    }
+    return ranked;
+  }, [rawPayload, video, pbResolvedServers]);
 
-  const activeUrl = selectedServerUrl || (allServers.length > 0 ? allServers[0].url : video?.full_video_url);
+  const activeUrl =
+    selectedServerUrl ||
+    (allServers.length > 0 ? allServers[0].url : normalizeStreamUrl(video?.full_video_url || ""));
 
-  // Check if active URL is a true direct MP4 video file
-  const isDirectMp4 = useMemo(() => {
+  // Check if active URL is a true direct video file, not an embed page.
+  const isDirectVideo = useMemo(() => {
     if (!activeUrl) return false;
+    let pathname = activeUrl.toLowerCase();
+    try {
+      pathname = new URL(activeUrl, window.location.origin).pathname.toLowerCase();
+    } catch {}
     const u = activeUrl.toLowerCase();
     // Exclude iframe locker and embed patterns
     if (
@@ -99,24 +198,228 @@ export default function OnlyfansWatch() {
     ) {
       return false;
     }
-    return u.endsWith(".mp4") || u.includes(".mp4?") || u.includes("/video.mp4");
+    return /\.(mp4|webm)\/?$/.test(pathname);
   }, [activeUrl]);
 
-  // If direct MP4 from influencersgonewild, proxy through /api/player/stream with Referer & Range support
+  const pimpbunnyQualityVariants = useMemo(() => {
+    if (video?.source_site !== "pimpbunny") return [];
+    return allServers.filter((server) => isDirectMediaUrl(server.url));
+  }, [allServers, video?.source_site]);
+  const showPimpbunnyQualitySelect = pimpbunnyQualityVariants.length > 1;
+
+  const pickSmartQuality = useMemo(() => {
+    return (variants: Array<{ url: string; quality_score?: number; quality_label?: string }>) => {
+      if (variants.length === 0) return null;
+      const conn = (navigator as any).connection;
+      const saveData = Boolean(conn?.saveData);
+      const et = String(conn?.effectiveType || "").toLowerCase();
+      const downlink = Number(conn?.downlink || 0);
+      const smallScreen = typeof window !== "undefined" ? window.innerWidth < 768 : false;
+      let target = 1080;
+      if (saveData || et === "slow-2g" || et === "2g" || (downlink > 0 && downlink < 1.5)) target = 480;
+      else if (et === "3g" || (downlink > 0 && downlink < 4) || smallScreen) target = 720;
+      else target = 1080;
+      const scoreOf = (v: any) => {
+        const m = String(v.quality_label || v.url || "").match(/(2160|1440|1080|720|480|360)/);
+        return m ? Number(m[1]) : Number(v.quality_score || 0);
+      };
+      const sorted = [...variants].sort((a,b) => scoreOf(b) - scoreOf(a));
+      const exactOrLower = sorted.find((v) => scoreOf(v) <= target);
+      return exactOrLower || sorted[sorted.length - 1] || sorted[0];
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!video?.id) return;
+    if (selectedServerUrl) return;
+    if (video.source_site !== "pimpbunny") return;
+    if (pimpbunnyQualityVariants.length === 0) return;
+    if (autoQualityApplied.current === video.id) return;
+    const picked = pickSmartQuality(pimpbunnyQualityVariants);
+    if (picked?.url) {
+      autoQualityApplied.current = video.id;
+      setSelectedServerUrl(picked.url);
+    }
+  }, [video?.id, video?.source_site, selectedServerUrl, pimpbunnyQualityVariants, pickSmartQuality]);
+
+  // If stored PimpBunny direct URLs expired/blocked, resolve fresh renditions on demand.
+  useEffect(() => {
+    if (video?.source_site !== "pimpbunny") return;
+    if (pbResolvedServers.length > 0) return;
+    const detail = video?.detail_url;
+    if (!detail || pbResolveAttempted.current === detail) return;
+    pbResolveAttempted.current = detail;
+    let cancelled = false;
+    (async () => {
+      try {
+        const r = await fetch(`/api/player?url=${encodeURIComponent(detail)}&format=json`, {
+          headers: { Accept: "application/json" },
+        });
+        if (!r.ok) return;
+        const data = await r.json();
+        const streams = Array.isArray(data?.streams) ? data.streams : [];
+        if (cancelled || streams.length === 0) return;
+        const mapped = streams
+          .filter((s: any) => s?.url && /pimpbunny\.com/i.test(String(s.url)))
+          .map((s: any) => ({
+            server: `PimpBunny ${s.label || (s.quality ? `${s.quality}p` : "Original")}`,
+            url: String(s.url),
+            quality_score: Number(s.quality) || 0,
+            quality_label: s.label || (s.quality ? `${s.quality}p` : "Original"),
+          }));
+        if (mapped.length > 0) setPbResolvedServers(mapped);
+      } catch {}
+    })();
+    return () => { cancelled = true; };
+  }, [video?.source_site, video?.detail_url, pbResolvedServers.length]);
+
+  const isDirectHls = useMemo(() => {
+    if (!activeUrl) return false;
+    try {
+      return new URL(activeUrl, window.location.origin).pathname.toLowerCase().endsWith(".m3u8");
+    } catch {
+      return activeUrl.toLowerCase().includes(".m3u8");
+    }
+  }, [activeUrl]);
+
+  // Cross-origin iframes do not expose playback state. Only show the fallback
+  // if the iframe document itself never loads; a pause or quality change is
+  // not evidence that the player is stalled.
+  useEffect(() => {
+    setPimpbunnyEmbedLoaded(false);
+    setPimpbunnyEmbedStalled(false);
+  }, [activeUrl, playerKey]);
+
+  useEffect(() => {
+    if (
+      !activeUrl ||
+      isDirectVideo ||
+      isDirectHls ||
+      !activeUrl.toLowerCase().includes("pimpbunny.com") ||
+      pimpbunnyEmbedLoaded
+    ) return;
+
+    const timeout = window.setTimeout(() => setPimpbunnyEmbedStalled(true), 18000);
+    return () => window.clearTimeout(timeout);
+  }, [activeUrl, isDirectVideo, isDirectHls, playerKey, pimpbunnyEmbedLoaded]);
+
+  useEffect(() => {
+    if (!activeUrl) return;
+    let origin = "";
+    try { origin = new URL(activeUrl, window.location.origin).origin; } catch { return; }
+    if (!origin || origin === window.location.origin) return;
+    const id = "va-video-preconnect";
+    let link = document.getElementById(id) as HTMLLinkElement | null;
+    if (!link) {
+      link = document.createElement("link");
+      link.id = id;
+      link.rel = "preconnect";
+      link.crossOrigin = "anonymous";
+      document.head.appendChild(link);
+    }
+    link.href = origin;
+    return () => { /* keep latest; cleaned on next change */ };
+  }, [activeUrl]);
+
+  // Direct MP4s from these hosts require a spoofed Referer and Range support.
   const directPlaybackUrl = useMemo(() => {
     if (!activeUrl) return "";
-    if (isDirectMp4 && activeUrl.includes("influencersgonewild")) {
+    if (isDirectVideo && needsStreamProxy(activeUrl)) {
       return `/api/player/stream?url=${encodeURIComponent(activeUrl)}`;
     }
     return activeUrl;
-  }, [activeUrl, isDirectMp4]);
+  }, [activeUrl, isDirectVideo]);
+
+  // Change renditions in the site's native video element without losing the
+  // current playhead or turning a quality switch into a new playback session.
+  useEffect(() => {
+    const pending = pendingQualitySwitch.current;
+    const player = videoPlayerRef.current;
+    if (!pending || !isDirectVideo || !player) return;
+
+    pendingQualitySwitch.current = null;
+    const restorePlayback = () => {
+      if (videoPlayerRef.current !== player) return;
+      const lastPlayableTime = Number.isFinite(player.duration)
+        ? Math.max(0, player.duration - 0.25)
+        : pending.time;
+      player.currentTime = Math.min(pending.time, lastPlayableTime);
+      if (pending.resume) player.play().catch(() => {});
+    };
+
+    if (player.readyState >= 1) {
+      restorePlayback();
+      return;
+    }
+
+    player.addEventListener("loadedmetadata", restorePlayback, { once: true });
+    return () => player.removeEventListener("loadedmetadata", restorePlayback);
+  }, [directPlaybackUrl, isDirectVideo, playerKey]);
+
+  const selectServer = (url: string) => {
+    if (url === activeUrl) return;
+    const player = videoPlayerRef.current;
+    pendingQualitySwitch.current = isDirectVideo && player
+      ? { time: player.currentTime, resume: !player.paused && !player.ended }
+      : null;
+    setSelectedServerUrl(url);
+    setPlayerKey((key) => key + 1);
+  };
+
+  const autoDowngradeQuality = (fromUrl: string) => {
+    const direct = pimpbunnyQualityVariants;
+    if (direct.length < 2) return;
+    const idx = direct.findIndex((v) => v.url === fromUrl);
+    const next = idx >= 0 ? direct[idx + 1] : direct[1];
+    if (next?.url) selectServer(next.url);
+  };
+
+  const pickMatchingQuality = (streams: Array<any>, currentUrl: string) => {
+    const getH = (v: any) => {
+      const m = String(v?.label || v?.quality_label || v?.url || "").match(/(2160|1440|1080|720|480|360)/);
+      return m ? Number(m[1]) : Number(v?.quality || v?.quality_score || 0);
+    };
+    const curH = getH({ url: currentUrl, label: currentUrl });
+    const mapped = streams
+      .filter((s: any) => s?.url && /pimpbunny\.com/i.test(String(s.url)))
+      .map((s: any) => ({
+        server: `PimpBunny ${s.label || (s.quality ? `${s.quality}p` : "Original")}`,
+        url: String(s.url),
+        quality_score: Number(s.quality) || 0,
+        quality_label: s.label || (s.quality ? `${s.quality}p` : "Original"),
+      }))
+      .sort((a: any, b: any) => getH(b) - getH(a));
+    if (mapped.length === 0) return { mapped, picked: null as any };
+    const picked = mapped.find((m: any) => getH(m) <= curH) || mapped[mapped.length - 1];
+    return { mapped, picked };
+  };
+
+  // Embed/locker URLs must go through the edge player, which applies the right
+  // Referer, bypasses frame-ancestors restrictions and can unwrap direct streams.
+  const embedPlaybackUrl = useMemo(() => {
+    if (!activeUrl) return "";
+    try {
+      const target = new URL(activeUrl);
+      const host = target.hostname.toLowerCase();
+      if (host === "pimpbunny.com" || host.endsWith(".pimpbunny.com")) {
+        // Route PimpBunny embeds/detail pages through the edge player so it can
+        // extract direct KVS renditions and expose an in-player quality selector.
+        // If extraction fails, /api/player falls back to the original URL.
+        if (/\/embed\/\d+/.test(target.pathname) || /\/videos\/[a-zA-Z0-9_-]+\/?$/.test(target.pathname)) {
+          return `/api/player?url=${encodeURIComponent(activeUrl)}`;
+        }
+        return activeUrl;
+      }
+    } catch {}
+    return `/api/player?url=${encodeURIComponent(activeUrl)}`;
+  }, [activeUrl]);
 
   const cleanPosterUrl = useMemo(() => {
     const raw = video?.clean_thumbnail_url || video?.thumbnail_url;
     if (raw && !raw.startsWith("data:")) {
       return raw.startsWith("http") ? (proxyImageUrl(raw) || raw) : raw;
     }
-    if (video?.source_post_id) {
+    if (video?.source_post_id && video?.source_site === "sheeshfans") {
       const pid = parseInt(video.source_post_id, 10);
       if (!isNaN(pid) && pid > 0) {
         const folder = Math.floor(pid / 1000) * 1000;
@@ -125,6 +428,29 @@ export default function OnlyfansWatch() {
     }
     return undefined;
   }, [video]);
+
+  const screenshots = useMemo(() => {
+    const raw = [
+      ...((video?.raw_payload?.screenshots as string[] | undefined) || []),
+      ...((video?.raw_payload?.gallery as string[] | undefined) || []),
+    ].filter((u): u is string => typeof u === "string" && u.trim().length > 0);
+    const seen = new Set<string>();
+    const out: string[] = [];
+    for (const u of raw) {
+      const clean = u.trim();
+      if (!/^https?:\/\//i.test(clean)) continue;
+      if (seen.has(clean)) continue;
+      // Skip obvious non-screenshot assets that slip through.
+      if (/\/(logo|avatar|favicon|icon|banner|emoji)\b|gravatar\.com|wp-content\/plugins|wp-content\/themes/i.test(clean)) continue;
+      seen.add(clean);
+      out.push(clean);
+      if (out.length <= 24) {
+        // keep collecting; cap later
+      }
+    }
+    return out.slice(0, 24);
+  }, [video]);
+  const [screenshotsOpen, setScreenshotsOpen] = useState(false);
 
   // Check if URL needs proxy or specific referrer policy
   const refPolicy = useMemo(() => {
@@ -142,6 +468,40 @@ export default function OnlyfansWatch() {
       setIsSaved(false);
     }
   }, [id]);
+
+  // PimpBunny direct get_file media rejects cross-origin Referer headers.
+  // Page-level meta referrer policy can override element referrerPolicy in
+  // Chromium; force no-referrer while a direct PimpBunny file is active.
+  useEffect(() => {
+    if (!activeUrl) return;
+    let host = "";
+    let path = "";
+    try {
+      const u = new URL(activeUrl, window.location.origin);
+      host = u.hostname.toLowerCase();
+      path = u.pathname.toLowerCase();
+    } catch {
+      return;
+    }
+    const isPimpbunnyDirect =
+      (host === "pimpbunny.com" || host.endsWith(".pimpbunny.com")) &&
+      /\/get_file\/.+\.(mp4|m3u8|webm)(\/|$)/.test(path);
+    if (!isPimpbunnyDirect) return;
+
+    const meta = document.querySelector('meta[name="referrer"]') as HTMLMetaElement | null;
+    const prev = meta?.getAttribute("content");
+    const created = !meta;
+    const el = meta || document.createElement("meta");
+    el.setAttribute("name", "referrer");
+    el.setAttribute("content", "no-referrer");
+    if (created) document.head.appendChild(el);
+    return () => {
+      const m = document.querySelector('meta[name="referrer"]') as HTMLMetaElement | null;
+      if (!m) return;
+      if (prev != null) m.setAttribute("content", prev);
+      else m.setAttribute("content", "strict-origin-when-cross-origin");
+    };
+  }, [activeUrl]);
 
   useEffect(() => {
     if (!video) return;
@@ -206,7 +566,7 @@ export default function OnlyfansWatch() {
           <p className="text-sm text-muted-foreground mb-6">
             This video may have been removed or the ID is invalid.
           </p>
-          <Link href="/onlyfans">
+          <Link href={site ? `/onlyfans/${site}` : "/onlyfans"}>
             <span className="px-4 py-2 rounded-xl text-sm font-medium bg-cyan-500 text-white cursor-pointer hover:bg-cyan-600 transition-colors inline-flex items-center gap-2">
               <ArrowLeft size={16} /> Return to OnlyFans Catalog
             </span>
@@ -216,8 +576,12 @@ export default function OnlyfansWatch() {
     );
   }
 
-  const modelName = video.actors?.[0] || video.raw_payload?.model || "";
-  const quality = video.quality_label || "1080p Full HD";
+  const modelName = video?.actors?.[0] || video?.raw_payload?.model || "";
+  const isPimpBunnySourcePlayer = video?.source_site === "pimpbunny" && (
+    video?.video_mime_type?.toLowerCase() === "embed/iframe" ||
+    allServers.some((server) => /\/embed\//i.test(server.url))
+  );
+  const quality = isPimpBunnySourcePlayer ? "Source player" : (video?.quality_label || "1080p Full HD");
 
   return (
     <Layout>
@@ -225,7 +589,7 @@ export default function OnlyfansWatch() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-6">
           {/* Breadcrumb / Back button */}
           <div className="flex items-center justify-between mb-4">
-            <Link href="/onlyfans">
+            <Link href={site ? `/onlyfans/${site}` : "/onlyfans"}>
               <span className="inline-flex items-center gap-2 text-xs font-medium text-muted-foreground hover:text-cyan-400 transition-colors cursor-pointer">
                 <ArrowLeft size={14} /> Back to OnlyFans Catalog
               </span>
@@ -262,32 +626,76 @@ export default function OnlyfansWatch() {
           </div>
 
           {/* Main Video Player Container */}
-          <div className="relative aspect-video w-full bg-black rounded-2xl overflow-hidden border border-border/50 shadow-2xl mb-6">
+          <div className="relative aspect-video w-full bg-black rounded-2xl overflow-hidden border border-white/10 shadow-[0_20px_80px_-20px_rgba(0,0,0,0.8)] ring-1 ring-cyan-500/10 mb-6">
             {activeUrl ? (
-              isDirectMp4 ? (
-                <video
+              isDirectVideo ? (
+                <VideoPlayer
                   key={`${directPlaybackUrl}-${playerKey}`}
                   src={directPlaybackUrl}
                   poster={cleanPosterUrl}
-                  controls
-                  playsInline
-                  autoPlay={false}
-                  onError={() => {
-                    // Auto-fallback to next server mirror if direct stream errors
+                  title={video.title}
+                  videoRef={videoPlayerRef}
+                  qualities={pimpbunnyQualityVariants.map((v) => ({ url: v.url, label: v.quality_label || v.server || "Original" }))}
+                  activeQualityUrl={activeUrl}
+                  onQualityChange={selectServer}
+                  onReload={async () => {
+                    if (video?.source_site === "pimpbunny" && video?.detail_url) {
+                      try {
+                        const r = await fetch(`/api/player?url=${encodeURIComponent(video.detail_url)}&format=json`, { headers: { Accept: "application/json" } });
+                        if (r.ok) {
+                          const data = await r.json();
+                          const streams = Array.isArray(data?.streams) ? data.streams : [];
+                          const { mapped, picked } = pickMatchingQuality(streams, activeUrl);
+                          if (mapped.length > 0) {
+                            setPbResolvedServers(mapped);
+                            if (picked?.url) setSelectedServerUrl(picked.url);
+                            setPlayerKey((k) => k + 1);
+                            return;
+                          }
+                        }
+                      } catch {}
+                    }
                     const curIdx = allServers.findIndex((s) => s.url === activeUrl);
                     if (curIdx >= 0 && curIdx < allServers.length - 1) {
                       setSelectedServerUrl(allServers[curIdx + 1].url);
                       setPlayerKey((k) => k + 1);
                     }
                   }}
-                  className="w-full h-full object-contain"
+                  onError={async () => {
+                    if (video?.source_site === "pimpbunny" && video?.detail_url) {
+                      try {
+                        const r = await fetch(`/api/player?url=${encodeURIComponent(video.detail_url)}&format=json`, { headers: { Accept: "application/json" } });
+                        if (r.ok) {
+                          const data = await r.json();
+                          const streams = Array.isArray(data?.streams) ? data.streams : [];
+                          const { mapped, picked } = pickMatchingQuality(streams, activeUrl);
+                          if (mapped.length > 0) {
+                            setPbResolvedServers(mapped);
+                            if (picked?.url) setSelectedServerUrl(picked.url);
+                            setPlayerKey((k) => k + 1);
+                            return;
+                          }
+                        }
+                      } catch {}
+                    }
+                    const curIdx = allServers.findIndex((s) => s.url === activeUrl);
+                    if (curIdx >= 0 && curIdx < allServers.length - 1) {
+                      setSelectedServerUrl(allServers[curIdx + 1].url);
+                      setPlayerKey((k) => k + 1);
+                    }
+                  }}
+                  onAutoDowngrade={autoDowngradeQuality}
                 />
               ) : (
                 <iframe
                   key={`${activeUrl}-${playerKey}`}
-                  src={activeUrl}
+                  src={embedPlaybackUrl}
                   title={video.title}
                   className="w-full h-full border-0"
+                  onLoad={() => {
+                    setPimpbunnyEmbedLoaded(true);
+                    setPimpbunnyEmbedStalled(false);
+                  }}
                   allowFullScreen
                   allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
                   referrerPolicy={refPolicy as any}
@@ -296,10 +704,7 @@ export default function OnlyfansWatch() {
             ) : (
               <div className="relative flex flex-col items-center justify-center h-full text-center p-8 space-y-4 overflow-hidden">
                 {cleanPosterUrl && (
-                  <div
-                    className="absolute inset-0 bg-cover bg-center filter blur-xl opacity-20 scale-105 pointer-events-none"
-                    style={{ backgroundImage: `url(${cleanPosterUrl})` }}
-                  />
+                  <div className="absolute inset-0 bg-cover bg-center filter blur-xl opacity-20 scale-105 pointer-events-none" style={{ backgroundImage: `url(${cleanPosterUrl})` }} />
                 )}
                 <div className="relative z-10 w-12 h-12 rounded-full bg-amber-500/10 border border-amber-500/20 flex items-center justify-center text-amber-400 shadow-inner">
                   <WarningCircle size={26} weight="bold" />
@@ -307,24 +712,17 @@ export default function OnlyfansWatch() {
                 <div className="relative z-10 space-y-1 max-w-md">
                   <h3 className="text-base font-semibold text-foreground">Video Stream Unavailable</h3>
                   <p className="text-xs text-muted-foreground leading-relaxed">
-                    {allServers.length > 0
-                      ? "The current server mirror is unreachable. Please select another mirror from the options below."
-                      : "This entry does not have an active playable video stream."}
+                    {allServers.length > 0 ? "The current server mirror is unreachable. Please select another mirror from the options below." : "This entry does not have an active playable video stream."}
                   </p>
                 </div>
                 <div className="relative z-10 pt-2 flex items-center gap-3">
-                  <Link href="/onlyfans">
+                  <Link href={site ? `/onlyfans/${site}` : "/onlyfans"}>
                     <button className="px-4 py-2 rounded-xl text-xs font-medium bg-cyan-500 hover:bg-cyan-400 text-white shadow-md shadow-cyan-500/20 transition-all flex items-center gap-2 cursor-pointer">
                       <ArrowLeft size={14} /> Browse OnlyFans Catalog
                     </button>
                   </Link>
                   {video?.detail_url && (
-                    <a
-                      href={video.detail_url}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="px-4 py-2 rounded-xl text-xs font-medium bg-card border border-border/80 hover:bg-accent text-muted-foreground hover:text-foreground transition-all inline-flex items-center gap-1.5"
-                    >
+                    <a href={video.detail_url} target="_blank" rel="noopener noreferrer" className="px-4 py-2 rounded-xl text-xs font-medium bg-card border border-border/80 hover:bg-accent text-muted-foreground hover:text-foreground transition-all inline-flex items-center gap-1.5">
                       <ArrowSquareOut size={14} /> Open Original Source
                     </a>
                   )}
@@ -333,16 +731,47 @@ export default function OnlyfansWatch() {
             )}
           </div>
 
+          {isPimpBunnySourcePlayer && (
+            <div className="-mt-3 mb-6 flex flex-wrap items-center justify-between gap-3 text-xs text-muted-foreground">
+              <p className="max-w-2xl leading-relaxed">
+                This record is using PimpBunny’s video-only embed. In-page quality choices appear here when direct renditions are available.
+              </p>
+              <div className="flex flex-wrap items-center gap-2">
+                {pimpbunnyEmbedStalled && (
+                  <span role="status" className="inline-flex items-center gap-1.5 text-amber-400">
+                    <WarningCircle size={14} /> The embedded page did not finish loading.
+                  </span>
+                )}
+                {pimpbunnyEmbedStalled && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setPimpbunnyEmbedStalled(false);
+                      setPlayerKey((key) => key + 1);
+                    }}
+                    className="rounded-lg border border-border px-3 py-2 font-medium text-foreground hover:bg-accent"
+                  >
+                    Retry embed
+                  </button>
+                )}
+              </div>
+            </div>
+          )}
+
           {/* Server Switcher Bar */}
-          {allServers.length > 0 && (
+          {allServers.length > 0 && !showPimpbunnyQualitySelect && (
             <div className="mb-6 p-4 rounded-2xl bg-card/60 border border-border/40 backdrop-blur-sm space-y-2.5">
               <div className="flex items-center justify-between">
                 <span className="text-xs font-semibold text-muted-foreground flex items-center gap-2">
                   <Broadcast size={14} className="text-cyan-400" />
-                  <span>Available Server Mirrors ({allServers.length})</span>
+                  <span>
+                    {video.source_site === "pimpbunny"
+                      ? `Available renditions (${allServers.length})`
+                      : `Available Server Mirrors (${allServers.length})`}
+                  </span>
                 </span>
                 <span className="text-[11px] text-muted-foreground/70">
-                  Switch mirror if stream fails or buffers
+                  {video.source_site === "pimpbunny" ? "Choose a rendition" : "Switch mirror if stream fails or buffers"}
                 </span>
               </div>
 
@@ -350,14 +779,11 @@ export default function OnlyfansWatch() {
                 {allServers.map((srv, idx) => {
                   const isActive = activeUrl === srv.url;
                   const label = srv.server || `Server ${idx + 1}`;
-                  const qLabel = srv.quality_label || "1080p";
+                  const qLabel = formatQualityLabel(srv.quality_label || srv.server, srv.url);
                   return (
                     <button
                       key={idx}
-                      onClick={() => {
-                        setSelectedServerUrl(srv.url);
-                        setPlayerKey((k) => k + 1);
-                      }}
+                      onClick={() => selectServer(srv.url)}
                       className={`px-3 py-1.5 rounded-xl text-xs font-medium flex items-center gap-2 transition-all cursor-pointer ${
                         isActive
                           ? "bg-cyan-500 text-white font-semibold shadow-md shadow-cyan-500/20"
@@ -389,7 +815,7 @@ export default function OnlyfansWatch() {
                     {quality}
                   </span>
                   {modelName && (
-                    <Link href={`/onlyfans?tag=${encodeURIComponent(modelName)}`}>
+                    <Link href={`/onlyfans/${video.source_site}?tag=${encodeURIComponent(modelName)}`}>
                       <span className="px-2.5 py-0.5 rounded-md text-xs font-semibold bg-primary/10 text-primary border border-primary/20 hover:bg-primary/20 transition-colors cursor-pointer flex items-center gap-1">
                         <User size={12} weight="bold" />
                         <span>@{modelName}</span>
@@ -397,13 +823,69 @@ export default function OnlyfansWatch() {
                     </Link>
                   )}
                   <span className="text-xs text-muted-foreground/70 capitalize">
-                    Source: {video.source_site}
+                    Source: {ONLYFANS_SITE_LABELS[video.source_site as keyof typeof ONLYFANS_SITE_LABELS] || video.source_site}
                   </span>
                 </div>
 
                 <h1 className="text-xl sm:text-2xl font-bold text-foreground leading-snug">
                   {video.title}
                 </h1>
+
+                {screenshots.length > 0 && (
+                  <section className="rounded-2xl border border-border/40 bg-card/30 overflow-hidden">
+                    <button
+                      type="button"
+                      onClick={() => setScreenshotsOpen((v) => !v)}
+                      className="w-full flex items-center justify-between gap-3 px-4 py-3 text-left hover:bg-white/[0.02] transition-colors"
+                      aria-expanded={screenshotsOpen}
+                      aria-controls="video-screenshots"
+                    >
+                      <div className="min-w-0">
+                        <h2 className="text-sm font-semibold text-foreground">Screenshots</h2>
+                        <p className="text-[11px] text-muted-foreground mt-0.5">
+                          {screenshots.length} frame{screenshots.length === 1 ? "" : "s"} from this video
+                        </p>
+                      </div>
+                      <span className={`shrink-0 text-muted-foreground transition-transform duration-200 ${screenshotsOpen ? "rotate-180" : ""}`}>
+                        <CaretDown size={16} weight="bold" />
+                      </span>
+                    </button>
+                    {screenshotsOpen && (
+                      <div id="video-screenshots" className="px-4 pb-4 pt-1">
+                        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-2.5">
+                          {screenshots.map((src, i) => (
+                            <a
+                              key={`${src}-${i}`}
+                              href={src}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="group relative block overflow-hidden rounded-xl border border-border/40 bg-muted/20 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-500/60"
+                              aria-label={`Open screenshot ${i + 1}`}
+                            >
+                              <img
+                                src={src}
+                                alt={`Screenshot ${i + 1}`}
+                                loading="lazy"
+                                referrerPolicy="no-referrer"
+                                className="aspect-video w-full object-cover transition-transform duration-300 group-hover:scale-[1.02]"
+                                onError={(e) => {
+                                  const img = e.currentTarget as HTMLImageElement;
+                                  if (!img.dataset.fallback) {
+                                    img.dataset.fallback = "1";
+                                    img.src = `/api/media?url=${encodeURIComponent(src)}&no_webp=1`;
+                                  } else {
+                                    img.closest("a")?.remove();
+                                  }
+                                }}
+                              />
+                              <div className="pointer-events-none absolute inset-0 ring-1 ring-inset ring-white/5 rounded-xl" />
+                            </a>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </section>
+                )}
 
                 <div className="flex items-center gap-4 text-xs text-muted-foreground">
                   {video.duration_formatted && (
@@ -430,7 +912,7 @@ export default function OnlyfansWatch() {
               <div className="pt-2 flex flex-wrap gap-1.5 items-center">
                 <TagIcon size={14} className="text-muted-foreground mr-1" />
                 {video.tags.map((tag, idx) => (
-                  <Link key={idx} href={`/onlyfans?tag=${encodeURIComponent(tag)}`}>
+                  <Link key={idx} href={`/onlyfans/${video.source_site}?tag=${encodeURIComponent(tag)}`}>
                     <span className="px-2.5 py-1 rounded-lg text-xs font-medium bg-card/60 text-muted-foreground hover:text-foreground hover:bg-card border border-border/40 transition-colors cursor-pointer">
                       #{tag}
                     </span>

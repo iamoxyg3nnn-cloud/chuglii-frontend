@@ -1,7 +1,13 @@
 import { useState, useEffect, useCallback } from "react";
-import { Link, useSearch, useLocation } from "wouter";
+import { Link, useParams, useSearch, useLocation } from "wouter";
 import { Layout } from "@/components/Layout";
-import { useOnlyfansVideos, type OnlyfansVideo, type OnlyfansSortOption } from "@/hooks/useOnlyfansVideos";
+import {
+  useOnlyfansVideos,
+  ONLYFANS_SITES,
+  ONLYFANS_SITE_LABELS,
+  isOnlyfansSite,
+  type OnlyfansSortOption,
+} from "@/hooks/useOnlyfansVideos";
 import { OnlyfansCard, OnlyfansCardSkeleton } from "@/components/OnlyfansCard";
 import { AppPagination } from "@/components/ui/app-pagination";
 import {
@@ -18,7 +24,7 @@ import {
 } from "@phosphor-icons/react";
 
 const OF_TABS = [
-  { id: "All", label: "All OnlyFans" },
+  { id: "All", label: "All videos" },
   { id: "1080p", label: "1080p Full HD" },
   { id: "4k", label: "4K UHD" },
   { id: "bryce-adams", label: "Bryce Adams" },
@@ -40,6 +46,8 @@ const SORT_OPTIONS: { id: OnlyfansSortOption; label: string }[] = [
 const ITEMS_PER_PAGE = 24;
 
 export default function OnlyfansFeed() {
+  const { site: routeSite } = useParams<{ site: string }>();
+  const site = isOnlyfansSite(routeSite) ? routeSite : undefined;
   const [, setLocation] = useLocation();
   const searchString = useSearch();
 
@@ -91,9 +99,10 @@ export default function OnlyfansFeed() {
       if (sort !== "newest") params.set("sort", sort);
       if (search) params.set("q", search);
       const queryString = params.toString();
-      setLocation(`/onlyfans${queryString ? `?${queryString}` : ""}`, { replace: true });
+      const basePath = site ? `/onlyfans/${site}` : "/onlyfans";
+      setLocation(`${basePath}${queryString ? `?${queryString}` : ""}`, { replace: true });
     },
-    [setLocation]
+    [setLocation, site]
   );
 
   // Debounce search input
@@ -112,6 +121,7 @@ export default function OnlyfansFeed() {
   // Hook query
   const isSavedView = activeTab === "Saved";
   const { data, isLoading, isError, refetch } = useOnlyfansVideos({
+    site,
     tag: !isSavedView && activeTab !== "All" ? activeTab : undefined,
     search: debouncedSearch || undefined,
     sort: activeSort,
@@ -138,6 +148,36 @@ export default function OnlyfansFeed() {
     window.scrollTo({ top: 0, behavior: "smooth" });
   };
 
+  if (!site) {
+    return (
+      <Layout>
+        <div className="min-h-screen bg-background text-foreground pb-20">
+          <section className="border-b border-border/40 bg-gradient-to-b from-cyan-950/20 via-background to-background py-10 px-4 sm:px-6 lg:px-8">
+            <div className="max-w-7xl mx-auto space-y-3">
+              <span className="text-xs font-semibold uppercase tracking-wider text-cyan-400">OnlyFans</span>
+              <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight">Choose a source</h1>
+              <p className="text-sm text-muted-foreground max-w-2xl">
+                Each source has its own section, database, and video routes.
+              </p>
+            </div>
+          </section>
+          <section aria-label="OnlyFans source sections" className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+              {ONLYFANS_SITES.map((source) => (
+                <Link key={source} href={`/onlyfans/${source}`}>
+                  <span className="block h-full rounded-2xl border border-border/50 bg-card/60 p-5 hover:border-cyan-500/50 hover:bg-card transition-colors">
+                    <span className="block text-base font-semibold text-foreground">{ONLYFANS_SITE_LABELS[source]}</span>
+                    <span className="block mt-2 text-xs text-muted-foreground">Open this source section</span>
+                  </span>
+                </Link>
+              ))}
+            </div>
+          </section>
+        </div>
+      </Layout>
+    );
+  }
+
   return (
     <Layout>
       <div className="min-h-screen bg-background text-foreground pb-20">
@@ -148,18 +188,18 @@ export default function OnlyfansFeed() {
               <div>
                 <div className="flex items-center gap-2 mb-1.5">
                   <span className="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-cyan-500/15 text-cyan-400 border border-cyan-500/30 flex items-center gap-1.5">
-                    <Broadcast size={13} weight="fill" className="animate-pulse text-cyan-400" />
-                    <span>Cross-Site Verified Catalog</span>
+                    <Broadcast size={13} weight="fill" className="text-cyan-400" />
+                    <span>{ONLYFANS_SITE_LABELS[site]}</span>
                   </span>
                   <span className="text-xs text-muted-foreground/70">
-                    Highest Quality Default • Zero Duplicates
+                    Independent source section
                   </span>
                 </div>
                 <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight text-foreground flex items-center gap-2.5">
-                  <span>OnlyFans Leaks & Archives</span>
+                  <span>{ONLYFANS_SITE_LABELS[site]}</span>
                 </h1>
                 <p className="text-sm text-muted-foreground mt-1 max-w-2xl">
-                  Aggregated and deduplicated across Internet Chicks, Influencers Gone Wild, SheeshFans, and PimpBunny with automatic 1080p / 4K promotion.
+                  Videos collected from {ONLYFANS_SITE_LABELS[site]}.
                 </p>
               </div>
 
@@ -174,6 +214,21 @@ export default function OnlyfansFeed() {
               </div>
             </div>
 
+            <nav aria-label="OnlyFans source sections" className="flex items-center gap-2 overflow-x-auto pt-1 pb-1">
+              <Link href="/onlyfans">
+                <span className="shrink-0 px-3 py-1.5 rounded-lg text-xs font-medium bg-card/60 text-muted-foreground hover:text-foreground border border-border/40 cursor-pointer">
+                  All sources
+                </span>
+              </Link>
+              {ONLYFANS_SITES.map((source) => (
+                <Link key={source} href={`/onlyfans/${source}`} aria-current={source === site ? "page" : undefined}>
+                  <span className={`shrink-0 px-3 py-1.5 rounded-lg text-xs font-medium border cursor-pointer ${source === site ? "bg-cyan-500 text-white border-cyan-500" : "bg-card/60 text-muted-foreground hover:text-foreground border-border/40"}`}>
+                    {ONLYFANS_SITE_LABELS[source]}
+                  </span>
+                </Link>
+              ))}
+            </nav>
+
             {/* Search and Filters Bar */}
             <div className="flex flex-col sm:flex-row gap-3 pt-2">
               <div className="relative flex-1">
@@ -185,12 +240,14 @@ export default function OnlyfansFeed() {
                   type="text"
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
+                  aria-label={`Search videos from ${ONLYFANS_SITE_LABELS[site]}`}
                   placeholder="Search model, creator, or leak title..."
                   className="w-full pl-10 pr-9 py-2 rounded-xl bg-card/60 border border-border/50 text-sm placeholder:text-muted-foreground/60 focus:outline-none focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500 transition-all"
                 />
                 {searchQuery && (
                   <button
                     onClick={() => setSearchQuery("")}
+                    aria-label="Clear search"
                     className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
                   >
                     <X size={14} />
@@ -202,6 +259,8 @@ export default function OnlyfansFeed() {
               <div className="relative">
                 <button
                   onClick={() => setSortOpen(!sortOpen)}
+                  aria-expanded={sortOpen}
+                  aria-haspopup="menu"
                   className="w-full sm:w-auto px-4 py-2 rounded-xl bg-card/60 border border-border/50 text-sm font-medium flex items-center justify-between gap-2 hover:border-border transition-colors"
                 >
                   <span className="flex items-center gap-1.5 text-muted-foreground">
@@ -287,7 +346,7 @@ export default function OnlyfansFeed() {
               <FilmStrip size={44} className="mx-auto text-muted-foreground/30" />
               <div className="text-sm font-semibold text-foreground">No videos found</div>
               <p className="text-xs text-muted-foreground">
-                Try searching for another model or switching back to "All OnlyFans".
+                Try another search or choose a different OnlyFans source section.
               </p>
             </div>
           ) : (

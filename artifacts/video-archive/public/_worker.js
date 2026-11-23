@@ -709,6 +709,13 @@ async function handleApi(request, env, url) {
         });
       }
 
+        // PimpBunny/Bunny Shield often blocks worker/datacenter fetches for
+        // screenshots/thumbnails. Redirect browser to fetch directly (img uses
+        // referrerPolicy="no-referrer" on the client).
+        if (!upstreamRes.ok && (targetObj.hostname === "pimpbunny.com" || targetObj.hostname.endsWith(".pimpbunny.com"))) {
+          return Response.redirect(targetUrl, 302);
+        }
+
       if (!upstreamRes.ok) {
         return Response.redirect(targetUrl, 302);
       }
@@ -727,6 +734,61 @@ async function handleApi(request, env, url) {
   }
 
 // ─── Clean Video Player Renderer (Ad-Free Hls.js / HTML5) ────────
+function extractPimpbunnyStreams(html, pageUrl) {
+  const assignments = {};
+  const pattern = /(?:['"]?(?:video_url|video_alt_url\d*)(?:_text)?['"]?)\s*[:=]\s*(['"])(.*?)\1/gi;
+  let m;
+  while ((m = pattern.exec(html)) !== null) {
+    const rawKey = m[0].split(/[:=]/)[0].trim().replace(/^['"]|['"]$/g, '').toLowerCase();
+    let value = (m[2] || '').replace(/\\\//g, '/').replace(/\\u0026/g, '&').replace(/&amp;/g, '&').trim();
+    if (value) assignments[rawKey] = value;
+  }
+  if (Object.keys(assignments).length === 0) {
+    const urlRe = /https?:\/\/(?:[a-z0-9.-]+\.)?pimpbunny\.com\/get_file\/[^\s"'<>]+?\.(?:mp4|m3u8|webm)(?:\/[^\s"'<>]*)?(?:\?[^\s"'<>]*)?/gi;
+    let um;
+    while ((um = urlRe.exec(html)) !== null) {
+      const u = um[0].replace(/\\\//g, '/').replace(/&amp;/g, '&');
+      if (/_preview(?:[_./]|$)/i.test(u)) continue;
+      const qm = u.match(/(?<!\d)(2160|1440|1080|720|480|360)p?(?!\d)/i);
+      const q = qm ? parseInt(qm[1], 10) : 0;
+      const k = `video_alt_url${q || Object.keys(assignments).length}`;
+      if (!assignments[k]) assignments[k] = u;
+      if (q) assignments[`${k}_text`] = `${q}p`;
+    }
+  }
+  const out = []; const seen = new Set();
+  for (const [key, value] of Object.entries(assignments)) {
+    if (key.endsWith('_text')) continue;
+    let abs; try { abs = new URL(value, pageUrl).toString(); } catch { continue; }
+    let u; try { u = new URL(abs); } catch { continue; }
+    const host = (u.hostname || '').toLowerCase();
+    if (u.protocol !== 'https:' || !(host === 'pimpbunny.com' || host.endsWith('.pimpbunny.com'))) continue;
+    const path = u.pathname.replace(/\/+$/, '').toLowerCase();
+    let type = null;
+    if (path.endsWith('.mp4')) type = 'direct_mp4';
+    else if (path.endsWith('.m3u8')) type = 'direct_hls';
+    else if (path.endsWith('.webm')) type = 'direct_webm';
+    else continue;
+    if (seen.has(abs)) continue; seen.add(abs);
+    const label = (assignments[`${key}_text`] || '').trim();
+    const qualitySource = `${label} ${u.pathname}`.toLowerCase();
+    let quality = 0;
+    if (/(?:4k|uhd|2160p?)/.test(qualitySource)) quality = 2160;
+    else { const qm = qualitySource.match(/(?<!\d)(1440|1080|720|480|360)p?(?!\d)/); quality = qm ? parseInt(qm[1], 10) : 0; }
+    const cleanLabel = (label && !/^https?:\/\//i.test(label)) ? label : (quality ? `${quality}p` : 'Original');
+      out.push({ url: `/api/player/stream?url=${encodeURIComponent(abs)}`, rawUrl: abs, type, quality, label: cleanLabel });
+  }
+  out.sort((a, b) => (b.quality || 0) - (a.quality || 0));
+  return out;
+}
+
+function renderCleanMp4Player(streams, title = '', poster = '') {
+  const safeTitle = (title || 'Chuglii Player').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  const safePoster = poster ? String(poster).replace(/"/g, '&quot;') : '';
+  const list = Array.isArray(streams) ? streams.filter(s => s && s.url) : [];
+  return `<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1.0,user-scalable=no"><meta name="referrer" content="no-referrer"><title>${safeTitle}</title><style>*{margin:0;padding:0;box-sizing:border-box}html,body{width:100%;height:100%;background:#000;overflow:hidden;display:flex;align-items:center;justify-content:center;position:relative}video{width:100%;height:100%;max-height:100vh;object-fit:contain;background:#000}.control-overlay{position:absolute;top:12px;right:12px;z-index:50}.quality-select{background:rgba(15,23,42,.88);color:#f8fafc;border:1px solid rgba(255,255,255,.25);border-radius:6px;padding:5px 10px;font-size:13px;font-family:system-ui,-apple-system,sans-serif;cursor:pointer}.quality-select option{background:#0f172a;color:#fff}</style></head><body><div id="quality-wrap" class="control-overlay" style="display:none"><select id="quality-selector" class="quality-select" title="Select Video Quality"></select></div><video id="player" controls autoplay playsinline referrerpolicy="no-referrer" ${safePoster ? `poster="${safePoster}"` : ''}></video><script>(function(){var v=document.getElementById('player'),s=${JSON.stringify(list)},sel=document.getElementById('quality-selector'),w=document.getElementById('quality-wrap');if(!s.length)return;function label(x){var l=x.label||(x.quality?(x.quality+'p'):'Original');if(x.quality>=1080&&!/full\s*hd/i.test(l))l+=' Full HD';else if(x.quality>=720&&x.quality<1080&&!/\bhd\b/i.test(l))l+=' HD';return l}if(s.length>1){w.style.display='block';s.forEach(function(x,i){var o=document.createElement('option');o.value=String(i);o.textContent=label(x);sel.appendChild(o)})}function set(i,keep){i=Math.max(0,Math.min(s.length-1,i));var t=keep?(v.currentTime||0):0,p=v.paused;sel.value=String(i);v.src=s[i].url;v.addEventListener('loadedmetadata',function m(){v.removeEventListener('loadedmetadata',m);try{if(t>0)v.currentTime=Math.min(t,Math.max(0,(v.duration||t)-.25))}catch(e){}if(!p)v.play().catch(function(){})});v.load()}sel.addEventListener('change',function(){set(parseInt(sel.value,10)||0,true)});set(0,false);v.play().catch(function(){v.muted=true;v.play().catch(function(){})})})();</script></body></html>`;
+}
+
 function renderCleanHlsPlayer(streamingUrl, title = "", poster = "") {
   const safeTitle = (title || "Chuglii Player").replace(/</g, "&lt;").replace(/>/g, "&gt;");
   const isHls = streamingUrl.includes(".m3u8") || streamingUrl.includes("/hls/");
@@ -773,27 +835,36 @@ function renderCleanHlsPlayer(streamingUrl, title = "", poster = "") {
             var levels = hls.levels;
             var selector = document.getElementById('quality-selector');
             var wrap = document.getElementById('quality-wrap');
-            if (levels && levels.length > 1) {
-              wrap.style.display = 'flex';
-              selector.innerHTML = '<option value="-1">Auto (Best)</option>';
+            if (levels && levels.length > 0) {
               var sorted = levels.map(function(lvl, idx) {
                 return { idx: idx, height: lvl.height || 0, bitrate: lvl.bitrate || 0 };
               }).sort(function(a, b) {
                 return b.height !== a.height ? b.height - a.height : b.bitrate - a.bitrate;
               });
-              sorted.forEach(function(item) {
-                var label = item.height ? (item.height + 'p') : ('Level ' + (item.idx + 1));
-                if (item.height >= 1080) label += ' Full HD';
-                else if (item.height >= 720) label += ' HD';
-                var opt = document.createElement('option');
-                opt.value = item.idx;
-                opt.textContent = label;
-                selector.appendChild(opt);
-              });
-              selector.addEventListener('change', function() {
-                var val = parseInt(selector.value, 10);
-                hls.currentLevel = val;
-              });
+
+              // Start at the highest advertised rendition. Users can switch to
+              // Auto (Best) or a lower level from the selector when needed.
+              var highestLevel = sorted[0].idx;
+              hls.currentLevel = highestLevel;
+
+              if (levels.length > 1) {
+                wrap.style.display = 'flex';
+                selector.innerHTML = '<option value="-1">Auto (Best)</option>';
+                sorted.forEach(function(item) {
+                  var label = item.height ? (item.height + 'p') : ('Level ' + (item.idx + 1));
+                  if (item.height >= 1080) label += ' Full HD';
+                  else if (item.height >= 720) label += ' HD';
+                  var opt = document.createElement('option');
+                  opt.value = item.idx;
+                  opt.textContent = label;
+                  selector.appendChild(opt);
+                });
+                selector.value = String(highestLevel);
+                selector.addEventListener('change', function() {
+                  var val = parseInt(selector.value, 10);
+                  hls.currentLevel = val;
+                });
+              }
             }
           } catch(err) {
             console.warn('Quality selector init error:', err);
@@ -984,6 +1055,11 @@ function extractPackedStreamInfo(html) {
       });
 
       if (!upstreamRes.ok && upstreamRes.status !== 206) {
+        // PimpBunny/Bunny Shield often blocks datacenter/worker fetches.
+        // Fall back to redirecting the browser to the signed URL directly.
+        if (targetObj.hostname === "pimpbunny.com" || targetObj.hostname.endsWith(".pimpbunny.com")) {
+          return Response.redirect(streamUpstreamUrl, 302);
+        }
         return new Response(upstreamRes.body, { status: upstreamRes.status, headers: CORS_HEADERS });
       }
 
@@ -1005,7 +1081,11 @@ function extractPackedStreamInfo(html) {
         if (upstreamRes.headers.get("Content-Length")) {
           resHeaders.set("Content-Length", upstreamRes.headers.get("Content-Length"));
         }
-        resHeaders.set("Cache-Control", upstreamRes.status === 206 ? "no-store" : "public, max-age=86400");
+          const isSignedPimpBunnyStream = targetObj.hostname.toLowerCase().includes("pimpbunny");
+          resHeaders.set(
+            "Cache-Control",
+            upstreamRes.status === 206 || isSignedPimpBunnyStream ? "no-store" : "public, max-age=86400"
+          );
 
         return new Response(upstreamRes.body, {
           status: upstreamRes.status,
@@ -1097,6 +1177,95 @@ function extractPackedStreamInfo(html) {
 
       const destObj = new URL(targetUrl);
 
+      // Render PimpBunny HLS variants in the site's HLS.js player and route
+      // playlist, key, and segment requests through the range/CORS proxy.
+      if (
+        (destObj.hostname === "pimpbunny.com" || destObj.hostname.endsWith(".pimpbunny.com")) &&
+        destObj.pathname.toLowerCase().endsWith(".m3u8")
+      ) {
+        const streamProxyUrl = `/api/player/stream?url=${encodeURIComponent(targetUrl)}`;
+        return new Response(renderCleanHlsPlayer(streamProxyUrl, "PimpBunny"), {
+          status: 200,
+          headers: {
+            "Content-Type": "text/html; charset=utf-8",
+            "Access-Control-Allow-Origin": "*",
+            "Cache-Control": "no-store",
+          },
+        });
+      }
+
+      // PimpBunny direct media: let the browser fetch signed URLs directly.
+      // Worker/datacenter IPs can be blocked by Bunny Shield, causing 403.
+      if (destObj.hostname === "pimpbunny.com" || destObj.hostname.endsWith(".pimpbunny.com")) {
+        const pbPath = destObj.pathname.toLowerCase();
+        if (/\/get_file\/.+\.(mp4|m3u8|webm)\/?$/.test(pbPath)) {
+          return Response.redirect(targetUrl, 302);
+        }
+
+        // Resolve PimpBunny embed/detail pages to direct signed MP4 renditions.
+        // The third-party embed locks quality and can redirect to pimpbunny.com;
+        // extracting KVS video_url/video_alt_url* gives us app-controlled quality.
+        const isEmbed = /\/embed\/\d+/.test(destObj.pathname);
+        const isVideoPage = /\/videos\/[a-zA-Z0-9_-]+\/?$/.test(destObj.pathname);
+        if (isEmbed || isVideoPage) {
+          const wantJson = url.searchParams.get("format") === "json" || request.headers.get("accept")?.includes("application/json");
+          try {
+            const pbRes = await fetch(targetUrl, {
+              headers: {
+                "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
+                "Referer": "https://pimpbunny.com/",
+                "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+              },
+            });
+            if (pbRes.ok) {
+              const pbHtml = await pbRes.text();
+              const pbStreams = extractPimpbunnyStreams(pbHtml, targetUrl);
+              if (pbStreams.length > 0) {
+                const titleMatch = pbHtml.match(/<title>([^<]+)<\/title>/i);
+                const title = titleMatch ? titleMatch[1].replace(/\|\s*PimpBunny.*$/i, "").trim() : "PimpBunny";
+                if (wantJson) {
+                  return new Response(JSON.stringify({
+                    ok: true,
+                    title,
+                    streams: pbStreams.map((s) => ({ url: s.rawUrl, type: s.type, quality: s.quality, label: s.label })),
+                  }), {
+                    status: 200,
+                    headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*", "Cache-Control": "no-store" },
+                  });
+                }
+                return new Response(renderCleanMp4Player(pbStreams, title), {
+                  status: 200,
+                  headers: {
+                    "Content-Type": "text/html; charset=utf-8",
+                    "Access-Control-Allow-Origin": "*",
+                    "Cache-Control": "no-store",
+                  },
+                });
+              }
+            }
+            if (wantJson) {
+              return new Response(JSON.stringify({ ok: false, error: "no_streams", status: pbRes.status }), {
+                status: 200, headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*", "Cache-Control": "no-store" },
+              });
+            }
+          } catch (e) {
+            console.error("PimpBunny resolve error:", e);
+            if (wantJson) {
+              return new Response(JSON.stringify({ ok: false, error: "resolve_failed" }), {
+                status: 200, headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*", "Cache-Control": "no-store" },
+              });
+            }
+          }
+          // Extraction failed or was blocked; fall back to the original embed/page.
+          if (wantJson) {
+            return new Response(JSON.stringify({ ok: false, error: "fallback", redirect: targetUrl }), {
+              status: 200, headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*", "Cache-Control": "no-store" },
+            });
+          }
+          return Response.redirect(targetUrl, 302);
+        }
+      }
+
       // Buu Mal (Myanmar) Resolver (buumal.com)
       // Extracts clean direct Cloudflare R2 MP4 stream from Buu Mal video page
       // Serves pure ad-free responsive video player or JSON stream
@@ -1158,10 +1327,9 @@ function extractPackedStreamInfo(html) {
         }
       }
 
-      // 2. Direct lockers (VOE only - never checks Referer)
-      const isDirectLocker = destObj.hostname.includes("voe.sx") 
-        || destObj.hostname.includes("caseyseemavoid.com");
-
+      // 2. Direct lockers (never check Referer). VOE is proxied below so we can
+      // spoof Referer and inject <base>, which is more reliable for iframe embeds.
+      const isDirectLocker = destObj.hostname.includes("caseyseemavoid.com");
       if (isDirectLocker) {
         return Response.redirect(targetUrl, 302);
       }
@@ -1269,7 +1437,51 @@ function extractPackedStreamInfo(html) {
         return Response.redirect(targetUrl, 302);
       }
 
-      // 7. Streamtape Resolver: Proxy HTML with spoofed Referer and disarm rogue download triggers
+      // 7. InternetChicks locker resolver (PlayMogo/StreamWish/VOE/Dood/Byse).
+      // These are embed iframes; spoof IC referer, inject <base>, and try to
+      // extract packed HLS/mp4 sources when present for cleaner playback.
+      if (/(playmogo|streamwish|voe\.sx|dood|bysezejataos)/i.test(destObj.hostname)) {
+        try {
+          const icRes = await fetch(targetUrl, {
+            headers: {
+              "User-Agent": request.headers.get("user-agent") || "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
+              "Referer": "https://internetchicks.com/",
+              "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+            },
+            redirect: "follow",
+          });
+          if (icRes.ok) {
+            const ct = icRes.headers.get("content-type") || "text/html; charset=utf-8";
+            if (ct.includes("text/html")) {
+              let html = await icRes.text();
+              const streamInfo = extractPackedStreamInfo(html);
+              if (streamInfo?.hls4 || streamInfo?.file) {
+                const streamUrl = streamInfo.hls4
+                  ? `/api/player/stream?origin=${encodeURIComponent(new URL(targetUrl).origin)}&path=${encodeURIComponent(streamInfo.hls4)}`
+                  : streamInfo.file;
+                const isHls = /\.m3u8(?:[?#]|$)/i.test(streamUrl) || streamInfo.hls4;
+                return new Response(isHls ? renderCleanHlsPlayer(streamUrl, streamInfo.title || "Video", streamInfo.poster) : renderCleanMp4Player([{ url: streamUrl, rawUrl: streamUrl, type: "direct_mp4", quality: 1080, label: "1080p" }], streamInfo.title || "Video", streamInfo.poster), {
+                  status: 200,
+                  headers: { "Content-Type": "text/html; charset=utf-8", "Access-Control-Allow-Origin": "*", "Cache-Control": "no-store" },
+                });
+              }
+              html = html.replace(/if\s*\(\s*top\.location\.href\s*==\s*location\.href\s*\)\s*\{[^}]*\}/g, "");
+              html = html.replace(/top\.location[^;]+;/g, "/* neutral */");
+              const baseTag = `<base href="${destObj.origin}/">`;
+              html = html.includes("<head>") ? html.replace("<head>", `<head>${baseTag}`) : `${baseTag}${html}`;
+              return new Response(html, {
+                status: 200,
+                headers: { "Content-Type": "text/html; charset=utf-8", "Access-Control-Allow-Origin": "*", "Cache-Control": "no-store" },
+              });
+            }
+            return new Response(icRes.body, { status: icRes.status, headers: { "Content-Type": ct, "Access-Control-Allow-Origin": "*" } });
+          }
+        } catch (e) {
+          console.error("IC locker proxy error:", e);
+        }
+      }
+
+      // 8. Streamtape Resolver: Proxy HTML with spoofed Referer and disarm rogue download triggers
       if (destObj.hostname.includes("streamtape.com")) {
         try {
           const stRes = await fetch(targetUrl, {
@@ -1308,10 +1520,12 @@ function extractPackedStreamInfo(html) {
         }
       }
 
-      // 6. Generic Fallback Proxy (EarnVids / evsishere / legacy):
-      // Edge worker proxies the HTML with spoofed Referer: https://supjav.com/ and injects <base>
+      // 6. Generic Fallback Proxy (EarnVids / evsishere / legacy / IC lockers):
+      // Edge worker proxies HTML with a spoofed Referer and injects <base>.
       let referer = "https://supjav.com/";
       if (targetUrl.includes("mmsvibex")) referer = "https://mmsvibex.life/";
+      const icLocker = /playmogo|streamwish|dood|bysezejataos|voe\.sx|streamtape|internetchicks/i.test(destObj.hostname);
+      if (icLocker) referer = "https://internetchicks.com/";
 
       const upstreamRes = await fetch(targetUrl, {
         headers: {
