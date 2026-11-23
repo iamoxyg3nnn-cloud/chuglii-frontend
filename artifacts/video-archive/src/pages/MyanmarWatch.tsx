@@ -1,6 +1,7 @@
 import { useRef, useState, useEffect, useCallback } from "react";
 import { useParams, Link, useLocation } from "wouter";
 import { Layout } from "@/components/Layout";
+import { VideoPlayer } from "@/components/VideoPlayer";
 import { useMyanmarVideoById, useMyanmarRelatedVideos, type MyanmarVideo } from "@/hooks/useMyanmarVideos";
 import { MyanmarCard } from "@/components/MyanmarCard";
 import { getSupabase } from "@/lib/supabase";
@@ -325,17 +326,19 @@ export default function MyanmarWatch() {
                 <p className="text-xs text-muted-foreground mt-1">Connecting to Cloudflare high-speed stream server</p>
               </div>
             ) : !useIframePlayer && streamUrl ? (
-              <video
-                ref={videoRef}
+              <VideoPlayer
                 key={`video-${streamUrl}-${retryNonce}`}
                 src={streamUrl}
                 poster={video.clean_thumbnail_url || video.thumbnail_url || undefined}
-                controls
+                title={video.title}
                 autoPlay
-                playsInline
-                preload="metadata"
-                className="w-full h-full object-contain bg-black"
+                videoRef={videoRef}
                 onError={handleVideoError}
+                onReload={() => {
+                  setUseIframePlayer(false);
+                  setRetryNonce((n) => n + 1);
+                  resolveFreshStream(true);
+                }}
               />
             ) : video.detail_url ? (
               <iframe

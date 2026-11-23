@@ -1,6 +1,7 @@
 import { useRef, useState, useEffect } from "react";
 import { useParams, Link, useLocation } from "wouter";
 import { Layout } from "@/components/Layout";
+import { VideoPlayer } from "@/components/VideoPlayer";
 import { useScrapedVideoById, useScrapedRelatedVideos, type ScrapedVideo } from "@/hooks/useScrapedVideos";
 import {
   Flame,
@@ -207,14 +208,12 @@ export default function LeakWatch() {
           {/* Video Player Cinema Frame */}
           <div className="relative aspect-video w-full max-h-[70vh] mx-auto bg-black rounded-2xl overflow-hidden shadow-2xl border border-border/30">
             {isDirectMp4 ? (
-              <video
-                ref={videoRef}
+              <VideoPlayer
                 src={video.full_video_url!}
                 poster={video.clean_thumbnail_url || video.thumbnail_url || undefined}
-                controls
+                title={video.title}
                 autoPlay
-                playsInline
-                className="w-full h-full object-contain"
+                videoRef={videoRef}
               />
             ) : resolvedEmbedUrl ? (
               <iframe

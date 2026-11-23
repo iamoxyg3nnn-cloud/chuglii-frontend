@@ -1524,6 +1524,7 @@ function extractPackedStreamInfo(html) {
       // Edge worker proxies HTML with a spoofed Referer and injects <base>.
       let referer = "https://supjav.com/";
       if (targetUrl.includes("mmsvibex")) referer = "https://mmsvibex.life/";
+      if (destObj.hostname.includes("sheeshfans")) referer = "https://sheeshfans.com/";
       const icLocker = /playmogo|streamwish|dood|bysezejataos|voe\.sx|streamtape|internetchicks/i.test(destObj.hostname);
       if (icLocker) referer = "https://internetchicks.com/";
 
@@ -1542,6 +1543,18 @@ function extractPackedStreamInfo(html) {
         let body = await upstreamRes.text();
         // Remove frame busting check
         body = body.replace(/if\s*\(\s*top\.location\.href\s*==\s*location\.href\s*\)\s*\{[^}]*\}/g, "");
+        body = body.replace(/top\.location[^;]+;/g, "void 0;");
+        // Strip Cloudflare RUM/beacon and common analytics scripts - they leak cross-origin requests from our player origin and cause CORS/404 noise.
+        body = body.replace(/<script[^>]*src=["'][^"']*cloudflareinsights\.com\/beacon[^"']*["'][^>]*>\s*<\/script>/gi, "");
+        body = body.replace(/<script[^>]*src=["'][^"']*\/cdn-cgi\/rum[^"']*["'][^>]*>\s*<\/script>/gi, "");
+        body = body.replace(/<script[^>]*>\s*window\.__CF\$cv\$params[\s\S]*?<\/script>/gi, "");
+        body = body.replace(/<script[^>]*data-cf-beacon=[^>]*>\s*<\/script>/gi, "");
+        body = body.replace(/<script[^>]*src=["'][^"']*(?:googletagmanager\.com|google-analytics\.com|gtag\/js)[^"']*["'][^>]*>\s*<\/script>/gi, "");
+        body = body.replace(/<script[^>]*>[\s\S]*?(?:gtag\(|GoogleAnalyticsObject|google-analytics\.com|googletagmanager\.com)[\s\S]*?<\/script>/gi, "");
+        // Neutralize RUM/analytics endpoints in remaining inline scripts (base href would resolve /cdn-cgi/rum to embed origin causing CORS).
+        body = body.replace(/(["'`])\/cdn-cgi\/rum\??[^"'`]*\1/g, '"about:blank"');
+        body = body.replace(/(["'`])https?:\/\/[^"'`]*\/cdn-cgi\/rum\??[^"'`]*\1/g, '"about:blank"');
+        body = body.replace(/(["'`])\/[^"'`]*\/ga\/g\/c\/[^"'`]*\1/g, '"about:blank"');
         // Inject <base> tag so relative CSS/JS load from destination host
         const baseTag = `<base href="${destObj.origin}/">`;
         if (body.includes("<head>")) {

@@ -25,8 +25,9 @@ function getPlayablePreviewUrl(video: OnlyfansVideo): string | null {
     video.trailer_preview_url,
     ...directServers,
   ];
-  // PimpBunny preview screenshot endpoints are often shield-blocked; only use
+  // PimpBunny preview endpoints are often shield-blocked; only use
   // trailer/direct candidates. Do not fall back to full_video_url for hover.
+  // If nothing is available, we resolve a fresh signed direct stream on hover.
   if (video.source_site !== "pimpbunny") {
     candidates.push(video.full_video_url);
   }
@@ -108,21 +109,41 @@ export function OnlyfansCard({ video, isSaved = false, onToggleSave }: OnlyfansC
   const resolvePimpbunnyPreview = async () => {
     if (resolvedPreview || previewFailed) return;
     if (video.source_site !== "pimpbunny" || !video.detail_url) return;
-    if (getPlayablePreviewUrl(video)) return; // already have a usable non-expired candidate
+    // Prefer any non-expired playable candidate; otherwise resolve fresh signed stream.
+    if (getPlayablePreviewUrl(video)) return;
     try {
       const resp = await fetch(`/api/player?url=${encodeURIComponent(video.detail_url)}&format=json`, {
         headers: { Accept: "application/json" },
         redirect: "manual",
+        cache: "no-store",
       });
-      if (!resp.ok) return;
       const ct = resp.headers.get("content-type") || "";
-      if (!ct.includes("application/json")) return;
-      const data = await resp.json().catch(() => null);
-      const streams = Array.isArray(data?.streams) ? data.streams : [];
-      const best = [...streams]
-        .filter((s: any) => typeof s?.url === "string" && /\.(mp4|webm)(?:[/?#]|$)/i.test(s.url))
-        .sort((a: any, b: any) => (Number(b?.quality) || 0) - (Number(a?.quality) || 0))[0];
-      if (best?.url) setResolvedPreview(String(best.url));
+      if (resp.ok && ct.includes("application/json")) {
+        const data = await resp.json().catch(() => null);
+        const streams = Array.isArray(data?.streams) ? data.streams : [];
+        const best = [...streams]
+          .filter((s: any) => typeof s?.url === "string" && /\.(mp4|webm)(?:[/?#]|$)/i.test(s.url))
+          .sort((a: any, b: any) => (Number(b?.quality) || 0) - (Number(a?.quality) || 0))[0];
+        if (best?.url) {
+          setResolvedPreview(String(best.url));
+          return;
+        }
+      }
+      // Worker resolve can be Bunny Shield-blocked; try direct browser fetch with no-referrer.
+      const pageResp = await fetch(video.detail_url, { referrerPolicy: "no-referrer", credentials: "omit", cache: "no-store" });
+      if (!pageResp.ok) return;
+      const html = await pageResp.text();
+      const matches = html.matchAll(/(?:['"]?(?:video_url|video_alt_url\d*)(?:_text)?['"]?)\s*[:=]\s*(['"])(.*?)\1/gi);
+      const candidates: Array<{url:string;quality:number}> = [];
+      for (const m of matches) {
+        let u = (m[2] || "").replace(/\\\//g, "/").replace(/\\u0026/g, "&").replace(/&amp;/g, "&").trim();
+        if (!u || !/pimpbunny\.com\/get_file\/.+\.(mp4|webm)/i.test(u)) continue;
+        try { u = new URL(u, video.detail_url).toString(); } catch { continue; }
+        const qm = u.match(/(?<!\d)(2160|1440|1080|720|480|360)p?(?!\d)/i);
+        candidates.push({ url: u, quality: qm ? Number(qm[1]) : 0 });
+      }
+      const bestDirect = candidates.sort((a,b)=>b.quality-a.quality)[0];
+      if (bestDirect?.url) setResolvedPreview(bestDirect.url);
     } catch {
       // ignore; hover preview is non-critical
     }

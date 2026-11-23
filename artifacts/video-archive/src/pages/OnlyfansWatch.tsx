@@ -100,6 +100,7 @@ export default function OnlyfansWatch() {
   const [pimpbunnyEmbedStalled, setPimpbunnyEmbedStalled] = useState(false);
   const [pimpbunnyEmbedLoaded, setPimpbunnyEmbedLoaded] = useState(false);
   const [pbResolvedServers, setPbResolvedServers] = useState<Array<{ server: string; url: string; quality_score?: number; quality_label?: string }>>([]);
+  const [failedDirectUrls, setFailedDirectUrls] = useState<Set<string>>(new Set());
   const pbResolveAttempted = useRef<string | null>(null);
   const videoPlayerRef = useRef<HTMLVideoElement>(null);
   const pendingQualitySwitch = useRef<{ time: number; resume: boolean } | null>(null);
@@ -109,6 +110,7 @@ export default function OnlyfansWatch() {
   useEffect(() => {
     setSelectedServerUrl(null);
     setPbResolvedServers([]);
+    setFailedDirectUrls(new Set());
     pbResolveAttempted.current = null;
   }, [id]);
 
@@ -127,10 +129,14 @@ export default function OnlyfansWatch() {
       list.push(item);
     };
 
+    const isFailedPimpBunnyDirect = (url: string) =>
+      video?.source_site === "pimpbunny" && isDirectMediaUrl(url) && failedDirectUrls.has(url);
+
     for (const item of rawList) {
-      let u = item.embed_url || item.url || "";
+      let u = item.embed_url || item.url;
       if (!u) continue;
       u = normalizeStreamUrl(u);
+      if (isFailedPimpBunnyDirect(u)) continue;
       const isPimpBunnySourcePlayer = video?.source_site === "pimpbunny" && /\/embed\//i.test(u);
       const qLabel = isPimpBunnySourcePlayer ? "Source player" : formatQualityLabel(item.quality_label || item.name || item.server, u);
       const label = isPimpBunnySourcePlayer
@@ -143,13 +149,14 @@ export default function OnlyfansWatch() {
     if (pbResolvedServers.length > 0) {
       for (const s of pbResolvedServers) {
         const u = normalizeStreamUrl(s.url);
+        if (isFailedPimpBunnyDirect(u)) continue;
         const qLabel = formatQualityLabel(s.quality_label || s.server, u);
         pushUnique({ server: s.server || `PimpBunny ${qLabel}`, url: u, quality_score: s.quality_score, quality_label: qLabel });
       }
     }
 
     const primaryUrl = normalizeStreamUrl(video?.full_video_url || "");
-    if (primaryUrl && !list.some((m) => m.url === primaryUrl)) {
+    if (primaryUrl && !list.some((m) => m.url === primaryUrl) && !isFailedPimpBunnyDirect(primaryUrl)) {
       const primaryLabel =
         video?.source_site === "pimpbunny" && /\/embed\//i.test(primaryUrl)
           ? "Source player"
@@ -162,7 +169,7 @@ export default function OnlyfansWatch() {
       });
     }
 
-    const DEAD_FIRST_HOSTS = ["streamtape", "vidoza"];
+    const DEAD_FIRST_HOSTS = ["playmogo.com", "bysejpadsk.com"];
     const isDemoted = (url: string) => DEAD_FIRST_HOSTS.some((h) => url.toLowerCase().includes(h));
     const ranked = [...list.filter((s) => !isDemoted(s.url)), ...list.filter((s) => isDemoted(s.url))];
     // Sort direct PimpBunny renditions by quality desc, keep embed/source-player last.
@@ -203,8 +210,8 @@ export default function OnlyfansWatch() {
 
   const pimpbunnyQualityVariants = useMemo(() => {
     if (video?.source_site !== "pimpbunny") return [];
-    return allServers.filter((server) => isDirectMediaUrl(server.url));
-  }, [allServers, video?.source_site]);
+    return allServers.filter((server) => isDirectMediaUrl(server.url) && !failedDirectUrls.has(server.url));
+  }, [allServers, video?.source_site, failedDirectUrls]);
   const showPimpbunnyQualitySelect = pimpbunnyQualityVariants.length > 1;
 
   const pickSmartQuality = useMemo(() => {
@@ -640,20 +647,29 @@ export default function OnlyfansWatch() {
                   onQualityChange={selectServer}
                   onReload={async () => {
                     if (video?.source_site === "pimpbunny" && video?.detail_url) {
+                      const failed = new Set(failedDirectUrls);
+                      if (activeUrl) failed.add(activeUrl);
+                      setFailedDirectUrls(failed);
                       try {
-                        const r = await fetch(`/api/player?url=${encodeURIComponent(video.detail_url)}&format=json`, { headers: { Accept: "application/json" } });
+                        const r = await fetch(`/api/player?url=${encodeURIComponent(video.detail_url)}&format=json`, { headers: { Accept: "application/json" }, cache: "no-store" });
                         if (r.ok) {
                           const data = await r.json();
                           const streams = Array.isArray(data?.streams) ? data.streams : [];
                           const { mapped, picked } = pickMatchingQuality(streams, activeUrl);
-                          if (mapped.length > 0) {
-                            setPbResolvedServers(mapped);
-                            if (picked?.url) setSelectedServerUrl(picked.url);
+                          const fresh = mapped.filter((s: any) => !failed.has(s.url));
+                          if (fresh.length > 0) {
+                            setPbResolvedServers(fresh);
+                            setSelectedServerUrl((picked?.url && !failed.has(picked.url) ? picked.url : fresh[0].url) || null);
                             setPlayerKey((k) => k + 1);
                             return;
                           }
                         }
                       } catch {}
+                      // Fresh signed URLs unavailable (Bunny Shield/expired). Fall back to embed player.
+                      setPbResolvedServers([]);
+                      setSelectedServerUrl(null);
+                      setPlayerKey((k) => k + 1);
+                      return;
                     }
                     const curIdx = allServers.findIndex((s) => s.url === activeUrl);
                     if (curIdx >= 0 && curIdx < allServers.length - 1) {
@@ -663,20 +679,29 @@ export default function OnlyfansWatch() {
                   }}
                   onError={async () => {
                     if (video?.source_site === "pimpbunny" && video?.detail_url) {
+                      const failed = new Set(failedDirectUrls);
+                      if (activeUrl) failed.add(activeUrl);
+                      setFailedDirectUrls(failed);
                       try {
-                        const r = await fetch(`/api/player?url=${encodeURIComponent(video.detail_url)}&format=json`, { headers: { Accept: "application/json" } });
+                        const r = await fetch(`/api/player?url=${encodeURIComponent(video.detail_url)}&format=json`, { headers: { Accept: "application/json" }, cache: "no-store" });
                         if (r.ok) {
                           const data = await r.json();
                           const streams = Array.isArray(data?.streams) ? data.streams : [];
                           const { mapped, picked } = pickMatchingQuality(streams, activeUrl);
-                          if (mapped.length > 0) {
-                            setPbResolvedServers(mapped);
-                            if (picked?.url) setSelectedServerUrl(picked.url);
+                          const fresh = mapped.filter((s: any) => !failed.has(s.url));
+                          if (fresh.length > 0) {
+                            setPbResolvedServers(fresh);
+                            setSelectedServerUrl((picked?.url && !failed.has(picked.url) ? picked.url : fresh[0].url) || null);
                             setPlayerKey((k) => k + 1);
                             return;
                           }
                         }
                       } catch {}
+                      // Signed PimpBunny get_file URLs can expire/403. Fall back to embed player.
+                      setPbResolvedServers([]);
+                      setSelectedServerUrl(null);
+                      setPlayerKey((k) => k + 1);
+                      return;
                     }
                     const curIdx = allServers.findIndex((s) => s.url === activeUrl);
                     if (curIdx >= 0 && curIdx < allServers.length - 1) {
@@ -696,8 +721,7 @@ export default function OnlyfansWatch() {
                     setPimpbunnyEmbedLoaded(true);
                     setPimpbunnyEmbedStalled(false);
                   }}
-                  allowFullScreen
-                  allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+                  allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share; fullscreen"
                   referrerPolicy={refPolicy as any}
                 />
               )
