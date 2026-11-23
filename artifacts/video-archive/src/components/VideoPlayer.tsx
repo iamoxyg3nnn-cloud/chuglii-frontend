@@ -78,7 +78,10 @@ export function VideoPlayer({
   const [hoverX, setHoverX] = useState(0);
   const [stallNotice, setStallNotice] = useState<string | null>(null);
   const stallTimer = useRef<number | null>(null);
+  const startupStallTimer = useRef<number | null>(null);
   const lastDowngradeAt = useRef(0);
+  const playRequested = useRef(false);
+  const lastProgressValue = useRef(0);
 
   const clearHideTimer = useCallback(() => {
     if (hideTimer.current) { window.clearTimeout(hideTimer.current); hideTimer.current = null; }
@@ -96,9 +99,15 @@ export function VideoPlayer({
   useEffect(() => {
     setError(false); setLoading(true); setPlaying(false); setCurrentTime(0); setDuration(0); setBuffered(0); setStallNotice(null);
     if (stallTimer.current) { window.clearTimeout(stallTimer.current); stallTimer.current = null; }
-  }, [src]);
+    if (startupStallTimer.current) { window.clearTimeout(startupStallTimer.current); startupStallTimer.current = null; }
+    playRequested.current = autoPlay;
+    lastProgressValue.current = 0;
+  }, [src, autoPlay]);
 
-  useEffect(() => () => { if (stallTimer.current) window.clearTimeout(stallTimer.current); }, []);
+  useEffect(() => () => {
+    if (stallTimer.current) window.clearTimeout(stallTimer.current);
+    if (startupStallTimer.current) window.clearTimeout(startupStallTimer.current);
+  }, []);
 
   useEffect(() => {
     const onFsChange = () => setFullscreen(Boolean(document.fullscreenElement));
@@ -108,10 +117,51 @@ export function VideoPlayer({
 
   useEffect(() => () => clearHideTimer(), [clearHideTimer]);
 
+  const clearStartupStallTimer = useCallback(() => {
+    if (startupStallTimer.current) { window.clearTimeout(startupStallTimer.current); startupStallTimer.current = null; }
+  }, []);
+
+  const triggerStartupRecovery = useCallback((reason: string) => {
+    const now = Date.now();
+    if (now - lastDowngradeAt.current < 12000) return;
+    lastDowngradeAt.current = now;
+    if (qualities.length > 1 && onAutoDowngrade) {
+      setStallNotice("Slow/blocked stream - trying lower quality...");
+      onAutoDowngrade(activeQualityUrl || src);
+      window.setTimeout(() => setStallNotice(null), 4000);
+      return;
+    }
+    setStallNotice(reason);
+    window.setTimeout(() => setStallNotice(null), 4000);
+    onReload?.();
+  }, [activeQualityUrl, onAutoDowngrade, onReload, qualities.length, src]);
+
+  const armStartupStallTimer = useCallback((delay = 9000) => {
+    clearStartupStallTimer();
+    startupStallTimer.current = window.setTimeout(() => {
+      const v = videoRef.current;
+      if (!v || error) return;
+      const noProgress = !Number.isFinite(v.currentTime) || v.currentTime <= 0.1;
+      const notReady = v.readyState < 2;
+      const noBuffer = !v.buffered.length || v.buffered.end(0) < 0.5;
+      if (playRequested.current && (noProgress || notReady || noBuffer)) {
+        triggerStartupRecovery("Stream taking too long - retrying...");
+      }
+    }, delay);
+  }, [clearStartupStallTimer, error, triggerStartupRecovery, videoRef]);
+
   const togglePlay = useCallback(() => {
     const v = videoRef.current; if (!v) return;
-    if (v.paused || v.ended) v.play().catch(() => {}); else v.pause();
-  }, [videoRef]);
+    if (v.paused || v.ended) {
+      playRequested.current = true;
+      armStartupStallTimer(9000);
+      v.play().catch(() => {});
+    } else {
+      playRequested.current = false;
+      clearStartupStallTimer();
+      v.pause();
+    }
+  }, [armStartupStallTimer, clearStartupStallTimer, videoRef]);
 
   const toggleMute = useCallback(() => {
     const v = videoRef.current; if (!v) return;
@@ -156,6 +206,11 @@ export function VideoPlayer({
     const v = videoRef.current; if (!v) return;
     setCurrentTime(v.currentTime);
     if (v.buffered.length > 0) { try { setBuffered(v.buffered.end(v.buffered.length - 1)); } catch {} }
+    if (v.currentTime > 0.25 || v.readyState >= 3) {
+      clearStartupStallTimer();
+      playRequested.current = false;
+      lastProgressValue.current = v.currentTime;
+    }
   };
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
@@ -200,13 +255,13 @@ export function VideoPlayer({
         className="w-full h-full object-contain"
         onClick={togglePlay}
         onDoubleClick={toggleFullscreen}
-        onPlay={() => { setPlaying(true); scheduleHide(); }}
+        onPlay={() => { setPlaying(true); scheduleHide(); if (playRequested.current) armStartupStallTimer(9000); }}
         onPause={() => { setPlaying(false); setShowControls(true); clearHideTimer(); }}
-        onEnded={() => { setPlaying(false); setShowControls(true); }}
+        onEnded={() => { setPlaying(false); setShowControls(true); playRequested.current = false; clearStartupStallTimer(); }}
         onTimeUpdate={onTimeUpdate}
         onDurationChange={() => setDuration(videoRef.current?.duration || 0)}
         onLoadedMetadata={() => { setDuration(videoRef.current?.duration || 0); setLoading(false); }}
-        onLoadedData={() => setLoading(false)}
+        onLoadedData={() => { setLoading(false); if (playRequested.current) armStartupStallTimer(9000); }}
         onWaiting={() => {
           setLoading(true);
           if (stallTimer.current) window.clearTimeout(stallTimer.current);
@@ -223,11 +278,12 @@ export function VideoPlayer({
               window.setTimeout(() => setStallNotice(null), 3000);
             }
           }, 2800);
+          if (playRequested.current) armStartupStallTimer(9000);
         }}
         onCanPlay={() => { setLoading(false); setError(false); if (stallTimer.current) { window.clearTimeout(stallTimer.current); stallTimer.current = null; } }}
-        onPlaying={() => { setLoading(false); if (stallTimer.current) { window.clearTimeout(stallTimer.current); stallTimer.current = null; } }}
-        onStalled={() => { setLoading(true); }}
-        onError={() => { setLoading(false); setError(true); if (stallTimer.current) { window.clearTimeout(stallTimer.current); stallTimer.current = null; } onError?.(); }}
+        onPlaying={() => { setLoading(false); clearStartupStallTimer(); playRequested.current = false; if (stallTimer.current) { window.clearTimeout(stallTimer.current); stallTimer.current = null; } }}
+        onStalled={() => { setLoading(true); if (playRequested.current) armStartupStallTimer(7000); }}
+        onError={() => { setLoading(false); setError(true); clearStartupStallTimer(); playRequested.current = false; if (stallTimer.current) { window.clearTimeout(stallTimer.current); stallTimer.current = null; } onError?.(); }}
       />
 
       <div className={`pointer-events-none absolute inset-x-0 top-0 h-28 bg-gradient-to-b from-black/70 via-black/20 to-transparent transition-opacity duration-300 ${showControls || !playing ? "opacity-100" : "opacity-0"}`} />

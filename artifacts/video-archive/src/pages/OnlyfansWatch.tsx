@@ -124,13 +124,37 @@ export default function OnlyfansWatch() {
     const rawList: any[] = rawPayload?.servers || rawPayload?.mirrors || [];
     const list: Array<{ server: string; url: string; quality_score?: number; quality_label?: string }> = [];
 
+    const dedupeKey = (url: string) => {
+      if (video?.source_site === "pimpbunny") {
+        try {
+          const u = new URL(url, window.location.origin);
+          if ((u.hostname === "pimpbunny.com" || u.hostname.endsWith(".pimpbunny.com")) && /\/get_file\/.+\.(mp4|webm|m3u8)(\/|$)/i.test(u.pathname)) {
+            return `${u.hostname}${u.pathname.replace(/\/+$/, "").toLowerCase()}`;
+          }
+        } catch {}
+      }
+      return url;
+    };
+
     const pushUnique = (item: { server: string; url: string; quality_score?: number; quality_label?: string }) => {
-      if (!item.url || list.some((m) => m.url === item.url)) return;
+      if (!item.url) return;
+      const key = dedupeKey(item.url);
+      if (list.some((m) => dedupeKey(m.url) === key)) return;
       list.push(item);
     };
 
     const isFailedPimpBunnyDirect = (url: string) =>
       video?.source_site === "pimpbunny" && isDirectMediaUrl(url) && failedDirectUrls.has(url);
+
+    // Prefer fresh on-demand PimpBunny renditions when available; stale DB URLs may be expired/signed duplicates.
+    if (pbResolvedServers.length > 0) {
+      for (const s of pbResolvedServers) {
+        const u = normalizeStreamUrl(s.url);
+        if (isFailedPimpBunnyDirect(u)) continue;
+        const qLabel = formatQualityLabel(s.quality_label || s.server, u);
+        pushUnique({ server: s.server || `PimpBunny ${qLabel}`, url: u, quality_score: s.quality_score, quality_label: qLabel });
+      }
+    }
 
     for (const item of rawList) {
       let u = item.embed_url || item.url;
@@ -145,28 +169,22 @@ export default function OnlyfansWatch() {
       pushUnique({ server: label, url: u, quality_score: item.quality_score, quality_label: qLabel });
     }
 
-    // Prefer fresh on-demand PimpBunny renditions when available.
-    if (pbResolvedServers.length > 0) {
-      for (const s of pbResolvedServers) {
-        const u = normalizeStreamUrl(s.url);
-        if (isFailedPimpBunnyDirect(u)) continue;
-        const qLabel = formatQualityLabel(s.quality_label || s.server, u);
-        pushUnique({ server: s.server || `PimpBunny ${qLabel}`, url: u, quality_score: s.quality_score, quality_label: qLabel });
-      }
-    }
-
     const primaryUrl = normalizeStreamUrl(video?.full_video_url || "");
-    if (primaryUrl && !list.some((m) => m.url === primaryUrl) && !isFailedPimpBunnyDirect(primaryUrl)) {
-      const primaryLabel =
-        video?.source_site === "pimpbunny" && /\/embed\//i.test(primaryUrl)
-          ? "Source player"
-          : formatQualityLabel(video?.quality_label, primaryUrl) || "1080p Full HD";
-      list.unshift({
-        server: video?.source_site === "pimpbunny" && !/\/embed\//i.test(primaryUrl) ? `PimpBunny ${primaryLabel}` : "Primary Stream",
-        url: primaryUrl,
-        quality_score: video?.quality_score || 1080,
-        quality_label: primaryLabel,
-      });
+    if (primaryUrl && !isFailedPimpBunnyDirect(primaryUrl)) {
+      const key = dedupeKey(primaryUrl);
+      const exists = list.some((m) => dedupeKey(m.url) === key);
+      if (!exists) {
+        const primaryLabel =
+          video?.source_site === "pimpbunny" && /\/embed\//i.test(primaryUrl)
+            ? "Source player"
+            : formatQualityLabel(video?.quality_label, primaryUrl) || "1080p Full HD";
+        list.unshift({
+          server: video?.source_site === "pimpbunny" && !/\/embed\//i.test(primaryUrl) ? `PimpBunny ${primaryLabel}` : "Primary Stream",
+          url: primaryUrl,
+          quality_score: video?.quality_score || 1080,
+          quality_label: primaryLabel,
+        });
+      }
     }
 
     const DEAD_FIRST_HOSTS = ["playmogo.com", "bysejpadsk.com"];
@@ -374,13 +392,21 @@ export default function OnlyfansWatch() {
   };
 
   const autoDowngradeQuality = (fromUrl: string) => {
-    const direct = pimpbunnyQualityVariants;
-    if (direct.length < 2) return;
-    const idx = direct.findIndex((v) => v.url === fromUrl);
-    const next = idx >= 0 ? direct[idx + 1] : direct[1];
-    if (next?.url) selectServer(next.url);
+    if (video?.source_site === "pimpbunny" && fromUrl) {
+      setFailedDirectUrls((prev) => { const next = new Set(prev); next.add(fromUrl); return next; });
+    }
+    const direct = pimpbunnyQualityVariants.filter((v) => v.url !== fromUrl);
+    if (direct.length > 0) {
+      const idx = pimpbunnyQualityVariants.findIndex((v) => v.url === fromUrl);
+      const next = idx >= 0 ? (pimpbunnyQualityVariants[idx + 1] && pimpbunnyQualityVariants[idx + 1].url !== fromUrl ? pimpbunnyQualityVariants[idx + 1] : direct[0]) : direct[0];
+      if (next?.url) { selectServer(next.url); return; }
+    }
+    if (video?.source_site === "pimpbunny") {
+      setPbResolvedServers([]);
+      setSelectedServerUrl(null);
+      setPlayerKey((k) => k + 1);
+    }
   };
-
   const pickMatchingQuality = (streams: Array<any>, currentUrl: string) => {
     const getH = (v: any) => {
       const m = String(v?.label || v?.quality_label || v?.url || "").match(/(2160|1440|1080|720|480|360)/);
