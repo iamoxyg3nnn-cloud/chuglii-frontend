@@ -3,6 +3,7 @@ import { useParams, Link, useLocation } from "wouter";
 import { Layout } from "@/components/Layout";
 import { useMyanmarVideoById, useMyanmarRelatedVideos, type MyanmarVideo } from "@/hooks/useMyanmarVideos";
 import { MyanmarCard } from "@/components/MyanmarCard";
+import { getSupabase } from "@/lib/supabase";
 import {
   ArrowLeft,
   Clock,
@@ -22,10 +23,10 @@ import {
 } from "@phosphor-icons/react";
 
 /**
- * Checks if a presigned AWS/Cloudflare R2 URL has expired based on query parameters.
+ * Returns the expiry timestamp (ms) of a presigned AWS/Cloudflare R2 URL, or null.
  */
-function isUrlExpired(url: string | null | undefined): boolean {
-  if (!url) return true;
+function presignedExpiryMs(url: string | null | undefined): number | null {
+  if (!url) return null;
   try {
     const u = new URL(url);
     const amzDate = u.searchParams.get("X-Amz-Date");
@@ -38,18 +39,27 @@ function isUrlExpired(url: string | null | undefined): boolean {
       const min = parseInt(amzDate.slice(11, 13), 10);
       const sec = parseInt(amzDate.slice(13, 15), 10);
       const signedTime = Date.UTC(year, month, day, hour, min, sec);
-      const expiresMs = parseInt(amzExpires, 10) * 1000;
-      // 2-minute safety window
-      return Date.now() > signedTime + expiresMs - 120_000;
+      return signedTime + parseInt(amzExpires, 10) * 1000;
     }
   } catch {}
-  return false;
+  return null;
+}
+
+/**
+ * Checks if a presigned AWS/Cloudflare R2 URL has expired based on query parameters.
+ */
+function isUrlExpired(url: string | null | undefined): boolean {
+  const expiresAt = presignedExpiryMs(url);
+  if (expiresAt === null) return !url;
+  // 2-minute safety window
+  return Date.now() > expiresAt - 120_000;
 }
 
 export default function MyanmarWatch() {
   const { id } = useParams<{ id: string }>();
   const [, setLocation] = useLocation();
   const videoRef = useRef<HTMLVideoElement | null>(null);
+  const failedStreamsRef = useRef<Set<string>>(new Set());
 
   const [copied, setCopied] = useState(false);
   const [copiedStream, setCopiedStream] = useState(false);
@@ -61,11 +71,15 @@ export default function MyanmarWatch() {
   const [streamError, setStreamError] = useState(false);
   const [useIframePlayer, setUseIframePlayer] = useState(false);
   const [playerKey, setPlayerKey] = useState(0);
+  const [retryNonce, setRetryNonce] = useState(0);
 
   const { data: video, isLoading, error } = useMyanmarVideoById(id);
   const { data: relatedVideos, isLoading: relatedLoading } = useMyanmarRelatedVideos(id, 8);
 
-  // Fetch or re-resolve fresh MP4 stream from /api/player
+  // Fetch or re-resolve a fresh MP4 stream.
+  // BuuMal's Cloudflare bot challenge blocks Cloudflare Worker egress, so we first
+  // ask the database host to resolve the page (it is not challenged) through the
+  // scraper_resolve_myanmar_stream_by_id RPC, then fall back to the worker resolver.
   const resolveFreshStream = useCallback(async (force = false) => {
     if (!video) return;
 
@@ -79,10 +93,31 @@ export default function MyanmarWatch() {
       return;
     }
 
-    // Otherwise, resolve fresh presigned stream URL via backend resolver
+    setIsResolving(true);
+    setStreamError(false);
+
+    // 1) Database-side resolver (bypasses the Cloudflare bot challenge)
+    if (video.source_post_id) {
+      try {
+        const sb = await getSupabase();
+        const { data, error: rpcError } = await sb.rpc("scraper_resolve_myanmar_stream_by_id", {
+          p_post_id: video.source_post_id,
+        });
+        if (!rpcError && typeof data === "string" && data.startsWith("http")) {
+          setStreamUrl(data);
+          setIsResolving(false);
+          return;
+        }
+        if (rpcError) {
+          console.warn("[MyanmarWatch] DB stream resolver failed:", rpcError.message);
+        }
+      } catch (err) {
+        console.warn("[MyanmarWatch] DB stream resolver error:", err);
+      }
+    }
+
+    // 2) Edge worker resolver (covers legacy records / other hosts)
     if (video.detail_url) {
-      setIsResolving(true);
-      setStreamError(false);
       try {
         const res = await fetch(`/api/player?url=${encodeURIComponent(video.detail_url)}&format=json`);
         if (!res.ok) throw new Error(`Resolver status ${res.status}`);
@@ -96,17 +131,14 @@ export default function MyanmarWatch() {
       } catch (err) {
         console.warn("[MyanmarWatch] Failed to resolve fresh stream:", err);
       }
+    }
 
-      // If resolving failed, fallback to candidate URL or switch to clean iframe
-      if (candidateUrl) {
-        setStreamUrl(candidateUrl);
-        setIsResolving(false);
-      } else {
-        setUseIframePlayer(true);
-        setIsResolving(false);
-      }
-    } else if (candidateUrl) {
+    // 3) Fall back to a still-valid stored URL, otherwise the clean embed.
+    if (candidateUrl && !isUrlExpired(candidateUrl)) {
       setStreamUrl(candidateUrl);
+      setIsResolving(false);
+    } else if (video.detail_url) {
+      setUseIframePlayer(true);
       setIsResolving(false);
     } else {
       setStreamError(true);
@@ -116,19 +148,26 @@ export default function MyanmarWatch() {
 
   // Trigger stream resolution whenever video data changes or playerKey increments
   useEffect(() => {
+    failedStreamsRef.current = new Set();
     setUseIframePlayer(false);
     resolveFreshStream(false);
   }, [video?.id, playerKey, resolveFreshStream]);
 
-  // Video error recovery handler
+  // Video error recovery handler: retry with a freshly resolved URL, but stop
+  // after a couple of attempts so a dead stream cannot loop forever.
   const handleVideoError = () => {
     console.warn("[MyanmarWatch] Native video error, resolving fresh stream...");
-    // If not already tried resolving, force resolve fresh stream URL
-    if (video?.detail_url && !isResolving) {
-      resolveFreshStream(true);
-    } else {
-      setStreamError(true);
+    if (streamUrl) failedStreamsRef.current.add(streamUrl);
+
+    if (failedStreamsRef.current.size >= 3 || isResolving) {
+      if (video?.detail_url) setUseIframePlayer(true);
+      else setStreamError(true);
+      return;
     }
+
+    // Force a remount even if the resolver hands back the same signed URL.
+    setRetryNonce((n) => n + 1);
+    resolveFreshStream(true);
   };
 
   // Check saved state from localStorage
@@ -288,7 +327,7 @@ export default function MyanmarWatch() {
             ) : !useIframePlayer && streamUrl ? (
               <video
                 ref={videoRef}
-                key={`video-${streamUrl}`}
+                key={`video-${streamUrl}-${retryNonce}`}
                 src={streamUrl}
                 poster={video.clean_thumbnail_url || video.thumbnail_url || undefined}
                 controls
@@ -313,7 +352,11 @@ export default function MyanmarWatch() {
                 <FilmStrip size={48} className="mb-2 text-muted-foreground/60" />
                 <p className="text-sm font-medium text-foreground">Video stream is temporarily unavailable.</p>
                 <button
-                  onClick={() => resolveFreshStream(true)}
+                  onClick={() => {
+                    setUseIframePlayer(false);
+                    setRetryNonce((n) => n + 1);
+                    resolveFreshStream(true);
+                  }}
                   className="mt-4 px-4 py-2 rounded-xl text-xs font-semibold bg-rose-500 text-white hover:bg-rose-600 transition-colors inline-flex items-center gap-1.5 cursor-pointer"
                 >
                   <ArrowClockwise size={14} /> Retry Stream

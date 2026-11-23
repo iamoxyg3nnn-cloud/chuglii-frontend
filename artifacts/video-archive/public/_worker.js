@@ -842,6 +842,35 @@ function renderCleanHlsPlayer(streamingUrl, title = "", poster = "") {
 </html>`;
 }
 
+// ─── BuuMal (Myanmar) DB-assisted Resolver ──────────────────────────
+// BuuMal returns a 1-hour presigned Cloudflare R2 MP4 URL on each video page.
+// Cloudflare Worker egress is blocked by BuuMal's managed bot challenge, so the
+// resolve is delegated to the database host (which is not challenged) through
+// the scraper_resolve_myanmar_stream_by_id RPC.
+async function resolveBuumalStreamViaDb(targetUrl, supabaseUrl, supabaseKey) {
+  try {
+    const postId = new URL(targetUrl).pathname.match(/\/video\/([A-Za-z0-9]+)/)?.[1];
+    if (!postId) return null;
+
+    const rpcRes = await fetch(`${supabaseUrl.replace(/\/+$/, "")}/rest/v1/rpc/scraper_resolve_myanmar_stream_by_id`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "apikey": supabaseKey,
+        "Authorization": `Bearer ${supabaseKey}`,
+      },
+      body: JSON.stringify({ p_post_id: postId }),
+    });
+    if (!rpcRes.ok) return null;
+    const raw = await rpcRes.text();
+    let parsed;
+    try { parsed = JSON.parse(raw); } catch { parsed = raw; }
+    return typeof parsed === "string" && parsed.startsWith("http") ? parsed : null;
+  } catch {
+    return null;
+  }
+}
+
 // ─── Universal Dean Edwards Unpacker & Stream Extractor ─────────────
 function unpackDeanEdwards(p, a, c, k) {
   const chars = "0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ";
@@ -1072,6 +1101,10 @@ function extractPackedStreamInfo(html) {
       // Extracts clean direct Cloudflare R2 MP4 stream from Buu Mal video page
       // Serves pure ad-free responsive video player or JSON stream
       if (destObj.hostname.includes("buumal.com")) {
+        let freshStreamUrl = null;
+        let title = "Myanmar Video";
+        let poster = "";
+
         try {
           const buuRes = await fetch(targetUrl, {
             headers: {
@@ -1087,34 +1120,41 @@ function extractPackedStreamInfo(html) {
             const posterMatch = buuHtml.match(/<video[^>]+poster=["']([^"']+)["']/i) || buuHtml.match(/<meta\s+property=["']og:image["']\s+content=["']([^"']+)["']/i);
 
             if (sourceMatch && sourceMatch[1]) {
-              const freshStreamUrl = sourceMatch[1].replace(/&amp;/g, "&");
-              let title = titleMatch ? titleMatch[1].replace(/Buu Mal\s*\(.*?\)/gi, "").trim() : "Myanmar Video";
-              const poster = posterMatch ? posterMatch[1].replace(/&amp;/g, "&") : "";
-
-              const wantJson = url.searchParams.get("format") === "json" || request.headers.get("accept")?.includes("application/json");
-              if (wantJson) {
-                return new Response(JSON.stringify({ streamUrl: freshStreamUrl, title, poster }), {
-                  status: 200,
-                  headers: {
-                    "Content-Type": "application/json",
-                    "Access-Control-Allow-Origin": "*",
-                    "Cache-Control": "no-store",
-                  },
-                });
-              }
-
-              return new Response(renderCleanHlsPlayer(freshStreamUrl, title, poster), {
-                status: 200,
-                headers: {
-                  "Content-Type": "text/html; charset=utf-8",
-                  "Access-Control-Allow-Origin": "*",
-                  "Cache-Control": "no-store",
-                },
-              });
+              freshStreamUrl = sourceMatch[1].replace(/&amp;/g, "&");
+              title = titleMatch ? titleMatch[1].replace(/Buu Mal\s*\(.*?\)/gi, "").trim() : "Myanmar Video";
+              poster = posterMatch ? posterMatch[1].replace(/&amp;/g, "&") : "";
             }
           }
         } catch (e) {
-          console.error("BuuMal resolve error:", e);
+          console.error("BuuMal direct resolve error:", e);
+        }
+
+        // Worker egress is normally challenge-blocked, resolve from the DB host.
+        if (!freshStreamUrl) {
+          freshStreamUrl = await resolveBuumalStreamViaDb(targetUrl, supabaseUrl, supabaseKey);
+        }
+
+        if (freshStreamUrl) {
+          const wantJson = url.searchParams.get("format") === "json" || request.headers.get("accept")?.includes("application/json");
+          if (wantJson) {
+            return new Response(JSON.stringify({ streamUrl: freshStreamUrl, title, poster }), {
+              status: 200,
+              headers: {
+                "Content-Type": "application/json",
+                "Access-Control-Allow-Origin": "*",
+                "Cache-Control": "no-store",
+              },
+            });
+          }
+
+          return new Response(renderCleanHlsPlayer(freshStreamUrl, title, poster), {
+            status: 200,
+            headers: {
+              "Content-Type": "text/html; charset=utf-8",
+              "Access-Control-Allow-Origin": "*",
+              "Cache-Control": "no-store",
+            },
+          });
         }
       }
 
