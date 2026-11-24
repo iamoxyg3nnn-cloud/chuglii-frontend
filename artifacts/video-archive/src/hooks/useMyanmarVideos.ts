@@ -1,5 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { getSupabase } from "@/lib/supabase";
+import { rankRelatedVideos } from "@/lib/recommendations";
 
 export interface MyanmarVideo {
   id: string;
@@ -114,19 +115,24 @@ export function useMyanmarVideoById(id: string | undefined) {
   });
 }
 
-export function useMyanmarRelatedVideos(id: string | undefined, limit: number = 8) {
+export function useMyanmarRelatedVideos(
+  id: string | undefined,
+  current: MyanmarVideo | null | undefined,
+  limit: number = 8,
+) {
   return useQuery({
-    queryKey: ["myanmar-related-videos", id, limit],
-    enabled: Boolean(id),
+    queryKey: ["myanmar-related-videos", id, current?.id, limit],
+    enabled: Boolean(id && current),
     queryFn: async (): Promise<MyanmarVideo[]> => {
       if (!id) return [];
       const sb = await getSupabase();
       const { data, error } = await sb.rpc("scraper_get_myanmar_related_videos", {
         p_video_id: id,
-        p_limit: limit,
+        p_limit: Math.max(limit * 3, 24),
       });
       if (error) throw error;
-      return (data as MyanmarVideo[]) || [];
+      const pool = (data as MyanmarVideo[]) || [];
+      return current ? rankRelatedVideos(current, pool, limit) : pool.slice(0, limit);
     },
     staleTime: 1000 * 60 * 10,
   });

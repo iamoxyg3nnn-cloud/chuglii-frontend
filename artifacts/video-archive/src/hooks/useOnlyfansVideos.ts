@@ -1,5 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { getSupabase } from "@/lib/supabase";
+import { rankRelatedVideos } from "@/lib/recommendations";
 
 export interface OnlyfansVideo {
   id: string;
@@ -152,24 +153,30 @@ export function useOnlyfansVideoById(site: OnlyfansSite | undefined, id: string 
   });
 }
 
-export function useOnlyfansRelatedVideos(site: OnlyfansSite | undefined, id: string | undefined, limit: number = 8) {
+export function useOnlyfansRelatedVideos(
+  site: OnlyfansSite | undefined,
+  video: OnlyfansVideo | null | undefined,
+  limit: number = 8,
+) {
   return useQuery({
-    queryKey: ["onlyfans-related-videos", site, id, limit],
-    enabled: Boolean(site && id),
+    queryKey: ["onlyfans-related-videos", site, video?.id, limit],
+    enabled: Boolean(site && video),
     queryFn: async (): Promise<OnlyfansVideo[]> => {
-      if (!site || !id) return [];
+      if (!site || !video) return [];
       const sb = await getSupabase();
+      // Pull a wider pool so relevance ranking has real choices, then rank by
+      // shared tags/actors/models instead of repeating the same latest clips.
       const { data, error } = await sb.rpc(`scraper_get_onlyfans_videos`, {
         p_source_site: site,
         p_tag: null,
         p_category: null,
         p_search: null,
         p_sort: "newest",
-        p_limit: limit,
+        p_limit: Math.max(limit * 4, 32),
         p_offset: 0,
       });
       if (error) throw error;
-      return ((data as OnlyfansVideo[]) || []).filter((v) => v.id !== id);
+      return rankRelatedVideos(video, (data as OnlyfansVideo[]) || [], limit);
     },
     staleTime: 1000 * 60 * 10,
   });

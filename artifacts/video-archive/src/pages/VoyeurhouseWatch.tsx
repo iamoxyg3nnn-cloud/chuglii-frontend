@@ -1,7 +1,8 @@
-import { useRef, useState, useEffect, useCallback } from "react";
+import { useRef, useState, useEffect, useCallback, useMemo } from "react";
 import { useParams, Link } from "wouter";
 import { Layout } from "@/components/Layout";
 import { VideoPlayer } from "@/components/VideoPlayer";
+import { rankRelatedVideos } from "@/lib/recommendations";
 import {
   useVoyeurhouseVideoById,
   useVoyeurhouseVideos,
@@ -43,13 +44,15 @@ export default function VoyeurhouseWatch() {
 
   const { data: video, isLoading, error } = useVoyeurhouseVideoById(site, id);
 
-  const firstTag = video?.tags?.find((t) => t && t !== "voyeurhouse");
-  const { data: related } = useVoyeurhouseVideos({
+  const { data: relatedPool } = useVoyeurhouseVideos({
     site,
-    tag: firstTag,
-    limit: 8,
+    limit: 32,
     page: 1,
   });
+  const related = useMemo(
+    () => rankRelatedVideos(video, relatedPool?.items || [], 8),
+    [video, relatedPool],
+  );
 
   const backHref = `/voyeurhouse/${site}`;
   const siteLabel = VOYEURHOUSE_SITE_LABELS[site];
@@ -375,14 +378,14 @@ export default function VoyeurhouseWatch() {
             )}
           </div>
 
-          {related && related.items.length > 0 && (
+          {related.length > 0 && (
             <div className="mt-10">
               <h2 className="text-base sm:text-lg font-bold text-foreground mb-4 flex items-center gap-2">
                 <Sparkle size={18} className="text-amber-400" />
-                <span>More from {siteLabel}</span>
+                <span>More like this on {siteLabel}</span>
               </h2>
               <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-                {related.items.filter((rv) => rv.id !== video.id).map((rv) => (
+                {related.map((rv) => (
                   <VoyeurhouseCard key={rv.id} video={rv} />
                 ))}
               </div>

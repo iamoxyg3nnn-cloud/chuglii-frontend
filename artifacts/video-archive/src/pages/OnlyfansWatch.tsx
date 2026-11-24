@@ -98,7 +98,7 @@ export default function OnlyfansWatch() {
   }, [id]);
 
   const { data: video, isLoading, error } = useOnlyfansVideoById(site, id);
-  const { data: relatedVideos, isLoading: relatedLoading } = useOnlyfansRelatedVideos(site, id, 8);
+  const { data: relatedVideos, isLoading: relatedLoading } = useOnlyfansRelatedVideos(site, video, 8);
 
   const rawPayload = video?.raw_payload as any;
 

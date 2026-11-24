@@ -46,6 +46,12 @@ export function LeakCard({ video, isSaved = false, onToggleSave }: LeakCardProps
   // Derive a clean badge label (category or primary tag)
   const categoryBadge = video.categories?.find((c) => c !== "viral-mms") || video.tags?.[0] || "Viral";
 
+  // Freshly ingested clips should stand out even when their source publish
+  // date is old (historical backfills).
+  const isRecentlyScraped = Boolean(
+    video.scraped_at && Date.now() - new Date(video.scraped_at).getTime() < 48 * 60 * 60 * 1000,
+  );
+
   return (
     <Link
       href={`/leak/video/${video.id}`}
@@ -77,6 +83,11 @@ export function LeakCard({ video, isSaved = false, onToggleSave }: LeakCardProps
 
           {/* Top-left: Stream & Category badges */}
           <div className="absolute top-2 left-2 flex items-center gap-1 pointer-events-none z-10">
+            {isRecentlyScraped && (
+              <span className="text-[10px] font-bold uppercase tracking-wide text-white bg-emerald-500/90 px-1.5 py-0.5 rounded-md ring-1 ring-white/15">
+                New
+              </span>
+            )}
             {video.full_video_url && (
               <span className="text-[10px] font-semibold text-white/95 bg-black/60 backdrop-blur-md ring-1 ring-white/10 px-1.5 py-0.5 rounded-md">
                 HD

@@ -40,7 +40,7 @@ export default function JapaneseWatch() {
   }, [id]);
 
   const { data: video, isLoading, error } = useJapaneseVideoById(id);
-  const { data: relatedVideos, isLoading: relatedLoading } = useJapaneseRelatedVideos(id, 8);
+  const { data: relatedVideos, isLoading: relatedLoading } = useJapaneseRelatedVideos(id, video, 8);
 
   const rawPayload = video?.raw_payload as any;
   const allServers: Array<{ name: string; embed_url: string }> = rawPayload?.servers || [];

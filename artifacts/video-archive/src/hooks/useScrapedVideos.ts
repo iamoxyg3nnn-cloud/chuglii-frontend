@@ -1,5 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { getSupabase } from "@/lib/supabase";
+import { rankRelatedVideos } from "@/lib/recommendations";
 
 export interface ScrapedVideo {
   id: string;
@@ -108,19 +109,26 @@ export function useScrapedVideoById(id: string | undefined) {
   });
 }
 
-export function useScrapedRelatedVideos(id: string | undefined, limit: number = 12) {
+export function useScrapedRelatedVideos(
+  id: string | undefined,
+  current: ScrapedVideo | null | undefined,
+  limit: number = 12,
+) {
   return useQuery({
-    queryKey: ["scraped-related-videos", id, limit],
-    enabled: Boolean(id),
+    queryKey: ["scraped-related-videos", id, current?.id, limit],
+    enabled: Boolean(id && current),
     queryFn: async (): Promise<ScrapedVideo[]> => {
       if (!id) return [];
       const sb = await getSupabase();
       const { data, error } = await sb.rpc("scraper_get_related_videos", {
         p_video_id: id,
-        p_limit: limit,
+        p_limit: Math.max(limit * 3, 24),
       });
       if (error) throw error;
-      return (data as ScrapedVideo[]) || [];
+      const pool = (data as ScrapedVideo[]) || [];
+      // Re-rank locally as well: the SQL RPC is authoritative, but this keeps
+      // dedupe/freshness working even before the ranking migration is applied.
+      return current ? rankRelatedVideos(current, pool, limit) : pool.slice(0, limit);
     },
     staleTime: 1000 * 60 * 10,
   });

@@ -2,6 +2,7 @@ import { useRef, useState, useEffect } from "react";
 import { useParams, Link, useLocation } from "wouter";
 import { Layout } from "@/components/Layout";
 import { VideoPlayer } from "@/components/VideoPlayer";
+import { LeakCard } from "@/components/LeakCard";
 import { useScrapedVideoById, useScrapedRelatedVideos, type ScrapedVideo } from "@/hooks/useScrapedVideos";
 import {
   Flame,
@@ -33,7 +34,7 @@ export default function LeakWatch() {
   const [selectedServerUrl, setSelectedServerUrl] = useState<string | null>(null);
 
   const { data: video, isLoading, error } = useScrapedVideoById(id);
-  const { data: relatedVideos, isLoading: relatedLoading } = useScrapedRelatedVideos(id, 8);
+  const { data: relatedVideos, isLoading: relatedLoading } = useScrapedRelatedVideos(id, video, 12);
 
   const isDirectMp4 = Boolean(
     video?.full_video_url && video.full_video_url.endsWith(".mp4")
@@ -389,59 +390,48 @@ export default function LeakWatch() {
 
           {/* Related Videos Grid */}
           <div className="mt-12">
-            <div className="flex items-center justify-between mb-4">
+            <div className="flex items-center justify-between mb-4 gap-3">
               <div className="flex items-center gap-2">
                 <Flame size={20} weight="fill" className="text-rose-500" />
-                <h2 className="text-lg sm:text-xl font-bold tracking-tight text-foreground">
-                  Related Leaks
-                </h2>
+                <div>
+                  <h2 className="text-lg sm:text-xl font-bold tracking-tight text-foreground">
+                    More leaks like this
+                  </h2>
+                  <p className="text-[11px] text-muted-foreground">
+                    Matched by tags, model and newly added clips
+                  </p>
+                </div>
               </div>
+              <Link
+                href="/leak"
+                className="shrink-0 text-xs font-semibold text-rose-400 hover:text-rose-300 hover:underline"
+              >
+                View all
+              </Link>
             </div>
 
             {relatedLoading ? (
-              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-                {Array.from({ length: 4 }).map((_, i) => (
-                  <div key={i} className="aspect-video bg-muted/40 rounded-xl animate-pulse" />
+              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4 sm:gap-5">
+                {Array.from({ length: 8 }).map((_, i) => (
+                  <div key={i} className="space-y-2">
+                    <div className="aspect-video bg-muted/40 rounded-lg animate-pulse" />
+                    <div className="h-3 w-3/4 bg-muted/40 rounded animate-pulse" />
+                  </div>
                 ))}
               </div>
             ) : relatedVideos && relatedVideos.length > 0 ? (
-              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 sm:gap-5">
+              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4 sm:gap-5">
                 {relatedVideos.map((item) => (
-                  <Link key={item.id} href={`/leak/video/${item.id}`}>
-                    <div className="group rounded-xl overflow-hidden bg-card border border-border/40 hover:border-rose-500/50 hover:shadow-lg transition-all duration-200 cursor-pointer flex flex-col">
-                      <div className="relative aspect-video w-full bg-muted/50 overflow-hidden">
-                        <img
-                          src={item.clean_thumbnail_url || item.thumbnail_url || undefined}
-                          alt={item.title}
-                          loading="lazy"
-                          className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
-                        />
-                        {item.duration_formatted && (
-                          <div className="absolute bottom-2 right-2 px-1.5 py-0.5 rounded bg-black/80 text-[11px] font-semibold text-white">
-                            {item.duration_formatted}
-                          </div>
-                        )}
-                      </div>
-                      <div className="p-3">
-                        <p className="text-xs sm:text-sm font-semibold line-clamp-2 text-foreground group-hover:text-rose-400 transition-colors">
-                          {item.title}
-                        </p>
-                        <div className="flex items-center justify-between gap-2 mt-2 text-[11px] text-muted-foreground">
-                          <span>{item.views_raw || "0 views"}</span>
-                          {item.rating_raw && (
-                            <span className="text-emerald-400 font-medium flex items-center gap-0.5">
-                              <ThumbsUp size={11} weight="fill" /> {item.rating_raw}
-                            </span>
-                          )}
-                        </div>
-                      </div>
-                    </div>
-                  </Link>
+                  <LeakCard key={item.id} video={item} />
                 ))}
               </div>
             ) : (
-              <div className="text-center py-10 text-muted-foreground text-sm">
-                No related leaks found.
+              <div className="text-center py-10 rounded-xl border border-border/40 bg-card/40 text-muted-foreground text-sm">
+                No close matches yet.{" "}
+                <Link href="/leak" className="text-rose-400 hover:underline font-semibold">
+                  Browse the full leak feed
+                </Link>
+                .
               </div>
             )}
           </div>

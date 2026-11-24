@@ -75,7 +75,7 @@ export default function MyanmarWatch() {
   const [retryNonce, setRetryNonce] = useState(0);
 
   const { data: video, isLoading, error } = useMyanmarVideoById(id);
-  const { data: relatedVideos, isLoading: relatedLoading } = useMyanmarRelatedVideos(id, 8);
+  const { data: relatedVideos, isLoading: relatedLoading } = useMyanmarRelatedVideos(id, video, 8);
 
   // Fetch or re-resolve a fresh MP4 stream.
   // BuuMal's Cloudflare bot challenge blocks Cloudflare Worker egress, so we first
