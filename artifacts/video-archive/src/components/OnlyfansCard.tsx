@@ -1,22 +1,37 @@
 import { useState } from "react";
 import { Link } from "wouter";
-import { Play, Eye, ThumbsUp, Clock, BookmarkSimple, Check, Sparkle, Broadcast } from "@phosphor-icons/react";
+import { Play, Eye, ThumbsUp, Clock, BookmarkSimple, Check } from "@phosphor-icons/react";
 import { proxyImageUrl } from "@/lib/proxy-url";
 import { isOnlyfansSite, type OnlyfansVideo } from "@/hooks/useOnlyfansVideos";
 
-function isLikelySignedExpired(url: string): boolean {
-  try {
-    const u = new URL(url);
-    if (u.searchParams.has("v-acctoken") || u.searchParams.has("token") || u.searchParams.has("expires")) return true;
-  } catch {}
-  return false;
+/** Parse quality from a clean label or URL filename, never a signed hash path. */
+function parseQuality(value: unknown): number {
+  const raw = String(value || "").trim();
+  if (!raw) return 0;
+  let text = raw;
+  if (/^(?:https?:)?\/\//i.test(raw)) {
+    try {
+      const u = new URL(raw.startsWith("//") ? `https:${raw}` : raw, window.location.origin);
+      const parts = u.pathname.split("/").filter(Boolean);
+      text = decodeURIComponent(parts[parts.length - 1] || "");
+    } catch {
+      text = "";
+    }
+  }
+  if (/\b(?:4k|uhd|2160p?)\b/i.test(text)) return 2160;
+  const m = text.match(/(?<!\d)(2160|1440|1080|720|480|360)p?(?!\d)/i);
+  return m ? Number(m[1]) : 0;
 }
 
 function getPlayablePreviewUrl(video: OnlyfansVideo): string | null {
   const rawPayload = video.raw_payload as Record<string, any> | undefined;
   const directServers = [...(rawPayload?.servers || []), ...(rawPayload?.mirrors || [])]
     .filter((server: any) => ["direct_mp4", "direct_webm"].includes(String(server?.type || "").toLowerCase()))
-    .sort((a: any, b: any) => (b?.quality_score || 0) - (a?.quality_score || 0))
+    .sort(
+      (a: any, b: any) =>
+        (parseQuality(b?.embed_url || b?.url) || parseQuality(b?.quality_label) || Number(b?.quality_score) || 0) -
+        (parseQuality(a?.embed_url || a?.url) || parseQuality(a?.quality_label) || Number(a?.quality_score) || 0)
+    )
     .map((server: any) => server?.embed_url || server?.url);
   const candidates = [
     rawPayload?.preview_video_url,
@@ -25,12 +40,7 @@ function getPlayablePreviewUrl(video: OnlyfansVideo): string | null {
     video.trailer_preview_url,
     ...directServers,
   ];
-  // PimpBunny preview endpoints are often shield-blocked; only use
-  // trailer/direct candidates. Do not fall back to full_video_url for hover.
-  // If nothing is available, we resolve a fresh signed direct stream on hover.
-  if (video.source_site !== "pimpbunny") {
-    candidates.push(video.full_video_url);
-  }
+  candidates.push(video.full_video_url);
 
   for (const candidate of candidates) {
     if (typeof candidate !== "string" || !candidate.trim()) continue;
@@ -38,31 +48,12 @@ function getPlayablePreviewUrl(video: OnlyfansVideo): string | null {
       const url = new URL(candidate);
       if (!new Set(["http:", "https:"]).has(url.protocol) || url.username || url.password) continue;
       if (!/\.(mp4|webm|webp|gif|jpg|jpeg|png|mp4_preview)(?:[/?#]|$)/i.test(url.pathname + url.search)) continue;
-      // Stored signed PimpBunny URLs expire quickly; avoid dead hover previews.
-      if (video.source_site === "pimpbunny" && isLikelySignedExpired(url.href)) continue;
       return url.href;
     } catch {
       // Ignore non-absolute or malformed URLs from stored source metadata.
     }
   }
   return null;
-}
-
-function getHoverMediaUrl(url: string): string {
-  try {
-    const parsed = new URL(url);
-    // PimpBunny direct get_file media rejects cross-origin referers; do not
-    // route through /api/player/stream (can be Bunny Shield-blocked and leaks
-    // referer on redirect). The video element uses referrerPolicy=no-referrer.
-    if ((parsed.hostname === "pimpbunny.com" || parsed.hostname.endsWith(".pimpbunny.com")) &&
-        /\/get_file\/.+\.(mp4|m3u8|webm)(\/|$)/i.test(parsed.pathname)) {
-      return url;
-    }
-    if (parsed.hostname === "pimpbunny.com" || parsed.hostname.endsWith(".pimpbunny.com")) {
-      return `/api/player/stream?url=${encodeURIComponent(url)}`;
-    }
-  } catch {}
-  return url;
 }
 
 interface OnlyfansCardProps {
@@ -101,53 +92,9 @@ export function OnlyfansCard({ video, isSaved = false, onToggleSave }: OnlyfansC
     ? (proxyImageUrl(thumbUrl) || thumbUrl)
     : thumbUrl;
 
-  const [resolvedPreview, setResolvedPreview] = useState<string | null>(null);
-  const previewUrl = resolvedPreview || getPlayablePreviewUrl(video);
-  const previewMediaUrl = previewUrl ? getHoverMediaUrl(previewUrl) : null;
+  const previewUrl = getPlayablePreviewUrl(video);
+  const previewMediaUrl = previewUrl;
   const previewIsImage = !!previewUrl && /\.(webp|jpg|jpeg|png|gif|mp4_preview)$/i.test(new URL(previewUrl).pathname);
-
-  const resolvePimpbunnyPreview = async () => {
-    if (resolvedPreview || previewFailed) return;
-    if (video.source_site !== "pimpbunny" || !video.detail_url) return;
-    // Prefer any non-expired playable candidate; otherwise resolve fresh signed stream.
-    if (getPlayablePreviewUrl(video)) return;
-    try {
-      const resp = await fetch(`/api/player?url=${encodeURIComponent(video.detail_url)}&format=json`, {
-        headers: { Accept: "application/json" },
-        redirect: "manual",
-        cache: "no-store",
-      });
-      const ct = resp.headers.get("content-type") || "";
-      if (resp.ok && ct.includes("application/json")) {
-        const data = await resp.json().catch(() => null);
-        const streams = Array.isArray(data?.streams) ? data.streams : [];
-        const best = [...streams]
-          .filter((s: any) => typeof s?.url === "string" && /\.(mp4|webm)(?:[/?#]|$)/i.test(s.url))
-          .sort((a: any, b: any) => (Number(b?.quality) || 0) - (Number(a?.quality) || 0))[0];
-        if (best?.url) {
-          setResolvedPreview(String(best.url));
-          return;
-        }
-      }
-      // Worker resolve can be Bunny Shield-blocked; try direct browser fetch with no-referrer.
-      const pageResp = await fetch(video.detail_url, { referrerPolicy: "no-referrer", credentials: "omit", cache: "no-store" });
-      if (!pageResp.ok) return;
-      const html = await pageResp.text();
-      const matches = html.matchAll(/(?:['"]?(?:video_url|video_alt_url\d*)(?:_text)?['"]?)\s*[:=]\s*(['"])(.*?)\1/gi);
-      const candidates: Array<{url:string;quality:number}> = [];
-      for (const m of matches) {
-        let u = (m[2] || "").replace(/\\\//g, "/").replace(/\\u0026/g, "&").replace(/&amp;/g, "&").trim();
-        if (!u || !/pimpbunny\.com\/get_file\/.+\.(mp4|webm)/i.test(u)) continue;
-        try { u = new URL(u, video.detail_url).toString(); } catch { continue; }
-        const qm = u.match(/(?<!\d)(2160|1440|1080|720|480|360)p?(?!\d)/i);
-        candidates.push({ url: u, quality: qm ? Number(qm[1]) : 0 });
-      }
-      const bestDirect = candidates.sort((a,b)=>b.quality-a.quality)[0];
-      if (bestDirect?.url) setResolvedPreview(bestDirect.url);
-    } catch {
-      // ignore; hover preview is non-critical
-    }
-  };
 
   const handleSaveClick = (e: React.MouseEvent) => {
     e.preventDefault();
@@ -162,38 +109,34 @@ export function OnlyfansCard({ video, isSaved = false, onToggleSave }: OnlyfansC
   const modelName = video.actors?.[0] || video.raw_payload?.model || "";
   const rawServers = video.raw_payload?.servers || video.raw_payload?.mirrors || [];
   const mirrorCount = rawServers.length > 0 ? rawServers.length : (video.full_video_url ? 1 : 0);
-  const parseQ = (v: unknown) => {
-    const s = String(v || "");
-    const m = s.match(/(?<!\d)(2160|1440|1080|720|480|360)p?(?!\d)/i);
-    return m ? parseInt(m[1], 10) : 0;
-  };
+  const rankServer = (server: any) =>
+    parseQuality(server?.embed_url || server?.url) ||
+    parseQuality(server?.quality_label) ||
+    parseQuality(server?.name) ||
+    Number(server?.quality_score) ||
+    0;
   const formatQuality = (raw: unknown, url?: string) => {
     const text = String(raw || "").trim();
-    const n = parseQ(text) || parseQ(url);
+    const n = parseQuality(text) || parseQuality(url);
     if (n >= 2160) return "4K";
     if (n > 0) return `${n}p`;
     if (/^https?:\/\//i.test(text)) return "Original";
     return text || "HD";
   };
-  const isPimpBunnySourcePlayer = video.source_site === "pimpbunny" && (
-    video.video_mime_type?.toLowerCase() === "embed/iframe" ||
-    /\/embed\//i.test(video.full_video_url || "") ||
-    rawServers.some((server: any) => String(server?.type || "").toLowerCase() === "iframe")
-  );
-  const bestServer = [...rawServers].sort((a:any,b:any)=>{
-    const qa = parseQ(a?.quality_label) || parseQ(a?.name) || parseQ(a?.embed_url) || (a?.quality_score||0);
-    const qb = parseQ(b?.quality_label) || parseQ(b?.name) || parseQ(b?.embed_url) || (b?.quality_score||0);
-    return qb-qa;
-  })[0];
-  const quality = isPimpBunnySourcePlayer ? "Source player" : formatQuality(
+  const bestServer = [...rawServers].sort((a: any, b: any) => rankServer(b) - rankServer(a))[0];
+  const bestQuality =
+    rankServer(bestServer) ||
+    parseQuality(video.full_video_url) ||
+    parseQuality(video.quality_label);
+  const quality = formatQuality(
     bestServer?.quality_label || bestServer?.name || video.quality_label,
     bestServer?.embed_url || bestServer?.url || video.full_video_url || undefined
   );
   const watchHref = isOnlyfansSite(video.source_site)
     ? `/onlyfans/${video.source_site}/video/${video.id}`
     : "/onlyfans";
-  const is4K = quality.includes("4K") || (video.quality_score && video.quality_score >= 2000);
-  const is1080p = quality.includes("1080p") || (video.quality_score && video.quality_score >= 1000 && video.quality_score < 2000);
+  const is4K = bestQuality >= 2160 || quality.includes("4K");
+  const is1080p = bestQuality === 1080 || quality.includes("1080p");
 
   return (
     <div className="group relative flex flex-col rounded-2xl bg-card/60 border border-border/40 overflow-hidden hover:border-cyan-500/50 hover:shadow-xl hover:shadow-cyan-500/5 transition-all duration-300">
@@ -203,7 +146,6 @@ export function OnlyfansCard({ video, isSaved = false, onToggleSave }: OnlyfansC
           setIsHovered(true);
           setPreviewReady(false);
           setPreviewFailed(false);
-          void resolvePimpbunnyPreview();
         }}
         onMouseLeave={() => {
           setIsHovered(false);
@@ -212,7 +154,6 @@ export function OnlyfansCard({ video, isSaved = false, onToggleSave }: OnlyfansC
         onFocus={() => {
           setIsHovered(true);
           setPreviewReady(false);
-          void resolvePimpbunnyPreview();
         }}
         onBlur={() => setIsHovered(false)}
       >

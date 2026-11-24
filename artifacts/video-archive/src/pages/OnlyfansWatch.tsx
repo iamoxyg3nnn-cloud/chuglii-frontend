@@ -1,5 +1,5 @@
 import { useRef, useState, useEffect, useMemo } from "react";
-import { useParams, Link, useLocation } from "wouter";
+import { useParams, Link } from "wouter";
 import { Layout } from "@/components/Layout";
 import { VideoPlayer } from "@/components/VideoPlayer";
 import { iframeReferrerPolicy, detectHostLabel } from "@/lib/video-hosts";
@@ -9,27 +9,22 @@ import {
   useOnlyfansRelatedVideos,
   isOnlyfansSite,
   ONLYFANS_SITE_LABELS,
-  type OnlyfansVideo,
 } from "@/hooks/useOnlyfansVideos";
 import { OnlyfansCard } from "@/components/OnlyfansCard";
 import {
   ArrowLeft,
   Clock,
   Eye,
-  ThumbsUp,
   Tag as TagIcon,
   ShareNetwork,
-  DownloadSimple,
   Play,
   Check,
-  FilmStrip,
   WarningCircle,
   Sparkle,
   BookmarkSimple,
   LinkSimple,
   User,
   Broadcast,
-  ArrowClockwise,
   ArrowSquareOut,
   CaretDown
 } from "@phosphor-icons/react";
@@ -43,46 +38,44 @@ function normalizeStreamUrl(url: string): string {
   return url.replace(/cdn\d+\.influencersgonewild\.net/gi, "cdn04.influencersgonewild.net");
 }
 
-function isDirectMediaUrl(url: string): boolean {
-  try {
-    return /\.(mp4|webm)\/?$/i.test(new URL(url, window.location.origin).pathname);
-  } catch {
-    return /\.(mp4|webm)(?:\?|$)/i.test(url);
+/**
+ * Read a rendition height only from a clean quality label or the final URL
+ * path segment, so random hash segments cannot be misread as a resolution.
+ */
+function parseQuality(value: unknown): number {
+  const raw = String(value || "").trim();
+  if (!raw) return 0;
+  let text = raw;
+  if (/^(?:https?:)?\/\//i.test(raw)) {
+    try {
+      const parsed = new URL(raw.startsWith("//") ? `https:${raw}` : raw, window.location.origin);
+      const parts = parsed.pathname.split("/").filter(Boolean);
+      text = decodeURIComponent(parts[parts.length - 1] || "");
+    } catch {
+      text = "";
+    }
   }
+  if (/\b(?:4k|uhd|2160p?)\b/i.test(text)) return 2160;
+  const match = text.match(/(?<!\d)(2160|1440|1080|720|480|360)p?(?!\d)/i);
+  return match ? Number(match[1]) : 0;
 }
 
 function formatQualityLabel(raw: unknown, url?: string): string {
+  const quality = parseQuality(raw) || parseQuality(url);
+  if (quality >= 2160) return "4K UHD";
+  if (quality === 1440) return "1440p QHD";
+  if (quality === 1080) return "1080p Full HD";
+  if (quality > 0) return `${quality}p`;
   const text = String(raw || "").trim();
-  // Some stored records accidentally contain full URLs as quality labels.
-  const fromUrl = (value: string) => {
-    try {
-      const u = new URL(value, window.location.origin);
-      const m = u.pathname.match(/(?<!\d)(2160|1440|1080|720|480|360)p?(?!\d)/i);
-      if (m) return `${m[1]}p`;
-      const slugQ = u.pathname.match(/\/(2160p|1440p|1080p|720p|480p|360p|4k)\/?$/i);
-      if (slugQ) return slugQ[1].toUpperCase().replace("4K", "4K");
-    } catch {}
-    const m = value.match(/(?<!\d)(2160|1440|1080|720|480|360)p?(?!\d)/i);
-    return m ? `${m[1]}p` : "";
-  };
-
-  if (/^https?:\/\//i.test(text)) return fromUrl(text) || "Original";
-  if (/\b(2160|1440|1080|720|480|360)p?\b/i.test(text)) return fromUrl(text) || text;
-  const fromMedia = url ? fromUrl(url) : "";
-  if (fromMedia) return fromMedia;
   return text || "Original";
 }
 
 /** Hosts that require a spoofed Referer / Range-capable proxy for direct MP4s. */
 function needsStreamProxy(url: string): boolean {
   const u = url.toLowerCase();
-  // PimpBunny direct get_file URLs must load from browser with no-referrer;
-  // worker proxy gets Bunny-Shield blocked and redirecting through it leaks referer.
-  if (u.includes("pimpbunny.com/get_file/")) return false;
   return (
     u.includes("influencersgonewild") ||
     u.includes("sheeshfans") ||
-    u.includes("pimpbunny") ||
     u.includes("internetchicks")
   );
 }
@@ -90,28 +83,18 @@ function needsStreamProxy(url: string): boolean {
 export default function OnlyfansWatch() {
   const { site: routeSite, id } = useParams<{ site: string; id: string }>();
   const site = isOnlyfansSite(routeSite) ? routeSite : undefined;
-  const [, setLocation] = useLocation();
 
   const [copied, setCopied] = useState(false);
   const [copiedStream, setCopiedStream] = useState(false);
   const [isSaved, setIsSaved] = useState(false);
   const [selectedServerUrl, setSelectedServerUrl] = useState<string | null>(null);
   const [playerKey, setPlayerKey] = useState(0);
-  const [pimpbunnyEmbedStalled, setPimpbunnyEmbedStalled] = useState(false);
-  const [pimpbunnyEmbedLoaded, setPimpbunnyEmbedLoaded] = useState(false);
-  const [pbResolvedServers, setPbResolvedServers] = useState<Array<{ server: string; url: string; quality_score?: number; quality_label?: string }>>([]);
-  const [failedDirectUrls, setFailedDirectUrls] = useState<Set<string>>(new Set());
-  const pbResolveAttempted = useRef<string | null>(null);
   const videoPlayerRef = useRef<HTMLVideoElement>(null);
   const pendingQualitySwitch = useRef<{ time: number; resume: boolean } | null>(null);
-  const autoQualityApplied = useRef<string | null>(null);
 
   // Reset selected server whenever navigating to a different video
   useEffect(() => {
     setSelectedServerUrl(null);
-    setPbResolvedServers([]);
-    setFailedDirectUrls(new Set());
-    pbResolveAttempted.current = null;
   }, [id]);
 
   const { data: video, isLoading, error } = useOnlyfansVideoById(site, id);
@@ -124,80 +107,34 @@ export default function OnlyfansWatch() {
     const rawList: any[] = rawPayload?.servers || rawPayload?.mirrors || [];
     const list: Array<{ server: string; url: string; quality_score?: number; quality_label?: string }> = [];
 
-    const dedupeKey = (url: string) => {
-      if (video?.source_site === "pimpbunny") {
-        try {
-          const u = new URL(url, window.location.origin);
-          if ((u.hostname === "pimpbunny.com" || u.hostname.endsWith(".pimpbunny.com")) && /\/get_file\/.+\.(mp4|webm|m3u8)(\/|$)/i.test(u.pathname)) {
-            return `${u.hostname}${u.pathname.replace(/\/+$/, "").toLowerCase()}`;
-          }
-        } catch {}
-      }
-      return url;
-    };
-
     const pushUnique = (item: { server: string; url: string; quality_score?: number; quality_label?: string }) => {
-      if (!item.url) return;
-      const key = dedupeKey(item.url);
-      if (list.some((m) => dedupeKey(m.url) === key)) return;
+      if (!item.url || list.some((m) => m.url === item.url)) return;
       list.push(item);
     };
-
-    const isFailedPimpBunnyDirect = (url: string) =>
-      video?.source_site === "pimpbunny" && isDirectMediaUrl(url) && failedDirectUrls.has(url);
-
-    // Prefer fresh on-demand PimpBunny renditions when available; stale DB URLs may be expired/signed duplicates.
-    if (pbResolvedServers.length > 0) {
-      for (const s of pbResolvedServers) {
-        const u = normalizeStreamUrl(s.url);
-        if (isFailedPimpBunnyDirect(u)) continue;
-        const qLabel = formatQualityLabel(s.quality_label || s.server, u);
-        pushUnique({ server: s.server || `PimpBunny ${qLabel}`, url: u, quality_score: s.quality_score, quality_label: qLabel });
-      }
-    }
 
     for (const item of rawList) {
       let u = item.embed_url || item.url;
       if (!u) continue;
       u = normalizeStreamUrl(u);
-      if (isFailedPimpBunnyDirect(u)) continue;
-      const isPimpBunnySourcePlayer = video?.source_site === "pimpbunny" && /\/embed\//i.test(u);
-      const qLabel = isPimpBunnySourcePlayer ? "Source player" : formatQualityLabel(item.quality_label || item.name || item.server, u);
-      const label = isPimpBunnySourcePlayer
-        ? "PimpBunny source player"
-        : (video?.source_site === "pimpbunny" ? `PimpBunny ${qLabel}` : (item.name || item.server || detectHostLabel(u)));
+      const qLabel = formatQualityLabel(item.quality_label || item.name || item.server, u);
+      const label = item.name || item.server || detectHostLabel(u);
       pushUnique({ server: label, url: u, quality_score: item.quality_score, quality_label: qLabel });
     }
 
     const primaryUrl = normalizeStreamUrl(video?.full_video_url || "");
-    if (primaryUrl && !isFailedPimpBunnyDirect(primaryUrl)) {
-      const key = dedupeKey(primaryUrl);
-      const exists = list.some((m) => dedupeKey(m.url) === key);
-      if (!exists) {
-        const primaryLabel =
-          video?.source_site === "pimpbunny" && /\/embed\//i.test(primaryUrl)
-            ? "Source player"
-            : formatQualityLabel(video?.quality_label, primaryUrl) || "1080p Full HD";
-        list.unshift({
-          server: video?.source_site === "pimpbunny" && !/\/embed\//i.test(primaryUrl) ? `PimpBunny ${primaryLabel}` : "Primary Stream",
-          url: primaryUrl,
-          quality_score: video?.quality_score || 1080,
-          quality_label: primaryLabel,
-        });
-      }
+    if (primaryUrl && !list.some((m) => m.url === primaryUrl)) {
+      list.unshift({
+        server: "Primary Stream",
+        url: primaryUrl,
+        quality_score: video?.quality_score || 1080,
+        quality_label: formatQualityLabel(video?.quality_label, primaryUrl) || "1080p Full HD",
+      });
     }
 
     const DEAD_FIRST_HOSTS = ["playmogo.com", "bysejpadsk.com"];
     const isDemoted = (url: string) => DEAD_FIRST_HOSTS.some((h) => url.toLowerCase().includes(h));
-    const ranked = [...list.filter((s) => !isDemoted(s.url)), ...list.filter((s) => isDemoted(s.url))];
-    // Sort direct PimpBunny renditions by quality desc, keep embed/source-player last.
-    if (video?.source_site === "pimpbunny") {
-      const direct = ranked.filter((s) => isDirectMediaUrl(s.url)).sort((a, b) => (b.quality_score || 0) - (a.quality_score || 0));
-      const other = ranked.filter((s) => !isDirectMediaUrl(s.url));
-      return [...direct, ...other];
-    }
-    return ranked;
-  }, [rawPayload, video, pbResolvedServers]);
+    return [...list.filter((s) => !isDemoted(s.url)), ...list.filter((s) => isDemoted(s.url))];
+  }, [rawPayload, video]);
 
   const activeUrl =
     selectedServerUrl ||
@@ -225,108 +162,6 @@ export default function OnlyfansWatch() {
     }
     return /\.(mp4|webm)\/?$/.test(pathname);
   }, [activeUrl]);
-
-  const pimpbunnyQualityVariants = useMemo(() => {
-    if (video?.source_site !== "pimpbunny") return [];
-    return allServers.filter((server) => isDirectMediaUrl(server.url) && !failedDirectUrls.has(server.url));
-  }, [allServers, video?.source_site, failedDirectUrls]);
-  const showPimpbunnyQualitySelect = pimpbunnyQualityVariants.length > 1;
-
-  const pickSmartQuality = useMemo(() => {
-    return (variants: Array<{ url: string; quality_score?: number; quality_label?: string }>) => {
-      if (variants.length === 0) return null;
-      const conn = (navigator as any).connection;
-      const saveData = Boolean(conn?.saveData);
-      const et = String(conn?.effectiveType || "").toLowerCase();
-      const downlink = Number(conn?.downlink || 0);
-      const smallScreen = typeof window !== "undefined" ? window.innerWidth < 768 : false;
-      let target = 1080;
-      if (saveData || et === "slow-2g" || et === "2g" || (downlink > 0 && downlink < 1.5)) target = 480;
-      else if (et === "3g" || (downlink > 0 && downlink < 4) || smallScreen) target = 720;
-      else target = 1080;
-      const scoreOf = (v: any) => {
-        const m = String(v.quality_label || v.url || "").match(/(2160|1440|1080|720|480|360)/);
-        return m ? Number(m[1]) : Number(v.quality_score || 0);
-      };
-      const sorted = [...variants].sort((a,b) => scoreOf(b) - scoreOf(a));
-      const exactOrLower = sorted.find((v) => scoreOf(v) <= target);
-      return exactOrLower || sorted[sorted.length - 1] || sorted[0];
-    };
-  }, []);
-
-  useEffect(() => {
-    if (!video?.id) return;
-    if (selectedServerUrl) return;
-    if (video.source_site !== "pimpbunny") return;
-    if (pimpbunnyQualityVariants.length === 0) return;
-    if (autoQualityApplied.current === video.id) return;
-    const picked = pickSmartQuality(pimpbunnyQualityVariants);
-    if (picked?.url) {
-      autoQualityApplied.current = video.id;
-      setSelectedServerUrl(picked.url);
-    }
-  }, [video?.id, video?.source_site, selectedServerUrl, pimpbunnyQualityVariants, pickSmartQuality]);
-
-  // If stored PimpBunny direct URLs expired/blocked, resolve fresh renditions on demand.
-  useEffect(() => {
-    if (video?.source_site !== "pimpbunny") return;
-    if (pbResolvedServers.length > 0) return;
-    const detail = video?.detail_url;
-    if (!detail || pbResolveAttempted.current === detail) return;
-    pbResolveAttempted.current = detail;
-    let cancelled = false;
-    (async () => {
-      try {
-        const r = await fetch(`/api/player?url=${encodeURIComponent(detail)}&format=json`, {
-          headers: { Accept: "application/json" },
-        });
-        if (!r.ok) return;
-        const data = await r.json();
-        const streams = Array.isArray(data?.streams) ? data.streams : [];
-        if (cancelled || streams.length === 0) return;
-        const mapped = streams
-          .filter((s: any) => s?.url && /pimpbunny\.com/i.test(String(s.url)))
-          .map((s: any) => ({
-            server: `PimpBunny ${s.label || (s.quality ? `${s.quality}p` : "Original")}`,
-            url: String(s.url),
-            quality_score: Number(s.quality) || 0,
-            quality_label: s.label || (s.quality ? `${s.quality}p` : "Original"),
-          }));
-        if (mapped.length > 0) setPbResolvedServers(mapped);
-      } catch {}
-    })();
-    return () => { cancelled = true; };
-  }, [video?.source_site, video?.detail_url, pbResolvedServers.length]);
-
-  const isDirectHls = useMemo(() => {
-    if (!activeUrl) return false;
-    try {
-      return new URL(activeUrl, window.location.origin).pathname.toLowerCase().endsWith(".m3u8");
-    } catch {
-      return activeUrl.toLowerCase().includes(".m3u8");
-    }
-  }, [activeUrl]);
-
-  // Cross-origin iframes do not expose playback state. Only show the fallback
-  // if the iframe document itself never loads; a pause or quality change is
-  // not evidence that the player is stalled.
-  useEffect(() => {
-    setPimpbunnyEmbedLoaded(false);
-    setPimpbunnyEmbedStalled(false);
-  }, [activeUrl, playerKey]);
-
-  useEffect(() => {
-    if (
-      !activeUrl ||
-      isDirectVideo ||
-      isDirectHls ||
-      !activeUrl.toLowerCase().includes("pimpbunny.com") ||
-      pimpbunnyEmbedLoaded
-    ) return;
-
-    const timeout = window.setTimeout(() => setPimpbunnyEmbedStalled(true), 18000);
-    return () => window.clearTimeout(timeout);
-  }, [activeUrl, isDirectVideo, isDirectHls, playerKey, pimpbunnyEmbedLoaded]);
 
   useEffect(() => {
     if (!activeUrl) return;
@@ -391,59 +226,10 @@ export default function OnlyfansWatch() {
     setPlayerKey((key) => key + 1);
   };
 
-  const autoDowngradeQuality = (fromUrl: string) => {
-    if (video?.source_site === "pimpbunny" && fromUrl) {
-      setFailedDirectUrls((prev) => { const next = new Set(prev); next.add(fromUrl); return next; });
-    }
-    const direct = pimpbunnyQualityVariants.filter((v) => v.url !== fromUrl);
-    if (direct.length > 0) {
-      const idx = pimpbunnyQualityVariants.findIndex((v) => v.url === fromUrl);
-      const next = idx >= 0 ? (pimpbunnyQualityVariants[idx + 1] && pimpbunnyQualityVariants[idx + 1].url !== fromUrl ? pimpbunnyQualityVariants[idx + 1] : direct[0]) : direct[0];
-      if (next?.url) { selectServer(next.url); return; }
-    }
-    if (video?.source_site === "pimpbunny") {
-      setPbResolvedServers([]);
-      setSelectedServerUrl(null);
-      setPlayerKey((k) => k + 1);
-    }
-  };
-  const pickMatchingQuality = (streams: Array<any>, currentUrl: string) => {
-    const getH = (v: any) => {
-      const m = String(v?.label || v?.quality_label || v?.url || "").match(/(2160|1440|1080|720|480|360)/);
-      return m ? Number(m[1]) : Number(v?.quality || v?.quality_score || 0);
-    };
-    const curH = getH({ url: currentUrl, label: currentUrl });
-    const mapped = streams
-      .filter((s: any) => s?.url && /pimpbunny\.com/i.test(String(s.url)))
-      .map((s: any) => ({
-        server: `PimpBunny ${s.label || (s.quality ? `${s.quality}p` : "Original")}`,
-        url: String(s.url),
-        quality_score: Number(s.quality) || 0,
-        quality_label: s.label || (s.quality ? `${s.quality}p` : "Original"),
-      }))
-      .sort((a: any, b: any) => getH(b) - getH(a));
-    if (mapped.length === 0) return { mapped, picked: null as any };
-    const picked = mapped.find((m: any) => getH(m) <= curH) || mapped[mapped.length - 1];
-    return { mapped, picked };
-  };
-
   // Embed/locker URLs must go through the edge player, which applies the right
   // Referer, bypasses frame-ancestors restrictions and can unwrap direct streams.
   const embedPlaybackUrl = useMemo(() => {
     if (!activeUrl) return "";
-    try {
-      const target = new URL(activeUrl);
-      const host = target.hostname.toLowerCase();
-      if (host === "pimpbunny.com" || host.endsWith(".pimpbunny.com")) {
-        // Route PimpBunny embeds/detail pages through the edge player so it can
-        // extract direct KVS renditions and expose an in-player quality selector.
-        // If extraction fails, /api/player falls back to the original URL.
-        if (/\/embed\/\d+/.test(target.pathname) || /\/videos\/[a-zA-Z0-9_-]+\/?$/.test(target.pathname)) {
-          return `/api/player?url=${encodeURIComponent(activeUrl)}`;
-        }
-        return activeUrl;
-      }
-    } catch {}
     return `/api/player?url=${encodeURIComponent(activeUrl)}`;
   }, [activeUrl]);
 
@@ -501,40 +287,6 @@ export default function OnlyfansWatch() {
       setIsSaved(false);
     }
   }, [id]);
-
-  // PimpBunny direct get_file media rejects cross-origin Referer headers.
-  // Page-level meta referrer policy can override element referrerPolicy in
-  // Chromium; force no-referrer while a direct PimpBunny file is active.
-  useEffect(() => {
-    if (!activeUrl) return;
-    let host = "";
-    let path = "";
-    try {
-      const u = new URL(activeUrl, window.location.origin);
-      host = u.hostname.toLowerCase();
-      path = u.pathname.toLowerCase();
-    } catch {
-      return;
-    }
-    const isPimpbunnyDirect =
-      (host === "pimpbunny.com" || host.endsWith(".pimpbunny.com")) &&
-      /\/get_file\/.+\.(mp4|m3u8|webm)(\/|$)/.test(path);
-    if (!isPimpbunnyDirect) return;
-
-    const meta = document.querySelector('meta[name="referrer"]') as HTMLMetaElement | null;
-    const prev = meta?.getAttribute("content");
-    const created = !meta;
-    const el = meta || document.createElement("meta");
-    el.setAttribute("name", "referrer");
-    el.setAttribute("content", "no-referrer");
-    if (created) document.head.appendChild(el);
-    return () => {
-      const m = document.querySelector('meta[name="referrer"]') as HTMLMetaElement | null;
-      if (!m) return;
-      if (prev != null) m.setAttribute("content", prev);
-      else m.setAttribute("content", "strict-origin-when-cross-origin");
-    };
-  }, [activeUrl]);
 
   useEffect(() => {
     if (!video) return;
@@ -610,11 +362,7 @@ export default function OnlyfansWatch() {
   }
 
   const modelName = video?.actors?.[0] || video?.raw_payload?.model || "";
-  const isPimpBunnySourcePlayer = video?.source_site === "pimpbunny" && (
-    video?.video_mime_type?.toLowerCase() === "embed/iframe" ||
-    allServers.some((server) => /\/embed\//i.test(server.url))
-  );
-  const quality = isPimpBunnySourcePlayer ? "Source player" : (video?.quality_label || "1080p Full HD");
+  const quality = formatQualityLabel(video?.quality_label, activeUrl) || "1080p Full HD";
 
   return (
     <Layout>
@@ -668,74 +416,20 @@ export default function OnlyfansWatch() {
                   poster={cleanPosterUrl}
                   title={video.title}
                   videoRef={videoPlayerRef}
-                  qualities={pimpbunnyQualityVariants.map((v) => ({ url: v.url, label: v.quality_label || v.server || "Original" }))}
-                  activeQualityUrl={activeUrl}
-                  onQualityChange={selectServer}
-                  onReload={async () => {
-                    if (video?.source_site === "pimpbunny" && video?.detail_url) {
-                      const failed = new Set(failedDirectUrls);
-                      if (activeUrl) failed.add(activeUrl);
-                      setFailedDirectUrls(failed);
-                      try {
-                        const r = await fetch(`/api/player?url=${encodeURIComponent(video.detail_url)}&format=json`, { headers: { Accept: "application/json" }, cache: "no-store" });
-                        if (r.ok) {
-                          const data = await r.json();
-                          const streams = Array.isArray(data?.streams) ? data.streams : [];
-                          const { mapped, picked } = pickMatchingQuality(streams, activeUrl);
-                          const fresh = mapped.filter((s: any) => !failed.has(s.url));
-                          if (fresh.length > 0) {
-                            setPbResolvedServers(fresh);
-                            setSelectedServerUrl((picked?.url && !failed.has(picked.url) ? picked.url : fresh[0].url) || null);
-                            setPlayerKey((k) => k + 1);
-                            return;
-                          }
-                        }
-                      } catch {}
-                      // Fresh signed URLs unavailable (Bunny Shield/expired). Fall back to embed player.
-                      setPbResolvedServers([]);
-                      setSelectedServerUrl(null);
-                      setPlayerKey((k) => k + 1);
-                      return;
-                    }
+                  onReload={() => {
                     const curIdx = allServers.findIndex((s) => s.url === activeUrl);
                     if (curIdx >= 0 && curIdx < allServers.length - 1) {
                       setSelectedServerUrl(allServers[curIdx + 1].url);
-                      setPlayerKey((k) => k + 1);
+                      setPlayerKey((key) => key + 1);
                     }
                   }}
-                  onError={async () => {
-                    if (video?.source_site === "pimpbunny" && video?.detail_url) {
-                      const failed = new Set(failedDirectUrls);
-                      if (activeUrl) failed.add(activeUrl);
-                      setFailedDirectUrls(failed);
-                      try {
-                        const r = await fetch(`/api/player?url=${encodeURIComponent(video.detail_url)}&format=json`, { headers: { Accept: "application/json" }, cache: "no-store" });
-                        if (r.ok) {
-                          const data = await r.json();
-                          const streams = Array.isArray(data?.streams) ? data.streams : [];
-                          const { mapped, picked } = pickMatchingQuality(streams, activeUrl);
-                          const fresh = mapped.filter((s: any) => !failed.has(s.url));
-                          if (fresh.length > 0) {
-                            setPbResolvedServers(fresh);
-                            setSelectedServerUrl((picked?.url && !failed.has(picked.url) ? picked.url : fresh[0].url) || null);
-                            setPlayerKey((k) => k + 1);
-                            return;
-                          }
-                        }
-                      } catch {}
-                      // Signed PimpBunny get_file URLs can expire/403. Fall back to embed player.
-                      setPbResolvedServers([]);
-                      setSelectedServerUrl(null);
-                      setPlayerKey((k) => k + 1);
-                      return;
-                    }
+                  onError={() => {
                     const curIdx = allServers.findIndex((s) => s.url === activeUrl);
                     if (curIdx >= 0 && curIdx < allServers.length - 1) {
                       setSelectedServerUrl(allServers[curIdx + 1].url);
-                      setPlayerKey((k) => k + 1);
+                      setPlayerKey((key) => key + 1);
                     }
                   }}
-                  onAutoDowngrade={autoDowngradeQuality}
                 />
               ) : (
                 <iframe
@@ -743,10 +437,6 @@ export default function OnlyfansWatch() {
                   src={embedPlaybackUrl}
                   title={video.title}
                   className="w-full h-full border-0"
-                  onLoad={() => {
-                    setPimpbunnyEmbedLoaded(true);
-                    setPimpbunnyEmbedStalled(false);
-                  }}
                   allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share; fullscreen"
                   referrerPolicy={refPolicy as any}
                 />
@@ -781,47 +471,18 @@ export default function OnlyfansWatch() {
             )}
           </div>
 
-          {isPimpBunnySourcePlayer && (
-            <div className="-mt-3 mb-6 flex flex-wrap items-center justify-between gap-3 text-xs text-muted-foreground">
-              <p className="max-w-2xl leading-relaxed">
-                This record is using PimpBunny’s video-only embed. In-page quality choices appear here when direct renditions are available.
-              </p>
-              <div className="flex flex-wrap items-center gap-2">
-                {pimpbunnyEmbedStalled && (
-                  <span role="status" className="inline-flex items-center gap-1.5 text-amber-400">
-                    <WarningCircle size={14} /> The embedded page did not finish loading.
-                  </span>
-                )}
-                {pimpbunnyEmbedStalled && (
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setPimpbunnyEmbedStalled(false);
-                      setPlayerKey((key) => key + 1);
-                    }}
-                    className="rounded-lg border border-border px-3 py-2 font-medium text-foreground hover:bg-accent"
-                  >
-                    Retry embed
-                  </button>
-                )}
-              </div>
-            </div>
-          )}
-
           {/* Server Switcher Bar */}
-          {allServers.length > 0 && !showPimpbunnyQualitySelect && (
+          {allServers.length > 0 && (
             <div className="mb-6 p-4 rounded-2xl bg-card/60 border border-border/40 backdrop-blur-sm space-y-2.5">
               <div className="flex items-center justify-between">
                 <span className="text-xs font-semibold text-muted-foreground flex items-center gap-2">
                   <Broadcast size={14} className="text-cyan-400" />
                   <span>
-                    {video.source_site === "pimpbunny"
-                      ? `Available renditions (${allServers.length})`
-                      : `Available Server Mirrors (${allServers.length})`}
+                    Available Server Mirrors (${allServers.length})
                   </span>
                 </span>
                 <span className="text-[11px] text-muted-foreground/70">
-                  {video.source_site === "pimpbunny" ? "Choose a rendition" : "Switch mirror if stream fails or buffers"}
+                  Switch mirror if stream fails or buffers
                 </span>
               </div>
 

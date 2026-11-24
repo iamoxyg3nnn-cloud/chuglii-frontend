@@ -19,6 +19,7 @@ import {
   GlobeHemisphereWest,
   FilmStrip,
   Broadcast,
+  Eye,
 } from "@phosphor-icons/react";
 import { NAV_LINKS } from "./DesktopNav";
 import { prefetchRoute } from "@/lib/route-chunks";
@@ -180,6 +181,26 @@ export function MobileMenu({
                   </span>
                   <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-rose-500/20 text-rose-400 uppercase">
                     New
+                  </span>
+                </span>
+              </Link>
+              <Link href="/voyeurhouse" aria-current={isActiveNavigationRoute("/voyeurhouse", location) ? "page" : undefined}>
+                <span
+                  className={`w-full px-3 py-2 text-sm rounded-lg transition-all duration-150 inline-flex items-center justify-between ${
+                    isActiveNavigationRoute("/voyeurhouse", location)
+                      ? "text-amber-400 font-medium bg-amber-500/15 border border-amber-500/30"
+                      : "text-amber-400/90 hover:text-amber-300 hover:bg-amber-500/10"
+                  }`}
+                  onClick={onClose}
+                  onMouseEnter={() => prefetchRoute("/voyeurhouse")}
+                  onFocus={() => prefetchRoute("/voyeurhouse")}
+                >
+                  <span className="inline-flex items-center gap-2.5">
+                    <Eye size={16} weight="fill" className="text-amber-400" />
+                    Voyeur House
+                  </span>
+                  <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-400 uppercase">
+                    5 SRC
                   </span>
                 </span>
               </Link>

@@ -673,7 +673,6 @@ async function handleApi(request, env, url) {
       if (
         targetObj.hostname.includes("influencersgonewild") ||
         targetObj.hostname.includes("internetchicks") ||
-        targetObj.hostname.includes("pimpbunny") ||
         targetObj.hostname.includes("sheeshfans") ||
         targetObj.hostname.includes("pixhost.to") ||
         targetObj.hostname.includes("catbox.moe") ||
@@ -709,13 +708,6 @@ async function handleApi(request, env, url) {
         });
       }
 
-        // PimpBunny/Bunny Shield often blocks worker/datacenter fetches for
-        // screenshots/thumbnails. Redirect browser to fetch directly (img uses
-        // referrerPolicy="no-referrer" on the client).
-        if (!upstreamRes.ok && (targetObj.hostname === "pimpbunny.com" || targetObj.hostname.endsWith(".pimpbunny.com"))) {
-          return Response.redirect(targetUrl, 302);
-        }
-
       if (!upstreamRes.ok) {
         return Response.redirect(targetUrl, 302);
       }
@@ -734,59 +726,28 @@ async function handleApi(request, env, url) {
   }
 
 // ─── Clean Video Player Renderer (Ad-Free Hls.js / HTML5) ────────
-function extractPimpbunnyStreams(html, pageUrl) {
-  const assignments = {};
-  const pattern = /(?:['"]?(?:video_url|video_alt_url\d*)(?:_text)?['"]?)\s*[:=]\s*(['"])(.*?)\1/gi;
-  let m;
-  while ((m = pattern.exec(html)) !== null) {
-    const rawKey = m[0].split(/[:=]/)[0].trim().replace(/^['"]|['"]$/g, '').toLowerCase();
-    let value = (m[2] || '').replace(/\\\//g, '/').replace(/\\u0026/g, '&').replace(/&amp;/g, '&').trim();
-    if (value) assignments[rawKey] = value;
+function lastPathSegment(raw) {
+  try {
+    const u = new URL(String(raw || ""), "https://chuglii.pages.dev/");
+    const parts = u.pathname.split("/").filter(Boolean);
+    return decodeURIComponent(parts[parts.length - 1] || "");
+  } catch {
+    return String(raw || "");
   }
-  if (Object.keys(assignments).length === 0) {
-    const urlRe = /https?:\/\/(?:[a-z0-9.-]+\.)?pimpbunny\.com\/get_file\/[^\s"'<>]+?\.(?:mp4|m3u8|webm)(?:\/[^\s"'<>]*)?(?:\?[^\s"'<>]*)?/gi;
-    let um;
-    while ((um = urlRe.exec(html)) !== null) {
-      const u = um[0].replace(/\\\//g, '/').replace(/&amp;/g, '&');
-      if (/_preview(?:[_./]|$)/i.test(u)) continue;
-      const qm = u.match(/(?<!\d)(2160|1440|1080|720|480|360)p?(?!\d)/i);
-      const q = qm ? parseInt(qm[1], 10) : 0;
-      const k = `video_alt_url${q || Object.keys(assignments).length}`;
-      if (!assignments[k]) assignments[k] = u;
-      if (q) assignments[`${k}_text`] = `${q}p`;
-    }
-  }
-  const out = []; const seen = new Set();
-  for (const [key, value] of Object.entries(assignments)) {
-    if (key.endsWith('_text')) continue;
-    let abs; try { abs = new URL(value, pageUrl).toString(); } catch { continue; }
-    let u; try { u = new URL(abs); } catch { continue; }
-    const host = (u.hostname || '').toLowerCase();
-    if (u.protocol !== 'https:' || !(host === 'pimpbunny.com' || host.endsWith('.pimpbunny.com'))) continue;
-    const path = u.pathname.replace(/\/+$/, '').toLowerCase();
-    let type = null;
-    if (path.endsWith('.mp4')) type = 'direct_mp4';
-    else if (path.endsWith('.m3u8')) type = 'direct_hls';
-    else if (path.endsWith('.webm')) type = 'direct_webm';
-    else continue;
-    if (seen.has(abs)) continue; seen.add(abs);
-    const label = (assignments[`${key}_text`] || '').trim();
-    const qualitySource = `${label} ${u.pathname}`.toLowerCase();
-    let quality = 0;
-    if (/(?:4k|uhd|2160p?)/.test(qualitySource)) quality = 2160;
-    else { const qm = qualitySource.match(/(?<!\d)(1440|1080|720|480|360)p?(?!\d)/); quality = qm ? parseInt(qm[1], 10) : 0; }
-    const cleanLabel = (label && !/^https?:\/\//i.test(label)) ? label : (quality ? `${quality}p` : 'Original');
-      out.push({ url: `/api/player/stream?url=${encodeURIComponent(abs)}`, rawUrl: abs, type, quality, label: cleanLabel });
-  }
-  out.sort((a, b) => (b.quality || 0) - (a.quality || 0));
-  return out;
+}
+
+function qualityFromValue(raw) {
+  const text = lastPathSegment(raw).toLowerCase();
+  if (/\b(?:4k|uhd|2160p?)\b/.test(text)) return 2160;
+  const m = text.match(/(?<!\d)(2160|1440|1080|720|480|360)p?(?!\d)/);
+  return m ? parseInt(m[1], 10) : 0;
 }
 
 function renderCleanMp4Player(streams, title = '', poster = '') {
   const safeTitle = (title || 'Chuglii Player').replace(/</g, '&lt;').replace(/>/g, '&gt;');
   const safePoster = poster ? String(poster).replace(/"/g, '&quot;') : '';
   const list = Array.isArray(streams) ? streams.filter(s => s && s.url) : [];
-  return `<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1.0,user-scalable=no"><meta name="referrer" content="no-referrer"><title>${safeTitle}</title><style>*{margin:0;padding:0;box-sizing:border-box}html,body{width:100%;height:100%;background:#000;overflow:hidden;display:flex;align-items:center;justify-content:center;position:relative}video{width:100%;height:100%;max-height:100vh;object-fit:contain;background:#000}.control-overlay{position:absolute;top:12px;right:12px;z-index:50}.quality-select{background:rgba(15,23,42,.88);color:#f8fafc;border:1px solid rgba(255,255,255,.25);border-radius:6px;padding:5px 10px;font-size:13px;font-family:system-ui,-apple-system,sans-serif;cursor:pointer}.quality-select option{background:#0f172a;color:#fff}</style></head><body><div id="quality-wrap" class="control-overlay" style="display:none"><select id="quality-selector" class="quality-select" title="Select Video Quality"></select></div><video id="player" controls autoplay playsinline referrerpolicy="no-referrer" ${safePoster ? `poster="${safePoster}"` : ''}></video><script>(function(){var v=document.getElementById('player'),s=${JSON.stringify(list)},sel=document.getElementById('quality-selector'),w=document.getElementById('quality-wrap');if(!s.length)return;function label(x){var l=x.label||(x.quality?(x.quality+'p'):'Original');if(x.quality>=1080&&!/full\s*hd/i.test(l))l+=' Full HD';else if(x.quality>=720&&x.quality<1080&&!/\bhd\b/i.test(l))l+=' HD';return l}if(s.length>1){w.style.display='block';s.forEach(function(x,i){var o=document.createElement('option');o.value=String(i);o.textContent=label(x);sel.appendChild(o)})}function set(i,keep){i=Math.max(0,Math.min(s.length-1,i));var t=keep?(v.currentTime||0):0,p=v.paused;sel.value=String(i);v.src=s[i].url;v.addEventListener('loadedmetadata',function m(){v.removeEventListener('loadedmetadata',m);try{if(t>0)v.currentTime=Math.min(t,Math.max(0,(v.duration||t)-.25))}catch(e){}if(!p)v.play().catch(function(){})});v.load()}sel.addEventListener('change',function(){set(parseInt(sel.value,10)||0,true)});set(0,false);v.play().catch(function(){v.muted=true;v.play().catch(function(){})})})();</script></body></html>`;
+  return `<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1.0,user-scalable=no"><meta name="referrer" content="no-referrer"><title>${safeTitle}</title><style>*{margin:0;padding:0;box-sizing:border-box}html,body{width:100%;height:100%;background:#000;overflow:hidden;display:flex;align-items:center;justify-content:center;position:relative}video{width:100%;height:100%;max-height:100vh;object-fit:contain;background:#000}.control-overlay{position:absolute;top:12px;right:12px;z-index:50}.quality-select{background:rgba(15,23,42,.88);color:#f8fafc;border:1px solid rgba(255,255,255,.25);border-radius:6px;padding:5px 10px;font-size:13px;font-family:system-ui,-apple-system,sans-serif;cursor:pointer}.quality-select option{background:#0f172a;color:#fff}</style></head><body><div id="quality-wrap" class="control-overlay" style="display:none"><select id="quality-selector" class="quality-select" title="Select Video Quality"></select></div><video id="player" controls autoplay muted playsinline referrerpolicy="no-referrer" ${safePoster ? `poster="${safePoster}"` : ''}></video><script>(function(){var v=document.getElementById('player'),s=${JSON.stringify(list)},sel=document.getElementById('quality-selector'),w=document.getElementById('quality-wrap');if(!s.length)return;function label(x){var l=x.label||(x.quality?(x.quality+'p'):'Original');if(x.quality>=1080&&!/full\s*hd/i.test(l))l+=' Full HD';else if(x.quality>=720&&x.quality<1080&&!/\bhd\b/i.test(l))l+=' HD';return l}if(s.length>1){w.style.display='block';s.forEach(function(x,i){var o=document.createElement('option');o.value=String(i);o.textContent=label(x);sel.appendChild(o)})}function set(i,keep){i=Math.max(0,Math.min(s.length-1,i));var t=keep?(v.currentTime||0):0,p=v.paused;sel.value=String(i);var usedFallback=false;var onError=function(){v.removeEventListener('error',onError);var fb=s[i].fallbackUrl;if(fb&&!usedFallback){usedFallback=true;v.src=fb;v.addEventListener('error',onError);v.load()}else if(i<s.length-1){set(i+1,keep)}};v.addEventListener('error',onError);v.src=s[i].url;v.addEventListener('loadedmetadata',function m(){v.removeEventListener('loadedmetadata',m);try{if(t>0)v.currentTime=Math.min(t,Math.max(0,(v.duration||t)-.25))}catch(e){}if(!p){v.muted=true;v.play().catch(function(){})}});v.load()}sel.addEventListener('change',function(){set(parseInt(sel.value,10)||0,true)});set(0,false);v.play().catch(function(){v.muted=true;v.play().catch(function(){})})})();</script></body></html>`;
 }
 
 function renderCleanHlsPlayer(streamingUrl, title = "", poster = "") {
@@ -963,6 +924,58 @@ function unpackDeanEdwards(p, a, c, k) {
   return p;
 }
 
+function unpackAllPackedSources(html) {
+  const out = [];
+  const text = String(html || "");
+  let pos = 0;
+  while (pos < text.length) {
+    const start = text.indexOf("eval(function", pos);
+    if (start < 0) break;
+    let i = start + 5;
+    let depth = 1;
+    let quote = null;
+    let escaped = false;
+    let end = -1;
+    while (i < text.length) {
+      const ch = text[i];
+      if (quote) {
+        if (escaped) escaped = false;
+        else if (ch === "\\") escaped = true;
+        else if (ch === quote) quote = null;
+        i += 1;
+        continue;
+      }
+      if (ch === '"' || ch === "'" || ch === "`") quote = ch;
+      else if (ch === "(") depth += 1;
+      else if (ch === ")") {
+        depth -= 1;
+        if (depth === 0) {
+          end = i;
+          break;
+        }
+      }
+      i += 1;
+    }
+    if (end < 0) break;
+    const arg = text.slice(start + 5, end);
+    pos = end + 1;
+    const match = arg.match(/\}\('((?:\\.|[^'\\])*)',(\d+),(\d+),'((?:\\.|[^'\\])*)'\.split\('\|'\)/);
+    if (!match) continue;
+    const p = match[1].replace(/\\'/g, "'").replace(/\\\\/g, "\\");
+    const a = parseInt(match[2], 10);
+    const c = parseInt(match[3], 10);
+    const k = match[4].replace(/\\'/g, "'").split("|");
+    let unpacked;
+    try { unpacked = unpackDeanEdwards(p, a, c, k); } catch { continue; }
+    const sourceRe = /(?:file|src|video_url|videoUrl|url)\s*:\s*["']([^"']+\.(?:mp4|m3u8|webm)(?:\?[^"']*)?)["']/gi;
+    let sourceMatch;
+    while ((sourceMatch = sourceRe.exec(unpacked)) !== null) out.push(sourceMatch[1].replace(/\\\//g, "/"));
+    const quotedRe = /["'](https?:\/\/[^"'\s<>]+?\.(?:mp4|m3u8|webm)(?:\?[^"'\s<>]*)?)["']/gi;
+    while ((sourceMatch = quotedRe.exec(unpacked)) !== null) out.push(sourceMatch[1].replace(/\\\//g, "/"));
+  }
+  return [...new Set(out)];
+}
+
 function extractPackedStreamInfo(html) {
   try {
     const match = html.match(/eval\(function\(p,a,c,k,e,d\)[\s\S]*?return p\}\('(.*?)',(\d+),(\d+),'(.*?)'\.split\('\|'\)/);
@@ -1011,6 +1024,350 @@ function extractPackedStreamInfo(html) {
   }
 }
 
+// ─── HotScopes / AVS embed resolver ──────────────────────────────────
+// HotScopes wraps its real player in an @hex@-encoded iframe pointing at a
+// Gounlimited gate. That gate makes a cross-origin XHR to router.parklogic.com
+// from inside our iframe, which browsers block (status 0). The empty response
+// then blows up upstream video.js ("element or ID supplied is not valid") and
+// "No available adapters". We resolve the chain on the server and serve either
+// a clean player or a clean unavailable card, never the broken upstream page.
+const HOT_SCOPES_HOST_RE = /(^|\.)hotscopes\.(io|net|com|org)$/i;
+
+function decodeAtHex(encoded) {
+  try {
+    const hex = String(encoded || "").replace(/@/g, "");
+    if (!hex || hex.length % 2 !== 0) return "";
+    return decodeURIComponent(hex.replace(/(..)/g, "%$1"));
+  } catch {
+    return "";
+  }
+}
+
+function buildStreamEntry(raw, pageUrl = "", label = "", typeHint = "") {
+  let value = String(raw || "").replace(/\\\//g, "/").replace(/&amp;/g, "&").trim();
+  if (!value || /^about:blank$/i.test(value)) return null;
+  let abs;
+  try { abs = new URL(value, pageUrl || "https://chuglii.pages.dev/").toString(); } catch { return null; }
+  let parsed;
+  try { parsed = new URL(abs); } catch { return null; }
+  if (parsed.protocol !== "https:" && parsed.protocol !== "http:") return null;
+
+  const path = parsed.pathname.toLowerCase();
+  let type = typeHint;
+  if (!type) {
+    if (path.endsWith(".mp4")) type = "direct_mp4";
+    else if (path.endsWith(".m3u8")) type = "direct_hls";
+    else if (path.endsWith(".webm")) type = "direct_webm";
+    else if (/\.m3u8(?:\?|$)/i.test(abs)) type = "direct_hls";
+    else if (/\.mp4(?:\?|$)/i.test(abs)) type = "direct_mp4";
+    else if (/\.webm(?:\?|$)/i.test(abs)) type = "direct_webm";
+  }
+  if (!type) return null;
+
+  const quality = qualityFromValue(parsed.pathname) || qualityFromValue(label);
+  // Fresh ClicknPlay URLs come from the live embed page. The browser accepts
+  // their HTTPS certificate, while Cloudflare egress does not, so play them
+  // directly and keep the worker proxy only as a fallback.
+  const useDirectAvs = AVS_DIRECT_HOST_RE.test(parsed.hostname);
+  const proxyUrl = `/api/player/stream?url=${encodeURIComponent(abs)}`;
+  return {
+    url: useDirectAvs ? abs : proxyUrl,
+    fallbackUrl: useDirectAvs ? proxyUrl : "",
+    rawUrl: abs,
+    type,
+    quality,
+    label: label || (quality ? `${quality}p` : "Original"),
+  };
+}
+
+function extractGenericStreams(html, pageUrl) {
+  const out = [];
+  const seen = new Set();
+  const add = (raw, label = "", typeHint = "") => {
+    const entry = buildStreamEntry(raw, pageUrl, label, typeHint);
+    if (!entry || seen.has(entry.rawUrl)) return;
+    seen.add(entry.rawUrl);
+    out.push(entry);
+  };
+
+  const urlRe = /["'](https?:\/\/[^"'\s<>]+?\.(?:mp4|m3u8|webm)(?:\?[^"'\s<>]*)?)["']/gi;
+  let m;
+  while ((m = urlRe.exec(html || "")) !== null) add(m[1]);
+
+  for (const source of unpackAllPackedSources(html || "")) add(source);
+
+  const packed = extractPackedStreamInfo(html || "");
+  if (packed?.hls4) add(packed.hls4, "", "direct_hls");
+  if (packed?.file) add(packed.file, "", /\.m3u8(?:\?|$)/i.test(packed.file) ? "direct_hls" : "direct_mp4");
+
+  out.sort((a, b) => (b.quality || 0) - (a.quality || 0));
+  return out;
+}
+
+function renderUnavailablePlayer(title, poster, detailUrl) {
+  const safeTitle = escapeHtml(title || "Video");
+  const safePoster = poster ? escapeHtml(poster) : "";
+  const safeDetail = detailUrl && /^https?:\/\//i.test(detailUrl) ? escapeHtml(detailUrl) : "";
+  return `<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="referrer" content="no-referrer"><title>${safeTitle}</title><style>
+  *{box-sizing:border-box}html,body{width:100%;height:100%;margin:0;background:#000;color:#f4f4f5;font-family:system-ui,-apple-system,sans-serif;overflow:hidden}
+  .wrap{position:relative;width:100%;height:100%;display:flex;align-items:center;justify-content:center;text-align:center;padding:24px}
+  .poster{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;opacity:.22;filter:blur(2px)}
+  .card{position:relative;z-index:1;max-width:460px;padding:22px 24px;border-radius:16px;background:rgba(9,9,11,.82);border:1px solid rgba(255,255,255,.12)}
+  .card h1{font-size:16px;line-height:1.4;margin:0 0 8px}
+  .card p{font-size:13px;line-height:1.5;color:#a1a1aa;margin:0 0 14px}
+  .card a{display:inline-block;padding:8px 14px;border-radius:10px;background:#f59e0b;color:#111;font-size:12px;font-weight:700;text-decoration:none}
+  .card a:focus-visible{outline:2px solid #f59e0b;outline-offset:3px}
+  </style></head><body><div class="wrap">
+  ${safePoster ? `<img class="poster" src="${safePoster}" alt="">` : ""}
+  <main class="card"><h1>${safeTitle}</h1><p>This upstream source is currently unavailable. No ad-gated or broken player scripts were loaded.</p>${safeDetail ? `<a href="${safeDetail}" target="_blank" rel="noopener noreferrer">Open source page</a>` : ""}</main>
+  </div></body></html>`;
+}
+
+async function resolveGounlimitedStream(nestedUrl, referer) {
+  try {
+    const nested = new URL(nestedUrl);
+    if (!/(^|\.)gounlimited\.to$/i.test(nested.hostname)) return [];
+    const upstream = await fetch(nested.toString(), {
+      headers: {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
+        "Referer": referer || "https://hotscopes.io/",
+        "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+      },
+      redirect: "follow",
+    });
+    if (!upstream.ok) return [];
+    const html = await upstream.text();
+    const payloadMatch = html.match(/"(eyJ[A-Za-z0-9+/=]{100,})"/);
+    if (!payloadMatch) return [];
+
+    const payload = JSON.parse(new TextDecoder().decode(Uint8Array.from(atob(payloadMatch[1]), (c) => c.charCodeAt(0))));
+    if (!payload || typeof payload !== "object") return [];
+    const params = payload.parameters || (payload.parameters = {});
+    params.adBlockingDetected = false;
+    params.isIframe = false;
+    params.refererBrowser = referer || "https://hotscopes.io/";
+    params.timezoneBrowser = "Asia/Kolkata";
+    params.timezoneOffset = -330;
+    params.webdriver = false;
+    params.gpu = null;
+
+    const routerPath = typeof params.path === "string" && params.path.startsWith("/") ? params.path : nested.pathname;
+    const routerRes = await fetch(`https://router.parklogic.com${routerPath}`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
+        "Referer": nested.toString(),
+        "Origin": "https://gounlimited.to",
+      },
+      body: JSON.stringify(payload),
+      redirect: "manual",
+    });
+    const routerText = (await routerRes.text()).trim();
+    let destination = /^https?:\/\//i.test(routerText) ? routerText : (routerRes.headers.get("location") || "");
+
+    if (!/^https?:\/\//i.test(destination)) {
+      return extractGenericStreams(routerText, nested.toString());
+    }
+
+    let destObj;
+    try { destObj = new URL(destination); } catch { return []; }
+    // ParkLogic / headline portals are dead ends, not media hosts.
+    if (/(parklogic|headlinelogic|click-v4|junimedclk|plarclck|adorarama)/i.test(destObj.hostname)) return [];
+
+    const destRes = await fetch(destination, {
+      headers: {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
+        "Referer": nested.toString(),
+        "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+      },
+      redirect: "follow",
+    });
+    const contentType = destRes.headers.get("content-type") || "";
+    if (!contentType.includes("text/html")) return [];
+    return extractGenericStreams(await destRes.text(), destRes.url || destination);
+  } catch (e) {
+    console.error("Gounlimited resolve error:", e);
+    return [];
+  }
+}
+
+const AVS_CHAIN_HOST_RE = /(^|\.)(hotscopes\.(io|net|com|org)|reallifecam\.to|reallifecams\.net|voyeur-house\.org|clicknplay\.to)$/i;
+const AVS_DIRECT_HOST_RE = /(^|\.)clicknplay\.to$/i;
+const AVS_DEAD_GATE_RE = /(gounlimited\.to|parklogic\.com|headlinelogic\.com|click-v4\.com|junimedclk\.com|plarclck\.com|adorarama\.com)/i;
+
+function extractIframeSources(html, pageUrl) {
+  const sources = [];
+  const scan = (text) => {
+    const re = /<iframe\b[^>]*\bsrc=["']([^"']+)["']/gi;
+    let match;
+    while ((match = re.exec(text || "")) !== null) {
+      let abs;
+      try { abs = new URL(match[1], pageUrl).toString(); } catch { continue; }
+      if (!sources.includes(abs)) sources.push(abs);
+    }
+  };
+  scan(html);
+  const encoded = String(html || "").match(/str\s*=\s*['"]([@0-9A-Fa-f]+)['"]/)?.[1] || "";
+  if (encoded) scan(decodeAtHex(encoded));
+  return sources;
+}
+
+async function probeMediaUrl(mediaUrl, referer) {
+  try {
+    const res = await fetch(mediaUrl, {
+      headers: {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
+        "Referer": referer || "https://hotscopes.net/",
+        "Accept": "video/mp4,application/vnd.apple.mpegurl,*/*;q=0.8",
+        "Range": "bytes=0-0",
+      },
+      redirect: "follow",
+    });
+    return res.ok || res.status === 206;
+  } catch {
+    return false;
+  }
+}
+
+// AVS clicknplay files rotate per embed request. A stored MP4 can therefore be
+// a 404 while the same video is still live. Walk the detail/embed/iframe chain
+// on the edge and return only a URL that answers a byte-range probe.
+async function resolveAvsStreamChain(startUrl, referer = "https://hotscopes.net/", maxSteps = 6) {
+  const queue = [{ url: startUrl, referer: referer || "https://hotscopes.net/" }];
+  const seen = new Set();
+  const streams = [];
+
+  for (let step = 0; step < maxSteps && queue.length && streams.length === 0; step += 1) {
+    const node = queue.shift();
+    let obj;
+    try { obj = new URL(node.url); } catch { continue; }
+    const key = obj.toString();
+    if (seen.has(key)) continue;
+    seen.add(key);
+    if (AVS_DEAD_GATE_RE.test(key)) continue;
+
+    if (/\.(mp4|m3u8|webm)(?:\?|$)/i.test(obj.pathname + obj.search)) {
+      const entry = buildStreamEntry(key, "", "", "");
+      if (entry && await probeMediaUrl(key, node.referer)) streams.push(entry);
+      continue;
+    }
+
+    let res;
+    try {
+      res = await fetch(key, {
+        headers: {
+          "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
+          "Referer": node.referer,
+          "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+        },
+        redirect: "follow",
+      });
+    } catch { continue; }
+    if (!res.ok) continue;
+    const html = await res.text();
+    const pageUrl = res.url || key;
+
+    for (const stream of extractGenericStreams(html, pageUrl)) {
+      if (streams.some((s) => s.rawUrl === stream.rawUrl)) continue;
+      // This URL came from the live embed page itself, so it is current by
+      // definition. Do not discard it because Cloudflare egress cannot probe
+      // playtwo.clicknplay.to; the browser can still play it from India.
+      streams.push(stream);
+    }
+    if (streams.length) break;
+
+    for (const iframeSrc of extractIframeSources(html, pageUrl)) {
+      let child;
+      try { child = new URL(iframeSrc); } catch { continue; }
+      if (AVS_CHAIN_HOST_RE.test(child.hostname) && !seen.has(iframeSrc)) {
+        queue.push({ url: iframeSrc, referer: pageUrl });
+      }
+    }
+  }
+  return streams;
+}
+
+async function resolveAvsForPlayer(targetUrl, searchParams) {
+  const title = searchParams.get("title") || "HotScopes Video";
+  const poster = searchParams.get("poster") || "";
+  // Prefer the live embed/detail page over a stored direct URL: AVS file
+  // names rotate, so the stored URL is usually expired by playback time.
+  const starts = [];
+  for (const key of ["embed", "detail"]) {
+    const extra = searchParams.get(key);
+    if (extra && /^https?:\/\//i.test(extra) && !starts.includes(extra)) starts.push(extra);
+  }
+  if (!starts.includes(targetUrl)) starts.push(targetUrl);
+  for (const start of starts) {
+    const streams = await resolveAvsStreamChain(start, "https://hotscopes.net/", 6);
+    if (streams.length) return renderCleanMp4Player(streams, title, poster);
+  }
+  return null;
+}
+
+async function resolveHotScopesEmbed(targetUrl, searchParams) {
+  const title = searchParams.get("title") || "HotScopes Video";
+  const poster = searchParams.get("poster") || "";
+  const upstream = await fetch(targetUrl, {
+    headers: {
+      "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
+      "Referer": "https://hotscopes.io/",
+      "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+    },
+    redirect: "follow",
+  });
+  if (!upstream.ok) return renderUnavailablePlayer(title, poster, "");
+  const html = await upstream.text();
+
+  const videoId = html.match(/var\s+video_id\s*=\s*["'](\d+)["']/i)?.[1] || "";
+  const finalPoster = poster || (videoId ? `https://hotscopes.io/media/videos/tmb1/${videoId}/1.jpg` : "");
+  const detailUrl = html.match(/player_logo_link\s*=\s*["']([^"']+)["']/i)?.[1] || "";
+
+  // Old embeds hide the iframe in str='@hex@'; modern embeds expose it as a
+  // plain <iframe>. Support both instead of assuming the legacy wrapper.
+  const nestedCandidates = extractIframeSources(html, targetUrl).filter((candidate) => {
+    try {
+      const host = new URL(candidate).hostname;
+      return AVS_CHAIN_HOST_RE.test(host) || /(^|\.)gounlimited\.to$/i.test(host);
+    } catch {
+      return false;
+    }
+  });
+  if (!nestedCandidates.length) return renderUnavailablePlayer(title, finalPoster, detailUrl);
+  const nestedUrl = nestedCandidates[0];
+
+  let streams = [];
+  try {
+    const nestedObj = new URL(nestedUrl);
+    if (/(^|\.)gounlimited\.to$/i.test(nestedObj.hostname)) {
+      streams = await resolveGounlimitedStream(nestedUrl, "https://hotscopes.io/");
+    } else {
+      // Modern AVS embeds decode to a plain clicknplay iframe whose packed
+      // player script contains the current rotating file URL.
+      streams = await resolveAvsStreamChain(nestedUrl, "https://hotscopes.io/", 6);
+      if (!streams.length && HOT_SCOPES_HOST_RE.test(nestedObj.hostname)) {
+        streams = extractGenericStreams(html, targetUrl);
+      }
+    }
+  } catch (e) {
+    console.error("HotScopes nested resolve error:", e);
+  }
+
+  if (streams.length > 0) {
+    const hls = streams.find((s) => s.type === "direct_hls" || /\.m3u8(?:\?|$)/i.test(s.rawUrl));
+    if (hls) {
+      return renderCleanHlsPlayer(hls.url, title, finalPoster);
+    }
+    const mp4s = streams.filter((s) => s.type !== "direct_hls");
+    if (mp4s.length > 0) {
+      return renderCleanMp4Player(mp4s, title, finalPoster);
+    }
+  }
+
+  return renderUnavailablePlayer(title, finalPoster, detailUrl || nestedUrl);
+}
+
   // ─── Edge HLS Stream Manifest Proxy (/api/player/stream) ───────────
   // Proxies M3U8 master/variant manifests, AES encryption keys, and TS segments for LuluStream, FC2Stream, and EarnVids.
   // Spoofs User-Agent: Mozilla/5.0 to bypass tnmr.org bot blocking, and adds CORS Access-Control-Allow-Origin: *
@@ -1028,7 +1385,15 @@ function extractPackedStreamInfo(html) {
     }
 
     try {
-      const targetObj = new URL(streamUpstreamUrl);
+      let targetObj = new URL(streamUpstreamUrl);
+      // playtwo.clicknplay.to has an invalid TLS certificate for Cloudflare
+      // egress (worker fetches fail with 526), but its plain-HTTP origin serves
+      // the same byte ranges correctly. The browser still reaches this proxy
+      // over HTTPS, so there is no mixed-content exposure to the user.
+      if (AVS_DIRECT_HOST_RE.test(targetObj.hostname) && targetObj.protocol === "https:") {
+        targetObj.protocol = "http:";
+        streamUpstreamUrl = targetObj.toString();
+      }
       let referer = "https://supjav.com/";
       if (targetObj.hostname.includes("influencersgonewild")) {
         referer = "https://influencersgonewild.com/";
@@ -1036,8 +1401,6 @@ function extractPackedStreamInfo(html) {
         referer = "https://sheeshfans.com/";
       } else if (targetObj.hostname.includes("internetchicks")) {
         referer = "https://internetchicks.com/";
-      } else if (targetObj.hostname.includes("pimpbunny")) {
-        referer = "https://pimpbunny.com/";
       }
 
       const reqHeaders = {
@@ -1045,9 +1408,26 @@ function extractPackedStreamInfo(html) {
         "Referer": referer,
       };
 
+      const isAvsDirect = AVS_DIRECT_HOST_RE.test(targetObj.hostname);
       const rangeHeader = request.headers.get("Range");
-      if (rangeHeader) {
-        reqHeaders["Range"] = rangeHeader;
+      let effectiveRange = rangeHeader || "";
+      if (isAvsDirect) {
+        // Cloudflare does not reliably stream a passthrough response body from
+        // this HTTP origin. Serve bounded byte ranges and buffer them instead,
+        // so every response is small enough to return atomically while still
+        // supporting seeking and progressive playback.
+        const AVS_CHUNK_SIZE = 4 * 1024 * 1024;
+        const full = effectiveRange.match(/^bytes=(\d+)-(\d*)$/);
+        if (full) {
+          const start = parseInt(full[1], 10);
+          const end = full[2] ? parseInt(full[2], 10) : start + AVS_CHUNK_SIZE - 1;
+          effectiveRange = `bytes=${start}-${Math.min(end, start + AVS_CHUNK_SIZE - 1)}`;
+        } else if (!effectiveRange) {
+          effectiveRange = `bytes=0-${AVS_CHUNK_SIZE - 1}`;
+        }
+      }
+      if (effectiveRange) {
+        reqHeaders["Range"] = effectiveRange;
       }
 
       const upstreamRes = await fetch(streamUpstreamUrl, {
@@ -1055,16 +1435,29 @@ function extractPackedStreamInfo(html) {
       });
 
       if (!upstreamRes.ok && upstreamRes.status !== 206) {
-        // PimpBunny/Bunny Shield often blocks datacenter/worker fetches.
-        // Fall back to redirecting the browser to the signed URL directly.
-        if (targetObj.hostname === "pimpbunny.com" || targetObj.hostname.endsWith(".pimpbunny.com")) {
-          return Response.redirect(streamUpstreamUrl, 302);
-        }
         return new Response(upstreamRes.body, { status: upstreamRes.status, headers: CORS_HEADERS });
       }
 
       const contentType = upstreamRes.headers.get("content-type") || "";
       const isM3U8 = streamUpstreamUrl.includes(".m3u8") || contentType.includes("mpegurl") || contentType.includes("application/x-mpegURL");
+
+      if (isAvsDirect && !isM3U8) {
+        const body = await upstreamRes.arrayBuffer();
+        const resHeaders = new Headers();
+        resHeaders.set("Content-Type", contentType || "video/mp4");
+        resHeaders.set("Access-Control-Allow-Origin", "*");
+        resHeaders.set("Access-Control-Allow-Methods", "GET, HEAD, OPTIONS");
+        resHeaders.set("Access-Control-Allow-Headers", "*");
+        resHeaders.set("Accept-Ranges", "bytes");
+        resHeaders.set("Content-Length", String(body.byteLength));
+        const contentRange = upstreamRes.headers.get("Content-Range");
+        if (contentRange) resHeaders.set("Content-Range", contentRange);
+        resHeaders.set("Cache-Control", "no-store");
+        return new Response(body, {
+          status: upstreamRes.status,
+          headers: resHeaders,
+        });
+      }
 
       // For binary TS segments, AES keys, and direct MP4 streams: forward Range and status 206/200 with CORS
       if (!isM3U8) {
@@ -1081,10 +1474,9 @@ function extractPackedStreamInfo(html) {
         if (upstreamRes.headers.get("Content-Length")) {
           resHeaders.set("Content-Length", upstreamRes.headers.get("Content-Length"));
         }
-          const isSignedPimpBunnyStream = targetObj.hostname.toLowerCase().includes("pimpbunny");
           resHeaders.set(
             "Cache-Control",
-            upstreamRes.status === 206 || isSignedPimpBunnyStream ? "no-store" : "public, max-age=86400"
+            upstreamRes.status === 206 ? "no-store" : "public, max-age=86400"
           );
 
         return new Response(upstreamRes.body, {
@@ -1177,14 +1569,23 @@ function extractPackedStreamInfo(html) {
 
       const destObj = new URL(targetUrl);
 
-      // Render PimpBunny HLS variants in the site's HLS.js player and route
-      // playlist, key, and segment requests through the range/CORS proxy.
-      if (
-        (destObj.hostname === "pimpbunny.com" || destObj.hostname.endsWith(".pimpbunny.com")) &&
-        destObj.pathname.toLowerCase().endsWith(".m3u8")
-      ) {
-        const streamProxyUrl = `/api/player/stream?url=${encodeURIComponent(targetUrl)}`;
-        return new Response(renderCleanHlsPlayer(streamProxyUrl, "PimpBunny"), {
+      // Voyeur House's own reallifecams.net CDN serves byte ranges correctly
+      // to the browser but stalls when streamed through the Worker. Play it
+      // directly in our controlled player instead of returning a raw proxied
+      // media document that Chrome renders as its own non-autoplaying player.
+      if (/(^|\.)reallifecams\.net$/i.test(destObj.hostname) && /\.(mp4|webm)(?:\?|$)/i.test(destObj.pathname)) {
+        const directStream = [{
+          url: targetUrl,
+          rawUrl: targetUrl,
+          type: "direct_mp4",
+          quality: 0,
+          label: "Original",
+        }];
+        return new Response(renderCleanMp4Player(
+          directStream,
+          url.searchParams.get("title") || "Voyeur House Video",
+          url.searchParams.get("poster") || "",
+        ), {
           status: 200,
           headers: {
             "Content-Type": "text/html; charset=utf-8",
@@ -1194,75 +1595,66 @@ function extractPackedStreamInfo(html) {
         });
       }
 
-      // PimpBunny direct media: let the browser fetch signed URLs directly.
-      // Worker/datacenter IPs can be blocked by Bunny Shield, causing 403.
-      if (destObj.hostname === "pimpbunny.com" || destObj.hostname.endsWith(".pimpbunny.com")) {
-        const pbPath = destObj.pathname.toLowerCase();
-        if (/\/get_file\/.+\.(mp4|m3u8|webm)\/?$/.test(pbPath)) {
-          return Response.redirect(targetUrl, 302);
-        }
-
-        // Resolve PimpBunny embed/detail pages to direct signed MP4 renditions.
-        // The third-party embed locks quality and can redirect to pimpbunny.com;
-        // extracting KVS video_url/video_alt_url* gives us app-controlled quality.
-        const isEmbed = /\/embed\/\d+/.test(destObj.pathname);
-        const isVideoPage = /\/videos\/[a-zA-Z0-9_-]+\/?$/.test(destObj.pathname);
-        if (isEmbed || isVideoPage) {
-          const wantJson = url.searchParams.get("format") === "json" || request.headers.get("accept")?.includes("application/json");
-          try {
-            const pbRes = await fetch(targetUrl, {
+      // AVS clicknplay MP4 filenames rotate. Validate the stored URL at the
+      // edge; if it expired, re-resolve the supplied embed/detail page and
+      // return a fresh working stream without changing the database row.
+      if (AVS_DIRECT_HOST_RE.test(destObj.hostname)) {
+        try {
+          const safeHtml = await resolveAvsForPlayer(targetUrl, url.searchParams);
+          if (safeHtml) {
+            return new Response(safeHtml, {
+              status: 200,
               headers: {
-                "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
-                "Referer": "https://pimpbunny.com/",
-                "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+                "Content-Type": "text/html; charset=utf-8",
+                "Access-Control-Allow-Origin": "*",
+                "Cache-Control": "no-store",
               },
             });
-            if (pbRes.ok) {
-              const pbHtml = await pbRes.text();
-              const pbStreams = extractPimpbunnyStreams(pbHtml, targetUrl);
-              if (pbStreams.length > 0) {
-                const titleMatch = pbHtml.match(/<title>([^<]+)<\/title>/i);
-                const title = titleMatch ? titleMatch[1].replace(/\|\s*PimpBunny.*$/i, "").trim() : "PimpBunny";
-                if (wantJson) {
-                  return new Response(JSON.stringify({
-                    ok: true,
-                    title,
-                    streams: pbStreams.map((s) => ({ url: s.rawUrl, type: s.type, quality: s.quality, label: s.label })),
-                  }), {
-                    status: 200,
-                    headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*", "Cache-Control": "no-store" },
-                  });
-                }
-                return new Response(renderCleanMp4Player(pbStreams, title), {
-                  status: 200,
-                  headers: {
-                    "Content-Type": "text/html; charset=utf-8",
-                    "Access-Control-Allow-Origin": "*",
-                    "Cache-Control": "no-store",
-                  },
-                });
-              }
-            }
-            if (wantJson) {
-              return new Response(JSON.stringify({ ok: false, error: "no_streams", status: pbRes.status }), {
-                status: 200, headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*", "Cache-Control": "no-store" },
-              });
-            }
-          } catch (e) {
-            console.error("PimpBunny resolve error:", e);
-            if (wantJson) {
-              return new Response(JSON.stringify({ ok: false, error: "resolve_failed" }), {
-                status: 200, headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*", "Cache-Control": "no-store" },
-              });
-            }
           }
-          // Extraction failed or was blocked; fall back to the original embed/page.
-          if (wantJson) {
-            return new Response(JSON.stringify({ ok: false, error: "fallback", redirect: targetUrl }), {
-              status: 200, headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*", "Cache-Control": "no-store" },
-            });
-          }
-          return Response.redirect(targetUrl, 302);
+        } catch (e) {
+          console.error("AVS direct resolve error:", e);
+        }
+        return new Response(renderUnavailablePlayer(
+          url.searchParams.get("title") || "HotScopes Video",
+          url.searchParams.get("poster") || "",
+          url.searchParams.get("detail") || targetUrl,
+        ), {
+          status: 200,
+          headers: {
+            "Content-Type": "text/html; charset=utf-8",
+            "Access-Control-Allow-Origin": "*",
+            "Cache-Control": "no-store",
+          },
+        });
+      }
+
+      // HotScopes / AVS-family embeds wrap a dead Gounlimited ad gate. Resolve
+      // it server-side so the browser never loads the broken router script.
+      if (HOT_SCOPES_HOST_RE.test(destObj.hostname)) {
+        try {
+          const safeHtml = await resolveHotScopesEmbed(targetUrl, url.searchParams);
+          return new Response(safeHtml, {
+            status: 200,
+            headers: {
+              "Content-Type": "text/html; charset=utf-8",
+              "Access-Control-Allow-Origin": "*",
+              "Cache-Control": "no-store",
+            },
+          });
+        } catch (e) {
+          console.error("HotScopes resolve error:", e);
+          return new Response(renderUnavailablePlayer(
+            url.searchParams.get("title") || "HotScopes Video",
+            url.searchParams.get("poster") || "",
+            targetUrl,
+          ), {
+            status: 200,
+            headers: {
+              "Content-Type": "text/html; charset=utf-8",
+              "Access-Control-Allow-Origin": "*",
+              "Cache-Control": "no-store",
+            },
+          });
         }
       }
 

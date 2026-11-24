@@ -1078,8 +1078,6 @@ router.get("/media", async (req, res) => {
     "influencersgonewild.com",
     "influencersgonewild.net",
     "internetchicks.com",
-    "pimpbunny.net",
-    "pimpbunny.com",
     "sheeshfans.com",
   ];
   const upstreamHostname = parsedUrl.hostname;

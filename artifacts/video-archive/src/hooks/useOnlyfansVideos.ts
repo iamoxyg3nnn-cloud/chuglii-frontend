@@ -57,14 +57,13 @@ export interface OnlyfansVideo {
 }
 
 export type OnlyfansSortOption = "newest" | "views" | "rating" | "quality" | "oldest";
-export const ONLYFANS_SITES = ["internetchicks", "influencersgonewild", "sheeshfans", "pimpbunny"] as const;
+export const ONLYFANS_SITES = ["internetchicks", "influencersgonewild", "sheeshfans"] as const;
 export type OnlyfansSite = (typeof ONLYFANS_SITES)[number];
 
 export const ONLYFANS_SITE_LABELS: Record<OnlyfansSite, string> = {
   internetchicks: "Internet Chicks",
   influencersgonewild: "Influencers Gone Wild",
   sheeshfans: "SheeshFans",
-  pimpbunny: "PimpBunny",
 };
 
 export function isOnlyfansSite(site: string | undefined): site is OnlyfansSite {
@@ -98,7 +97,7 @@ export function useOnlyfansVideos(options: UseOnlyfansVideosOptions = {}) {
       const p_category = category && !["all", "onlyfans"].includes(category.toLowerCase()) ? category.trim().toLowerCase() : null;
       const p_search = search && search.trim().length > 0 ? search.trim() : null;
 
-      // Use canonical OnlyFans RPCs. Per-source pimpbunny table has duplicate/dirty rows.
+      // Use canonical OnlyFans RPCs with per-site isolation.
       const [itemsResp, countResp] = await Promise.all([
         sb.rpc(`scraper_get_onlyfans_videos`, {
           p_source_site: site,

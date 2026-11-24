@@ -31,7 +31,6 @@ export function detectHostLabel(url: string): string {
     if (hostname.includes("anonmp4")) return "AnonMP4";
     if (hostname.includes("udrop")) return "UDrop";
     if (hostname.includes("vidmoly")) return "VidMoly";
-    if (hostname.includes("pimpbunny")) return "PimpBunny";
     if (hostname.includes("sheeshfans")) return "SheeshFans";
     if (hostname.includes("influencersgonewild")) return "InfluencersGoneWild";
     return hostname.replace(/^www\./, "");
@@ -147,13 +146,6 @@ export function iframeReferrerPolicy(
 ): "no-referrer" | "origin" | "strict-origin-when-cross-origin" {
   try {
     const { hostname } = new URL(url);
-    if (hostname === "pimpbunny.com" || hostname.endsWith(".pimpbunny.com")) {
-      // Direct media files reject cross-origin referers; embeds may need origin.
-      if (/\/get_file\/.+\.(mp4|m3u8|webm)(\/|$)/i.test(new URL(url).pathname)) {
-        return "no-referrer";
-      }
-      return "origin";
-    }
     // Hosts that validate Referer for playback-ticket or session auth
     if (
       hostname.includes("anonmp4") ||

@@ -44,8 +44,6 @@ const NO_PROXY_HOSTS: string[] = [
   "influencersgonewild.com",
   "influencersgonewild.net",
   "internetchicks.com",
-  "pimpbunny.net",
-  "pimpbunny.com",
   "sheeshfans.com",
   // NOTE: imgchest.com was removed from this list on 2026-09-26. The old note
   // claimed it "returns 403 when loaded directly" — re-probed against
