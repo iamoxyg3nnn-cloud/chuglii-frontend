@@ -774,6 +774,38 @@ async function handleApi(request, env, url, ctx) {
         });
       }
 
+      // 91dasj cover CDN (pic.biacea.cn): serves AES-128-CBC encrypted blobs
+      // (content-type binary/octet-stream). The site's image.0821.js decrypts
+      // client-side with a fixed key/iv; replicate that here so thumbnails
+      // render. Plaintext is the raw JPEG.
+      if (
+        upstreamRes.ok &&
+        (targetObj.hostname === "biacea.cn" || targetObj.hostname.endsWith(".biacea.cn"))
+      ) {
+        try {
+          const encBuf = new Uint8Array(await upstreamRes.arrayBuffer());
+          const ccDecode = (s) => s.split("_").map((a) => String.fromCharCode(parseInt(a))).join("");
+          const rawKey = new TextEncoder().encode(
+            ccDecode("102_53_100_57_54_53_100_102_55_53_51_51_54_50_55_48")
+          );
+          const rawIv = new TextEncoder().encode(
+            ccDecode("57_55_98_54_48_51_57_52_97_98_99_50_102_98_101_49")
+          );
+          const aesKey = await crypto.subtle.importKey("raw", rawKey, "AES-CBC", false, ["decrypt"]);
+          const plain = await crypto.subtle.decrypt({ name: "AES-CBC", iv: rawIv }, aesKey, encBuf);
+          return new Response(plain, {
+            status: 200,
+            headers: {
+              "Content-Type": "image/jpeg",
+              "Cache-Control": "public, max-age=31536000, immutable",
+              "Access-Control-Allow-Origin": "*",
+            },
+          });
+        } catch (decErr) {
+          // fall through to the normal pass-through below
+        }
+      }
+
       if (!upstreamRes.ok) {
         return Response.redirect(targetUrl, 302);
       }

@@ -262,7 +262,14 @@ export function proxyUrl(url: string | null | undefined): string | null {
   if (isAlreadyProxied(url)) return url;
 
   const base = getApiBaseUrl();
-  const path = `${PROXY_PATH}?url=${encodeURIComponent(url)}`;
+  // pic.biacea.cn (91dasj covers): the edge cached the pre-decrypt (encrypted)
+  // responses under these URLs for a year — bump the cache key so the
+  // decrypting worker code actually runs.
+  const bust =
+    parsed.hostname === "biacea.cn" || parsed.hostname.endsWith(".biacea.cn")
+      ? "&rv=2"
+      : "";
+  const path = `${PROXY_PATH}?url=${encodeURIComponent(url)}${bust}`;
   return base ? `${base}${path}` : path;
 }
 
