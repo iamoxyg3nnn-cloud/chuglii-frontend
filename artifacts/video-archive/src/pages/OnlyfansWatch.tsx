@@ -134,7 +134,14 @@ export default function OnlyfansWatch() {
       });
     }
 
-    const DEAD_FIRST_HOSTS = ["playmogo.com", "bysejpadsk.com"];
+    const DEAD_FIRST_HOSTS = [
+      "sbfast.com",
+      "sbfull.com",
+      "streamlare.com",
+      "vidoza.net",
+      "bysejpadsk.com",
+      "playmogo.com",
+    ];
     const isDemoted = (url: string) => DEAD_FIRST_HOSTS.some((h) => url.toLowerCase().includes(h));
     return [...list.filter((s) => !isDemoted(s.url)), ...list.filter((s) => isDemoted(s.url))];
   }, [rawPayload, video]);
