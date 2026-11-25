@@ -229,16 +229,56 @@ export default function OnlyfansWatch() {
     setPlayerKey((key) => key + 1);
   };
 
-  // Embed/locker URLs must go through the edge player, which applies the right
-  // Referer, bypasses frame-ancestors restrictions and can unwrap direct streams.
+  // Third-party embed lockers (VOE, Streamtape, DoodStream, PlayMogo, Byse,
+  // Filemoon, Vidoza, sbfull, etc.) must load directly in the browser iframe
+  // so anti-proxy scripts, Cloudflare WAF, SPAs, and IP-bound tokens (e.g.
+  // Streamtape /get_video or VPN-accessed DoodStream) work as on the source site.
+  const needsEdgePlayer = useMemo(() => {
+    if (!activeUrl) return false;
+    const u = activeUrl.toLowerCase();
+    if (
+      u.includes("voe.sx") ||
+      u.includes("caseyseemavoid.com") ||
+      u.includes("streamtape") ||
+      u.includes("dood") ||
+      u.includes("playmogo") ||
+      u.includes("bysezejataos") ||
+      u.includes("filemoon") ||
+      u.includes("sbfull") ||
+      u.includes("vidoza") ||
+      u.includes("streamwish") ||
+      u.includes("streamlare") ||
+      u.includes("sltube") ||
+      u.includes("lulustream") ||
+      u.includes("luminscdn") ||
+      u.includes("luluvdo") ||
+      u.includes("mixdrop") ||
+      u.includes("dropload") ||
+      u.includes("dr0pstream") ||
+      u.includes("vidara") ||
+      u.includes("upns") ||
+      u.includes("embedseek") ||
+      u.includes("seeks.cloud")
+    ) {
+      return false;
+    }
+    if (site === "internetchicks" && !u.includes("internetchicks.com")) {
+      return false;
+    }
+    return true;
+  }, [activeUrl, site]);
+
+  // First-party/site-hosted embed URLs go through the edge player, which
+  // applies the right Referer and can unwrap direct streams.
   const embedPlaybackUrl = useMemo(() => {
     if (!activeUrl) return "";
+    if (!needsEdgePlayer) return activeUrl;
     return buildEdgePlayerUrl(activeUrl, {
       title: video?.title,
       poster: video?.clean_thumbnail_url || video?.thumbnail_url || "",
       detail: video?.detail_url || activeUrl,
     });
-  }, [activeUrl, video?.title, video?.clean_thumbnail_url, video?.thumbnail_url, video?.detail_url]);
+  }, [activeUrl, needsEdgePlayer, video?.title, video?.clean_thumbnail_url, video?.thumbnail_url, video?.detail_url]);
 
   const cleanPosterUrl = useMemo(() => {
     const raw = video?.clean_thumbnail_url || video?.thumbnail_url;
@@ -444,6 +484,12 @@ export default function OnlyfansWatch() {
                   poster={cleanPosterUrl || undefined}
                   referrerPolicy={refPolicy as any}
                   onRetry={() => setPlayerKey((key) => key + 1)}
+                  onNextSource={allServers.length > 1 ? () => {
+                    const curIdx = allServers.findIndex((s) => s.url === activeUrl);
+                    const nextIdx = curIdx >= 0 ? (curIdx + 1) % allServers.length : 0;
+                    setSelectedServerUrl(allServers[nextIdx].url);
+                    setPlayerKey((key) => key + 1);
+                  } : undefined}
                 />
               )
             ) : (

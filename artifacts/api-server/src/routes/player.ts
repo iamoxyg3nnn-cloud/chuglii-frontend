@@ -138,4 +138,110 @@ router.get("/player", async (req, res) => {
   }
 });
 
+/**
+ * Stream proxy for direct MP4/WebM files that require a spoofed Referer and
+ * Range-capable passthrough (internetchicks, sheeshfans, influencersgonewild).
+ * The browser's native <video> element cannot inject a custom Referer header,
+ * so we proxy the bytes server-side and add the right origin header.
+ *
+ * Usage: GET /api/player/stream?url=<encoded-cdn-url>
+ */
+router.get("/player/stream", async (req, res) => {
+  const targetUrl = typeof req.query.url === "string" ? req.query.url : null;
+  if (!targetUrl || (!targetUrl.startsWith("http://") && !targetUrl.startsWith("https://"))) {
+    res.status(400).json({ error: "Missing or invalid url parameter" });
+    return;
+  }
+
+  try {
+    const destObj = new URL(targetUrl);
+
+    // Determine the correct spoofed Referer based on the CDN origin.
+    let referer = `${destObj.protocol}//${destObj.hostname}/`;
+    if (destObj.hostname.includes("internetchicks")) {
+      referer = "https://internetchicks.com/";
+    } else if (destObj.hostname.includes("sheeshfans")) {
+      referer = "https://sheeshfans.com/";
+    } else if (destObj.hostname.includes("influencersgonewild")) {
+      referer = "https://influencersgonewild.com/";
+    }
+
+    const upstreamHeaders: Record<string, string> = {
+      "User-Agent":
+        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
+      Referer: referer,
+      Origin: referer.replace(/\/$/, ""),
+      Accept: "video/webm,video/mp4,video/*;q=0.9,*/*;q=0.8",
+      "Accept-Language": "en-US,en;q=0.9",
+    };
+
+    // Forward Range header so seek/partial-content works in the browser player.
+    const rangeHeader = req.headers["range"];
+    if (rangeHeader) {
+      upstreamHeaders["Range"] = rangeHeader;
+    }
+
+    const upstream = await fetch(targetUrl, {
+      headers: upstreamHeaders,
+      redirect: "follow",
+    });
+
+    if (!upstream.ok && upstream.status !== 206) {
+      res.status(upstream.status).json({ error: `Upstream returned ${upstream.status}` });
+      return;
+    }
+
+    // Relay status (200 or 206 Partial Content), content headers, and body.
+    res.status(upstream.status);
+
+    const relayHeaders = [
+      "content-type",
+      "content-length",
+      "content-range",
+      "accept-ranges",
+      "cache-control",
+      "last-modified",
+      "etag",
+    ];
+    for (const h of relayHeaders) {
+      const val = upstream.headers.get(h);
+      if (val) res.setHeader(h, val);
+    }
+    // Allow browser to cache stream segments.
+    if (!res.getHeader("cache-control")) {
+      res.setHeader("Cache-Control", "public, max-age=3600");
+    }
+    res.setHeader("Access-Control-Allow-Origin", "*");
+
+    if (!upstream.body) {
+      res.end();
+      return;
+    }
+
+    // Pipe the response body to the client.
+    const reader = upstream.body.getReader();
+    const pump = async () => {
+      try {
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) {
+            res.end();
+            break;
+          }
+          const shouldContinue = res.write(value);
+          if (!shouldContinue) {
+            // Back-pressure: wait for drain before reading more.
+            await new Promise<void>((resolve) => res.once("drain", resolve));
+          }
+        }
+      } catch {
+        res.end();
+      }
+    };
+    await pump();
+  } catch (err) {
+    res.status(500).json({ error: "Failed to proxy stream" });
+  }
+});
+
 export default router;
