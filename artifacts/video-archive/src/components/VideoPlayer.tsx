@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState, useCallback, type ReactNode } from "react";
+import { isDirectVideoUrl } from "../lib/video-source";
 import {
   Play,
   Pause,
@@ -299,10 +300,19 @@ export function VideoPlayer({
   const ensurePreviewEngine = useCallback(() => {
     if (previewInitRef.current) return;
     const hasHlsCandidates = Boolean(previewCandidates && previewCandidates.length > 0);
-    if (!hasHlsCandidates && !src) return;
-    previewInitRef.current = true;
+    // Direct media sources get the same live hover preview (a second muted
+    // decoder seeking on the same file). Playability is detected two ways:
+    // a recognisable media URL (mp4/webm), or the main video having already
+    // decoded a video track (covers proxied URLs whose path hides the real
+    // filename, e.g. /api/player/stream?url=...get_file/...). Embed/iframe
+    // URLs never satisfy either, so they are excluded instead of painting
+    // a black box.
+    const srcIsDirect = Boolean(src && isDirectVideoUrl(src));
+    const srcIsMedia = Boolean(videoRef.current && videoRef.current.videoWidth > 0);
+    if (!hasHlsCandidates && !srcIsDirect && !srcIsMedia) return;
     const pv = previewVideoRef.current;
-    if (!pv) return;
+    if (!pv) return; // box not rendered yet; a later call retries
+    previewInitRef.current = true;
     pv.muted = true;
     if (hasHlsCandidates) {
       // Always drive HLS previews through hls.js (even where the browser claims
@@ -334,11 +344,11 @@ export function VideoPlayer({
         hls.loadSource(previewCandidates![0]);
         hls.attachMedia(pv);
       }).catch(() => { /* preview unavailable */ });
-    } else if (src) {
+    } else if ((srcIsDirect || srcIsMedia) && src) {
       pv.src = src;
       maybePrefetchDirectFile();
     }
-  }, [previewCandidates, src]);
+  }, [previewCandidates, src, videoRef]);
 
   // Whole-file prefetch for short direct files (MP4 leaks): a single
   // background fetch populates the browser HTTP cache (the proxy serves these
@@ -427,6 +437,16 @@ export function VideoPlayer({
     return () => window.clearInterval(id);
   }, [videoRef]);
 
+  // Once the main video proves its src is decodable media (metadata with a
+  // video track), arm the preview engine even without a pre-warm timer -
+  // this is what turns on hover previews for proxied-MP4 categories.
+  useEffect(() => {
+    if (previewInitRef.current) return;
+    if (previewCandidates && previewCandidates.length > 0) return;
+    if (!mainDims || mainDims.w <= 0) return;
+    ensurePreviewEngine();
+  }, [mainDims, previewCandidates, ensurePreviewEngine]);
+
   // ─── Background segment cache-warmer ─────────────────────────────────
   // Sequentially fetches the low-rendition segments into the browser HTTP
   // cache (immutable, week-long) starting near the playhead and wrapping to
@@ -494,7 +514,7 @@ export function VideoPlayer({
   // Pre-warm: start the preview decoder shortly after the main video begins
   // loading so the first hover is already instant near the playhead.
   useEffect(() => {
-    const hasPreview = Boolean(previewCandidates && previewCandidates.length > 0) || Boolean(src);
+    const hasPreview = Boolean(previewCandidates && previewCandidates.length > 0) || isDirectVideoUrl(src);
     if (!hasPreview) return;
     const t = window.setTimeout(() => ensurePreviewEngine(), 5000);
     const t2 = previewCandidates?.length
@@ -546,6 +566,9 @@ export function VideoPlayer({
   // Live hover preview box: fixed size derived from the MAIN video's aspect
   // ratio (same content, same AR), so the box never jumps when the preview
   // decoder loads and works for both portrait and landscape sources.
+  const previewAvailable = Boolean(previewCandidates && previewCandidates.length > 0)
+    || isDirectVideoUrl(src)
+    || Boolean(mainDims && mainDims.w > 0);
   const previewAr = mainDims && mainDims.w > 0 ? mainDims.w / mainDims.h : 16 / 9;
   const PREVIEW_MAX_W = 200;
   const PREVIEW_MAX_H = 170;
@@ -726,21 +749,25 @@ export function VideoPlayer({
         >
           {/* Live hover preview: the muted low-rendition decoder plays at
               the hovered position right above the seek bar. Always mounted
-              so its warm hls.js buffer survives between hovers. */}
+              so its warm hls.js buffer survives between hovers. Only for
+              sources we can actually decode (HLS candidates or direct
+              MP4/WebM); embed-only videos show the timestamp alone. */}
           <div
             className="absolute bottom-full mb-1 -translate-x-1/2 flex flex-col items-center pointer-events-none z-30"
             style={{ left: hoverTime !== null ? clampedHoverX : -9999, visibility: hoverTime !== null ? "visible" : "hidden" }}
           >
-            <div className="mb-1 rounded-md border border-white/20 shadow-lg bg-black overflow-hidden" style={{ width: `${previewBoxW}px`, height: `${previewBoxH}px` }}>
-              <video
-                ref={previewVideoRef}
-                muted
-                playsInline
-                preload="auto"
-                className="w-full h-full object-contain"
-                aria-hidden
-              />
-            </div>
+            {previewAvailable && (
+              <div className="mb-1 rounded-md border border-white/20 shadow-lg bg-black overflow-hidden" style={{ width: `${previewBoxW}px`, height: `${previewBoxH}px` }}>
+                <video
+                  ref={previewVideoRef}
+                  muted
+                  playsInline
+                  preload="auto"
+                  className="w-full h-full object-contain"
+                  aria-hidden
+                />
+              </div>
+            )}
             <div className="px-2 py-1 rounded-md bg-black/90 border border-white/10 text-[11px] font-medium text-white tabular-nums">
               {hoverTime !== null && duration > 0 ? formatTime(hoverTime) : ""}
             </div>
