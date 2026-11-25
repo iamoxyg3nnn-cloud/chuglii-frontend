@@ -47,13 +47,30 @@ export const STUDIO_SITES = [
 ] as const;
 
 /** Site sections crawled from madouer.cc (whitelisted MacCMS type ids).
- *  Mirrors scraper/categories/studios/categories.py MADOUER_TYPES. */
+ *  Mirrors scraper/categories/studios/categories.py MADOUER_TYPES. JAV
+ *  sections (23–27) and type 20 (萝莉社) are excluded at the source. */
 export const MADOUER_SECTIONS = [
   { id: "1", cn: "麻豆视频", en: "Madou Videos" },
   { id: "2", cn: "日本视频", en: "Japanese Videos" },
   { id: "3", cn: "欧美视频", en: "Western Videos" },
   { id: "4", cn: "动漫视频", en: "Anime Videos" },
   { id: "5", cn: "国产视频", en: "Chinese Amateur" },
+  { id: "6", cn: "麻豆原创", en: "Madou Original" },
+  { id: "7", cn: "91制片厂", en: "91 Studio" },
+  { id: "8", cn: "天美传媒", en: "Tianmei Media" },
+  { id: "9", cn: "蜜桃影像", en: "Peach Images" },
+  { id: "10", cn: "星空传媒", en: "Starlight Media" },
+  { id: "11", cn: "皇家华人", en: "Royal Chinese" },
+  { id: "12", cn: "精东影业", en: "Jingdong Studio" },
+  { id: "13", cn: "乐播传媒", en: "Lebo Media" },
+  { id: "14", cn: "成人头条", en: "Adult Headlines" },
+  { id: "15", cn: "兔子先生", en: "Mr. Rabbit" },
+  { id: "16", cn: "杏吧原创", en: "Xingba Original" },
+  { id: "17", cn: "玩偶姐姐", en: "HongKongDoll" },
+  { id: "18", cn: "糖心Vlog", en: "Tangxin Vlog" },
+  { id: "22", cn: "华语原创", en: "Chinese Original" },
+  { id: "31", cn: "推特女神", en: "Twitter Girls" },
+  { id: "32", cn: "国产系列", en: "Chinese Series" },
 ] as const;
 
 export type StudiosSortOption = "newest" | "oldest" | "quality";
