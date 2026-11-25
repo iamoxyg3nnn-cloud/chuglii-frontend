@@ -111,6 +111,8 @@ export const MADOUHD_SECTIONS = [
   { id: "cate28", cn: "Cosplay", en: "Cosplay" },
   { id: "cate29", cn: "VR影片", en: "VR Films" },
   { id: "cate30", cn: "18禁三级", en: "Softcore III" },
+  { id: "cate9", cn: "强奸迷奸", en: "Forced Fantasy" },
+  { id: "cate27", cn: "真实破处", en: "Defloration" },
   { id: "cate31", cn: "伪娘人妖", en: "Femboy & Ladyboy" },
   { id: "cate36", cn: "kittyxkum", en: "kittyxkum" },
   { id: "cate37", cn: "桥本香菜", en: "Hashimoto Kana" },
@@ -145,6 +147,8 @@ export const MADOUHD_SECTIONS = [
   { id: "cate68", cn: "轻S-调教反差", en: "Light SM" },
   { id: "cate69", cn: "拳交-肛交", en: "Fisting & Anal" },
   { id: "cate70", cn: "同性-女调女", en: "Lesbian" },
+  { id: "cate71", cn: "重口-尿", en: "Watersports" },
+  { id: "cate72", cn: "重口-屎", en: "Scat" },
   { id: "cate73", cn: "SM-虐肛", en: "SM Rough" },
   { id: "cate74", cn: "SM-虐阴", en: "SM Torment" },
   { id: "cate75", cn: "SM-虐待", en: "SM Abuse" },
@@ -234,6 +238,7 @@ export const MADOUHD_SECTIONS = [
   { id: "cate170", cn: "PMV", en: "PMV" },
   { id: "cate171", cn: "裸舞", en: "Nude Dance" },
   { id: "cate172", cn: "口交", en: "Blowjob" },
+  { id: "cate173", cn: "猎奇", en: "Bizarre Extreme" },
   { id: "cate174", cn: "混剪", en: "Compilations" },
 ] as const;
 
