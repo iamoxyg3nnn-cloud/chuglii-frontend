@@ -1694,7 +1694,7 @@ async function resolveHotScopesEmbed(targetUrl, searchParams) {
 
       const gate = await resolveStreamtapeGate(raw);
       if (!gate) {
-        return errorResponse("Streamtape stream is unavailable", 502);
+        return errorResponse("Streamtape stream is unavailable", 400);
       }
 
       const headers = {
@@ -1719,7 +1719,7 @@ async function resolveHotScopesEmbed(targetUrl, searchParams) {
       const mediaRes = await fetch(gate, { headers, redirect: "follow" });
       if (!mediaRes.ok && mediaRes.status !== 206) {
         const detail = await mediaRes.text().catch(() => "");
-        return errorResponse(`Streamtape proxy error: ${mediaRes.status} ${detail.slice(0, 120)}`, 502);
+        return errorResponse(`Streamtape proxy error: ${mediaRes.status} ${detail.slice(0, 120)}`, 400);
       }
 
       const body = await mediaRes.arrayBuffer();
@@ -1736,7 +1736,7 @@ async function resolveHotScopesEmbed(targetUrl, searchParams) {
 
       return new Response(body, { status: mediaRes.status, headers: resHeaders });
     } catch (err) {
-      return errorResponse("Streamtape proxy error: " + (err.message || err), 502);
+      return errorResponse("Streamtape proxy error: " + (err.message || err), 400);
     }
   }
 
