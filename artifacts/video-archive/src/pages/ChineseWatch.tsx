@@ -9,6 +9,7 @@ import {
   useChineseVideoById,
   useChineseVideos,
   CHINESE_GROUP_LABELS,
+  chineseDisplayTitle,
   isChineseGroup,
 } from "@/hooks/useChineseVideos";
 import { ChineseCard } from "@/components/ChineseCard";
@@ -103,10 +104,10 @@ export default function ChineseWatch() {
   useEffect(() => {
     if (!video) return;
     window.scrollTo({ top: 0 });
-    document.title = `${video.title} - Chinese | Chuglii`;
-    setMeta("description", `Watch ${video.title} on Chuglii. Chinese isolated category archive.`);
-    setMeta("og:title", `${video.title} | Chinese`, true);
-    setMeta("og:description", `Watch ${video.title} on Chuglii.`, true);
+    document.title = `${chineseDisplayTitle(video)} - Chinese | Chuglii`;
+    setMeta("description", `Watch ${chineseDisplayTitle(video)} on Chuglii. Chinese isolated category archive.`);
+    setMeta("og:title", `${chineseDisplayTitle(video)} | Chinese`, true);
+    setMeta("og:description", `Watch ${chineseDisplayTitle(video)} on Chuglii.`, true);
     const ogThumb = video.clean_thumbnail_url || video.thumbnail_url || "";
     if (ogThumb) setMeta("og:image", ogThumb, true);
     if (video.full_video_url) {
@@ -180,7 +181,7 @@ export default function ChineseWatch() {
 
   const playerFrameSrc = video.full_video_url
     ? buildEdgePlayerUrl(video.full_video_url, {
-        title: video.title,
+        title: chineseDisplayTitle(video),
         poster: video.clean_thumbnail_url || video.thumbnail_url || "",
         detail: video.detail_url,
         fallbacks: streamFallbacks,
@@ -250,7 +251,7 @@ export default function ChineseWatch() {
               <PlayerFrame
                 src={playerFrameSrc}
                 resetKey={`chinese-${video.id}-${retryNonce}`}
-                title={video.title}
+                title={chineseDisplayTitle(video)}
                 poster={video.clean_thumbnail_url || video.thumbnail_url || undefined}
                 onRetry={() => setRetryNonce((value) => value + 1)}
               />
@@ -357,7 +358,7 @@ export default function ChineseWatch() {
                 {isTorrent ? "Magnet" : "Stream"}
               </span>
             </div>
-            <h1 className="text-lg sm:text-2xl font-bold text-foreground leading-snug">{video.title}</h1>
+            <h1 className="text-lg sm:text-2xl font-bold text-foreground leading-snug">{chineseDisplayTitle(video)}</h1>
 
             {isTorrent && video.magnet_hash && (
               <div className="mt-3 space-y-1.5">
@@ -390,7 +391,7 @@ export default function ChineseWatch() {
                   <a key={idx} href={src} target="_blank" rel="noopener noreferrer" className="block">
                     <img
                       src={src}
-                      alt={`${video.title} screenshot ${idx + 1}`}
+                      alt={`${chineseDisplayTitle(video)} screenshot ${idx + 1}`}
                       loading="lazy"
                       referrerPolicy="no-referrer"
                       className="w-full aspect-video object-cover rounded-xl border border-border/40 hover:border-amber-500/50 transition-colors"

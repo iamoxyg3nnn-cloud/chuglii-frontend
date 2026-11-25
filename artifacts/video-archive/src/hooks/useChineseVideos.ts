@@ -7,6 +7,8 @@ export interface ChineseVideo {
   source_post_id: string;
   content_type: "video" | "torrent";
   title: string;
+  /** Google-translated English title (may be null for legacy rows). */
+  title_en?: string | null;
   slug: string | null;
   detail_url: string;
   full_video_url: string | null;
@@ -34,6 +36,13 @@ export interface ChineseVideo {
   published_at: string | null;
   scraped_at: string;
   raw_payload?: Record<string, unknown>;
+}
+
+/** English-first display title: falls back to the original CJK title when a
+ *  row has no translation yet. */
+export function chineseDisplayTitle(video: Pick<ChineseVideo, "title" | "title_en">): string {
+  const en = (video.title_en || "").trim();
+  return en || video.title;
 }
 
 /** Coarse website-browse groups inside the isolated chinese table.

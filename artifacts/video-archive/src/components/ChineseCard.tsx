@@ -2,7 +2,7 @@ import { useState } from "react";
 import { Link } from "wouter";
 import { Play, Clock, BookmarkSimple, Check, Magnet, Broadcast } from "@phosphor-icons/react";
 import type { ChineseVideo } from "@/hooks/useChineseVideos";
-import { CHINESE_GROUP_LABELS, isChineseGroup } from "@/hooks/useChineseVideos";
+import { CHINESE_GROUP_LABELS, chineseDisplayTitle, isChineseGroup } from "@/hooks/useChineseVideos";
 import { proxyImageUrl } from "@/lib/proxy-url";
 
 interface ChineseCardProps {
@@ -42,7 +42,7 @@ export function ChineseCard({ video, isSaved = false, onToggleSave }: ChineseCar
         <div className="relative aspect-[16/10] w-full overflow-hidden bg-muted/40 cursor-pointer">
           <img
             src={thumbSrc}
-            alt={video.title}
+            alt={chineseDisplayTitle(video)}
             loading="lazy"
             decoding="async"
             referrerPolicy="no-referrer"
@@ -102,10 +102,10 @@ export function ChineseCard({ video, isSaved = false, onToggleSave }: ChineseCar
       <div className="p-3.5 flex flex-col flex-1 justify-between gap-2.5">
         <Link href={watchHref}>
           <h3
-            title={video.title}
+            title={chineseDisplayTitle(video)}
             className="text-sm font-semibold text-foreground/90 group-hover:text-amber-400 line-clamp-2 transition-colors cursor-pointer leading-snug"
           >
-            {video.title}
+            {chineseDisplayTitle(video)}
           </h3>
         </Link>
 
