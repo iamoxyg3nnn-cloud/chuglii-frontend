@@ -240,6 +240,7 @@ export const MADOUHD_SECTIONS = [
   { id: "cate172", cn: "口交", en: "Blowjob" },
   { id: "cate173", cn: "猎奇", en: "Bizarre Extreme" },
   { id: "cate174", cn: "混剪", en: "Compilations" },
+  { id: "cate35", cn: "全部", en: "All (catch-all)" },
 ] as const;
 
 export type StudiosSortOption = "newest" | "oldest" | "quality";
