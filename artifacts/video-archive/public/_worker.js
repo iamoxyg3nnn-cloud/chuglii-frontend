@@ -743,6 +743,47 @@ function qualityFromValue(raw) {
   return m ? parseInt(m[1], 10) : 0;
 }
 
+// Streamtape hides the real MP4 behind an IP-bound /get_video token. The token
+// must be issued and consumed by the same edge request, so callers never send
+// it to the browser. botlink/robotlink carry the valid link; ideoolink is a
+// deliberately corrupted decoy.
+function decodeStreamtapeLink(html, elementId) {
+  const match = html.match(
+    new RegExp("document\\.getElementById\\(['\"]" + elementId + "['\"]\\)\\.innerHTML\\s*=\\s*([^;]+);", "i"),
+  );
+  if (!match) return "";
+  const expr = match[1];
+  const paren = expr.match(/\(\s*(['"])([\s\S]*?)\1\s*\)/);
+  if (!paren) return "";
+  let value = paren[2];
+  for (const sub of expr.slice(paren.index + paren[0].length).matchAll(/\.substring\((\d+)\)/g)) {
+    value = value.substring(parseInt(sub[1], 10));
+  }
+  let prefix = "";
+  for (const str of expr.slice(0, paren.index).matchAll(/(['"])([\s\S]*?)\1/g)) {
+    prefix += str[2];
+  }
+  const link = prefix + value;
+  return link.startsWith("//") ? "https:" + link : link;
+}
+
+async function resolveStreamtapeGate(streamtapeUrl) {
+  const ua = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36";
+  const pageRes = await fetch(streamtapeUrl, {
+    headers: {
+      "User-Agent": ua,
+      "Referer": "https://internetchicks.com/",
+      "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+    },
+    redirect: "follow",
+  });
+  if (!pageRes.ok) return "";
+  const pageHtml = await pageRes.text();
+  const gate = decodeStreamtapeLink(pageHtml, "botlink") || decodeStreamtapeLink(pageHtml, "robotlink");
+  if (!/^https?:\/\//i.test(gate) || !gate.includes("/get_video")) return "";
+  return gate;
+}
+
 function renderCleanMp4Player(streams, title = '', poster = '') {
   const safeTitle = (title || 'Chuglii Player').replace(/</g, '&lt;').replace(/>/g, '&gt;');
   const safePoster = poster ? String(poster).replace(/"/g, '&quot;') : '';
@@ -1569,6 +1610,59 @@ async function resolveHotScopesEmbed(targetUrl, searchParams) {
   return renderUnavailablePlayer(title, finalPoster, detailUrl || nestedUrl);
 }
 
+  // ─── Streamtape same-request MP4 proxy (/api/player/streamtape) ─────
+  // Streamtape's /get_video URL is bound to the egress IP that requested the
+  // embed page. Resolve and consume it inside this one edge request so the
+  // token and the byte stream always come from the same IP.
+  if (path === "/api/player/streamtape") {
+    const raw = url.searchParams.get("url");
+    if (!raw || !/^https?:\/\//i.test(raw)) {
+      return errorResponse("Missing or invalid streamtape url parameter", 400);
+    }
+
+    try {
+      const parsed = new URL(raw);
+      if (!parsed.hostname.includes("streamtape.com")) {
+        return errorResponse("Invalid streamtape url parameter", 400);
+      }
+
+      const gate = await resolveStreamtapeGate(raw);
+      if (!gate) {
+        return errorResponse("Streamtape stream is unavailable", 502);
+      }
+
+      const headers = {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
+        "Referer": "https://internetchicks.com/",
+      };
+      const range = request.headers.get("Range");
+      if (range) headers["Range"] = range;
+
+      const mediaRes = await fetch(gate, { headers, redirect: "follow" });
+      if (!mediaRes.ok && mediaRes.status !== 206) {
+        const detail = await mediaRes.text().catch(() => "");
+        return errorResponse(`Streamtape proxy error: ${mediaRes.status} ${detail.slice(0, 120)}`, 502);
+      }
+
+      const resHeaders = new Headers();
+      resHeaders.set("Content-Type", mediaRes.headers.get("content-type") || "video/mp4");
+      resHeaders.set("Access-Control-Allow-Origin", "*");
+      resHeaders.set("Access-Control-Expose-Headers", "Content-Range, Content-Length, Accept-Ranges");
+      resHeaders.set("Accept-Ranges", "bytes");
+      if (mediaRes.headers.get("Content-Range")) {
+        resHeaders.set("Content-Range", mediaRes.headers.get("Content-Range"));
+      }
+      if (mediaRes.headers.get("Content-Length")) {
+        resHeaders.set("Content-Length", mediaRes.headers.get("Content-Length"));
+      }
+      resHeaders.set("Cache-Control", "no-store");
+
+      return new Response(mediaRes.body, { status: mediaRes.status, headers: resHeaders });
+    } catch (err) {
+      return errorResponse("Streamtape proxy error: " + (err.message || err), 502);
+    }
+  }
+
   // ─── Edge HLS Stream Manifest Proxy (/api/player/stream) ───────────
   // Proxies M3U8 master/variant manifests, AES encryption keys, and TS segments for LuluStream, FC2Stream, and EarnVids.
   // Spoofs User-Agent: Mozilla/5.0 to bypass tnmr.org bot blocking, and adds CORS Access-Control-Allow-Origin: *
@@ -2143,8 +2237,36 @@ async function resolveHotScopesEmbed(targetUrl, searchParams) {
         }
       }
 
-      // 8. Streamtape Resolver: Proxy HTML with spoofed Referer and disarm rogue download triggers
+      // 8. Streamtape Resolver: serve a clean MP4 player backed by the
+      // same-request /api/player/streamtape proxy. Fall back to the upstream
+      // HTML only if Streamtape changes its gate format.
       if (destObj.hostname.includes("streamtape.com")) {
+        try {
+          const gate = await resolveStreamtapeGate(targetUrl);
+          if (gate) {
+            const playerUrl = `/api/player/streamtape?url=${encodeURIComponent(targetUrl)}`;
+            const title = url.searchParams.get("title") || "Video";
+            const poster = url.searchParams.get("poster") || "";
+            return new Response(
+              renderCleanMp4Player(
+                [{ url: playerUrl, rawUrl: targetUrl, type: "direct_mp4", quality: 720, label: "Streamtape" }],
+                title,
+                poster,
+              ),
+              {
+                status: 200,
+                headers: {
+                  "Content-Type": "text/html; charset=utf-8",
+                  "Access-Control-Allow-Origin": "*",
+                  "Cache-Control": "no-store",
+                },
+              },
+            );
+          }
+        } catch (e) {
+          console.error("Streamtape resolver error:", e);
+        }
+
         try {
           const stRes = await fetch(targetUrl, {
             headers: {
