@@ -26,7 +26,9 @@ export interface VideoProgressState {
 }
 
 interface VideoPlayerProps {
-  src: string;
+  /** Direct media URL. Omit when an external engine (e.g. hls.js/MSE)
+   *  attaches to the video element itself. */
+  src?: string;
   poster?: string;
   title?: string;
   autoPlay?: boolean;
@@ -162,7 +164,7 @@ export function VideoPlayer({
     lastDowngradeAt.current = now;
     if (qualities.length > 1 && onAutoDowngrade) {
       showNotice("Slow/blocked stream - trying lower quality...", 4000);
-      onAutoDowngrade(activeQualityUrl || src);
+      onAutoDowngrade(activeQualityUrl || src || "");
       return;
     }
     showNotice(reason, 4000);
@@ -300,7 +302,7 @@ export function VideoPlayer({
     >
       <video
         ref={videoRef}
-        src={src}
+        src={src || undefined}
         poster={poster}
         autoPlay={autoPlay}
         muted={muted}
@@ -327,7 +329,7 @@ export function VideoPlayer({
             if (qualities.length > 1 && onAutoDowngrade) {
               lastDowngradeAt.current = now;
               showNotice("Slow network - switching to lower quality...", 3500);
-              onAutoDowngrade(activeQualityUrl || src);
+              onAutoDowngrade(activeQualityUrl || src || "");
             } else {
               showNotice("Buffering... slow network detected", 3000);
             }
@@ -344,7 +346,7 @@ export function VideoPlayer({
           clearStartupStallTimer(); clearNoticeTimer();
           playRequested.current = false;
           if (stallTimer.current) { window.clearTimeout(stallTimer.current); stallTimer.current = null; }
-          onError?.({ code: v?.error?.code, message: v?.error?.message, src });
+          onError?.({ code: v?.error?.code, message: v?.error?.message, src: src || "" });
         }}
       />
 

@@ -764,10 +764,11 @@ function qualityFromValue(raw) {
   return m ? parseInt(m[1], 10) : 0;
 }
 
-// Streamtape hides the real MP4 behind an IP-bound /get_video token. The token
-// must be issued and consumed by the same edge request, so callers never send
-// it to the browser. botlink/robotlink carry the valid link; ideoolink is a
-// deliberately corrupted decoy.
+// Streamtape hides the MP4 behind a short-lived /get_video token. The edge can
+// resolve the token from the embed HTML, but Streamtape blocks datacenter IPs
+// when the token is consumed. Serve the token URL to the browser instead, so
+// the actual media request comes from the viewer's IP. botlink/robotlink are
+// valid; ideoolink is a deliberately corrupted decoy.
 function decodeStreamtapeLink(html, elementId) {
   const match = html.match(
     new RegExp("document\\.getElementById\\(['\"]" + elementId + "['\"]\\)\\.innerHTML\\s*=\\s*([^;]+);", "i"),
@@ -1676,70 +1677,6 @@ async function resolveHotScopesEmbed(targetUrl, searchParams) {
     return res;
   }
 
-  // ─── Streamtape same-request MP4 proxy (/api/player/streamtape) ─────
-  // Streamtape's /get_video URL is bound to the egress IP that requested the
-  // embed page. Resolve and consume it inside this one edge request so the
-  // token and the byte stream always come from the same IP.
-  if (path === "/api/player/streamtape") {
-    const raw = url.searchParams.get("url");
-    if (!raw || !/^https?:\/\//i.test(raw)) {
-      return errorResponse("Missing or invalid streamtape url parameter", 400);
-    }
-
-    try {
-      const parsed = new URL(raw);
-      if (!parsed.hostname.includes("streamtape.com")) {
-        return errorResponse("Invalid streamtape url parameter", 400);
-      }
-
-      const gate = await resolveStreamtapeGate(raw);
-      if (!gate) {
-        return errorResponse("Streamtape stream is unavailable", 400);
-      }
-
-      const headers = {
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
-        "Referer": "https://internetchicks.com/",
-      };
-      // Buffer a bounded range instead of streaming the upstream body: cloud
-      // platforms reject some streamed 206 responses once Content-Length is
-      // forwarded, and capping the chunk keeps every response atomic.
-      const CHUNK_SIZE = 4 * 1024 * 1024;
-      const range = request.headers.get("Range");
-      const match = range && range.match(/^bytes=(\d+)-(\d*)$/);
-      let start = 0;
-      let end = CHUNK_SIZE - 1;
-      if (match) {
-        start = parseInt(match[1], 10);
-        end = match[2] ? parseInt(match[2], 10) : start + CHUNK_SIZE - 1;
-        end = Math.min(end, start + CHUNK_SIZE - 1);
-      }
-      headers["Range"] = `bytes=${start}-${end}`;
-
-      const mediaRes = await fetch(gate, { headers, redirect: "follow" });
-      if (!mediaRes.ok && mediaRes.status !== 206) {
-        const detail = await mediaRes.text().catch(() => "");
-        return errorResponse(`Streamtape proxy error: ${mediaRes.status} ${detail.slice(0, 120)}`, 400);
-      }
-
-      const body = await mediaRes.arrayBuffer();
-      const resHeaders = new Headers();
-      resHeaders.set("Content-Type", mediaRes.headers.get("content-type") || "video/mp4");
-      resHeaders.set("Access-Control-Allow-Origin", "*");
-      resHeaders.set("Access-Control-Expose-Headers", "Content-Range, Content-Length, Accept-Ranges");
-      resHeaders.set("Accept-Ranges", "bytes");
-      if (mediaRes.headers.get("Content-Range")) {
-        resHeaders.set("Content-Range", mediaRes.headers.get("Content-Range"));
-      }
-      resHeaders.set("Content-Length", String(body.byteLength));
-      resHeaders.set("Cache-Control", "no-store");
-
-      return new Response(body, { status: mediaRes.status, headers: resHeaders });
-    } catch (err) {
-      return errorResponse("Streamtape proxy error: " + (err.message || err), 400);
-    }
-  }
-
   // ─── Edge HLS Stream Manifest Proxy (/api/player/stream) ───────────
   // Proxies M3U8 master/variant manifests, AES encryption keys, and TS segments for LuluStream, FC2Stream, and EarnVids.
   // Spoofs User-Agent: Mozilla/5.0 to bypass tnmr.org bot blocking, and adds CORS Access-Control-Allow-Origin: *
@@ -2314,19 +2251,19 @@ async function resolveHotScopesEmbed(targetUrl, searchParams) {
         }
       }
 
-      // 8. Streamtape Resolver: serve a clean MP4 player backed by the
-      // same-request /api/player/streamtape proxy. Fall back to the upstream
-      // HTML only if Streamtape changes its gate format.
+      // 8. Streamtape Resolver: extract the short-lived /get_video URL and let
+      // the browser fetch it directly. Streaming it through the edge fails
+      // because Streamtape rejects Cloudflare's datacenter IP on consumption.
+      // Fall back to the upstream HTML only if the gate format changes.
       if (destObj.hostname.includes("streamtape.com")) {
         try {
           const gate = await resolveStreamtapeGate(targetUrl);
           if (gate) {
-            const playerUrl = `/api/player/streamtape?url=${encodeURIComponent(targetUrl)}`;
             const title = url.searchParams.get("title") || "Video";
             const poster = url.searchParams.get("poster") || "";
             return new Response(
               renderCleanMp4Player(
-                [{ url: playerUrl, rawUrl: targetUrl, type: "direct_mp4", quality: 720, label: "Streamtape" }],
+                [{ url: gate, rawUrl: targetUrl, type: "direct_mp4", quality: 720, label: "Streamtape" }],
                 title,
                 poster,
               ),

@@ -2,6 +2,7 @@ import { useRef, useState, useEffect, useMemo } from "react";
 import { useParams, Link } from "wouter";
 import { Layout } from "@/components/Layout";
 import { PlayerFrame } from "@/components/PlayerFrame";
+import { HlsVideoPlayer } from "@/components/HlsVideoPlayer";
 import { copyText } from "@/lib/clipboard";
 import { buildEdgePlayerUrl } from "@/lib/video-source";
 import { rankRelatedVideos } from "@/lib/recommendations";
@@ -57,6 +58,7 @@ export default function ChineseWatch() {
   const [copiedStream, setCopiedStream] = useState(false);
   const [retryNonce, setRetryNonce] = useState(0);
   const [streamError, setStreamError] = useState(false);
+  const [useIframeFallback, setUseIframeFallback] = useState(false);
   const [savedIds, setSavedIds] = useState<string[]>([]);
 
   const { data: video, isLoading, error } = useChineseVideoById(id);
@@ -188,6 +190,25 @@ export default function ChineseWatch() {
       })
     : null;
 
+  // HLS candidates for the in-page native player: primary manifest first,
+  // then every CDN endpoint fallback, all proxied through the edge stream
+  // route (CORS + referer + root-relative segment rewriting happen there).
+  // Plain computation (not useMemo) — this sits after conditional early
+  // returns, so hooks are not allowed here.
+  const hlsCandidates = (() => {
+    const primary = video.full_video_url || "";
+    if (!primary) return [];
+    const seen = new Set<string>();
+    const urls = [primary, ...streamFallbacks];
+    return urls
+      .filter((u) => {
+        if (!u || seen.has(u)) return false;
+        seen.add(u);
+        return true;
+      })
+      .map((u) => `/api/player/stream?url=${encodeURIComponent(u)}`);
+  })();
+
   const screenshots = (video.screenshots || []).slice(0, 12);
 
   return (
@@ -247,6 +268,15 @@ export default function ChineseWatch() {
                   <ArrowClockwise size={14} /> Retry Stream
                 </button>
               </div>
+            ) : hlsCandidates.length > 0 && !useIframeFallback ? (
+              <HlsVideoPlayer
+                key={`chinese-hls-${video.id}-${retryNonce}`}
+                candidates={hlsCandidates}
+                poster={video.clean_thumbnail_url || video.thumbnail_url || undefined}
+                title={chineseDisplayTitle(video)}
+                autoPlay
+                onExhausted={() => setUseIframeFallback(true)}
+              />
             ) : playerFrameSrc ? (
               <PlayerFrame
                 src={playerFrameSrc}
