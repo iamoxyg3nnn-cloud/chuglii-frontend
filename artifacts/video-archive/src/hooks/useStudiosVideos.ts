@@ -52,7 +52,6 @@ export const STUDIO_SITES = [
  *  sections (23–27) and type 20 (萝莉社) are excluded at the source. */
 export const MADOUER_SECTIONS = [
   { id: "1", cn: "麻豆视频", en: "Madou Videos" },
-  { id: "2", cn: "日本视频", en: "Japanese Videos" },
   { id: "3", cn: "欧美视频", en: "Western Videos" },
   { id: "4", cn: "动漫视频", en: "Anime Videos" },
   { id: "5", cn: "国产视频", en: "Chinese Amateur" },
