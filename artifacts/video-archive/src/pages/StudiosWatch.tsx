@@ -181,7 +181,7 @@ export default function StudiosWatch() {
     }
     const proxied = `/api/player/stream?url=${encodeURIComponent(primary)}`;
     if (
-      /(^|\.)(cdn2020\.com|97img\.com)$/i.test(host)
+      /(^|\.)(cdn2020\.com|97img\.com|thm3u8\.co)$/i.test(host)
     ) {
       return [primary, proxied];
     }
