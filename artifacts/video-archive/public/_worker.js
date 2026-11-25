@@ -406,7 +406,7 @@ async function handleSocialEmbed(request, env, url) {
 }
 
 export default {
-  async fetch(request, env) {
+  async fetch(request, env, ctx) {
     const url = new URL(request.url);
 
     // 1. Handle CORS preflight for all /api requests
@@ -417,7 +417,7 @@ export default {
     // 2. Route /api/* requests
     if (url.pathname.startsWith("/api/")) {
       try {
-        return await handleApi(request, env, url);
+        return await handleApi(request, env, url, ctx);
       } catch (err) {
         return errorResponse(err, 500);
       }
@@ -675,7 +675,7 @@ async function syncMmsvibex(env, maxPages = 2, category = null) {
 
 // ─── API Router ──────────────────────────────────────────────────────
 
-async function handleApi(request, env, url) {
+async function handleApi(request, env, url, ctx) {
   const supabaseUrl = env.SUPABASE_URL || "https://supabase.chuglii.in";
   const supabaseKey = env.SUPABASE_SERVICE_ROLE_KEY || env.SUPABASE_ANON_KEY || "eyJhbGciOiAiSFMyNTYiLCAidHlwIjogIkpXVCJ9.eyJyb2xlIjogImFub24iLCAiaXNzIjogInN1cGFiYXNlIiwgImlhdCI6IDE3MDAwMDAwMDAsICJleHAiOiAyMDE1MzYwMDAwfQ.NSqjip-vQHwHjATurt4ensfmKBHa4Pt5m_dLP909lV8";
 
@@ -1739,6 +1739,19 @@ async function resolveHotScopesEmbed(targetUrl, searchParams) {
     }
 
     try {
+      // Edge cache: segments and playlists are immutable, so serve repeat
+      // fetches straight from the Cloudflare colo (~30ms) instead of paying
+      // the slow origin-CDN round trip (~2-3s) every time.
+      const streamCache = caches.default;
+      try {
+        const cachedStream = await streamCache.match(new Request(url.toString(), { method: "GET" }));
+        if (cachedStream) {
+          const hitHeaders = new Headers(cachedStream.headers);
+          hitHeaders.set("X-Edge-Cache", "hit");
+          return new Response(cachedStream.body, { status: cachedStream.status, headers: hitHeaders });
+        }
+      } catch { /* cache lookup best-effort */ }
+
       let targetObj = new URL(streamUpstreamUrl);
       // playtwo.clicknplay.to has an invalid TLS certificate for Cloudflare
       // egress (worker fetches fail with 526), but its plain-HTTP origin serves
@@ -1837,6 +1850,23 @@ async function resolveHotScopesEmbed(targetUrl, searchParams) {
             upstreamRes.status === 206 ? "no-store" : "public, max-age=604800, immutable"
           );
 
+        // Populate the edge cache with full (non-Range) segment responses so
+        // every later fetch - this visitor or anyone else's - is served from
+        // the colo instead of the slow origin CDN. Bounded to small media
+        // (segments/keys); huge full-file MP4 downloads are skipped.
+        const contentLength = parseInt(upstreamRes.headers.get("Content-Length") || "0", 10);
+        if (upstreamRes.status === 200 && !effectiveRange && upstreamRes.body && (!contentLength || contentLength <= 8 * 1024 * 1024)) {
+          try {
+            const [clientBody, cacheBody] = upstreamRes.body.tee();
+            const cachePromise = streamCache.put(
+              new Request(url.toString(), { method: "GET" }),
+              new Response(cacheBody, { status: 200, headers: resHeaders })
+            ).catch(() => { /* best-effort */ });
+            if (ctx && typeof ctx.waitUntil === "function") ctx.waitUntil(cachePromise);
+            return new Response(clientBody, { status: upstreamRes.status, headers: resHeaders });
+          } catch { /* fall through to plain streaming */ }
+        }
+
         return new Response(upstreamRes.body, {
           status: upstreamRes.status,
           headers: resHeaders,
@@ -1881,7 +1911,7 @@ async function resolveHotScopesEmbed(targetUrl, searchParams) {
         return `/api/player/stream?url=${encodeURIComponent(absoluteSegmentUrl)}`;
       }).join("\n");
 
-      return new Response(rewritten, {
+      const playlistResponse = new Response(rewritten, {
         status: 200,
         headers: {
           "Content-Type": "application/vnd.apple.mpegurl",
@@ -1891,6 +1921,15 @@ async function resolveHotScopesEmbed(targetUrl, searchParams) {
           "Cache-Control": "public, max-age=3600",
         },
       });
+      // Rewritten playlists are deterministic: edge-cache them too.
+      try {
+        const putPlaylist = streamCache.put(
+          new Request(url.toString(), { method: "GET" }),
+          playlistResponse.clone()
+        ).catch(() => { /* best-effort */ });
+        if (ctx && typeof ctx.waitUntil === "function") ctx.waitUntil(putPlaylist);
+      } catch { /* best-effort */ }
+      return playlistResponse;
     } catch (err) {
       return errorResponse("Stream proxy error: " + (err.message || err), 502);
     }

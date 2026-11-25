@@ -146,6 +146,8 @@ export function VideoPlayer({
     // Reset the hover preview engine so it re-initializes for the new source.
     previewInitRef.current = false;
     lastPreviewSeekRef.current = 0;
+    warmerAbortRef.current = true;
+    warmStartedRef.current = null;
     if (previewHlsRef.current) { try { previewHlsRef.current.destroy(); } catch { /* noop */ } previewHlsRef.current = null; }
     playRequested.current = autoPlay;
     lastProgressValue.current = 0;
@@ -318,7 +320,9 @@ export function VideoPlayer({
           // in the browser HTTP cache across reloads.
           maxBufferLength: 180,
           maxMaxBufferLength: 400,
-          backBufferLength: Infinity,
+          // Bound in-memory back-buffer; positions outside it are re-served
+          // instantly from the browser HTTP cache by the segment warmer.
+          backBufferLength: 600,
         });
         previewHlsRef.current = hls;
         hls.on(Hls.Events.MANIFEST_PARSED, () => {
@@ -423,14 +427,81 @@ export function VideoPlayer({
     return () => window.clearInterval(id);
   }, [videoRef]);
 
+  // ─── Background segment cache-warmer ─────────────────────────────────
+  // Sequentially fetches the low-rendition segments into the browser HTTP
+  // cache (immutable, week-long) starting near the playhead and wrapping to
+  // the start. After warming, ANY hover/seek position paints instantly -
+  // hls.js hits the disk cache instead of the slow origin CDN. Pauses while
+  // the main player is buffer-starved so playback is never sacrificed.
+  const warmerAbortRef = useRef(false);
+  const warmStartedRef = useRef<string | null>(null);
+  const warmSegmentCache = useCallback(async (manifestUrl: string) => {
+    if (warmStartedRef.current === manifestUrl) return;
+    warmStartedRef.current = manifestUrl;
+    warmerAbortRef.current = false;
+    try {
+      const res = await fetch(manifestUrl);
+      const text = await res.text();
+      const segs: { url: string; dur: number }[] = [];
+      let pendingDur = 0;
+      for (const raw of text.split("\n")) {
+        const line = raw.trim();
+        if (line.startsWith("#EXTINF:")) {
+          pendingDur = parseFloat(line.slice(8).split(",")[0]) || 0;
+        } else if (line && !line.startsWith("#")) {
+          segs.push({ url: line.startsWith("/") ? `${window.location.origin}${line}` : line, dur: pendingDur });
+          pendingDur = 0;
+        }
+      }
+      if (!segs.length) return;
+
+      // Start at the segment nearest the current playhead, then wrap around
+      // so the region the user is actually watching warms first.
+      const mv = videoRef.current;
+      const totalDur = segs.reduce((a, s) => a + s.dur, 0);
+      const startT = mv && Number.isFinite(mv.duration) ? mv.currentTime : 0;
+      let startIdx = totalDur > 0
+        ? Math.min(segs.length - 1, Math.max(0, Math.floor((startT / totalDur) * segs.length)))
+        : 0;
+      const order = [...segs.keys()].slice(startIdx).concat([...segs.keys()].slice(0, startIdx));
+
+      const BUDGET_BYTES = 120 * 1024 * 1024;
+      let fetchedBytes = 0;
+      for (const i of order) {
+        if (warmerAbortRef.current) return;
+        // Adaptive backoff: don't compete with a buffer-starved main player.
+        for (let waits = 0; waits < 30; waits++) {
+          const v = videoRef.current;
+          const buf = v?.buffered;
+          const ahead = v && buf && buf.length ? buf.end(buf.length - 1) - v.currentTime : 99;
+          if (!v || v.paused || ahead >= 15) break;
+          if (warmerAbortRef.current) return;
+          await new Promise((r) => setTimeout(r, 2000));
+        }
+        if (warmerAbortRef.current) return;
+        try {
+          const r = await fetch(segs[i].url);
+          const ab = await r.arrayBuffer(); // consume -> stored in HTTP cache
+          fetchedBytes += ab.byteLength;
+          if (fetchedBytes > BUDGET_BYTES) return;
+        } catch { /* skip failed segment */ }
+      }
+    } catch { /* warming is best-effort */ }
+  }, [videoRef]);
+
+  useEffect(() => () => { warmerAbortRef.current = true; }, []);
+
   // Pre-warm: start the preview decoder shortly after the main video begins
   // loading so the first hover is already instant near the playhead.
   useEffect(() => {
     const hasPreview = Boolean(previewCandidates && previewCandidates.length > 0) || Boolean(src);
     if (!hasPreview) return;
     const t = window.setTimeout(() => ensurePreviewEngine(), 5000);
-    return () => window.clearTimeout(t);
-  }, [ensurePreviewEngine, previewCandidates, src]);
+    const t2 = previewCandidates?.length
+      ? window.setTimeout(() => warmSegmentCache(previewCandidates[0]), 8000)
+      : undefined;
+    return () => { window.clearTimeout(t); if (t2) window.clearTimeout(t2); };
+  }, [ensurePreviewEngine, previewCandidates, src, warmSegmentCache]);
 
   useEffect(() => () => {
     if (previewHlsRef.current) { try { previewHlsRef.current.destroy(); } catch { /* noop */ } previewHlsRef.current = null; }
