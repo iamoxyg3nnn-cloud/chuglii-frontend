@@ -100,7 +100,7 @@ export default function ChineseWatch() {
   const groupLabel = isChineseGroup(video?.category_group || undefined)
     ? CHINESE_GROUP_LABELS[video!.category_group as keyof typeof CHINESE_GROUP_LABELS]
     : "Chinese";
-  const backHref = "/chinese";
+  const backHref = "/chinese/95da";
   const isTorrent = video?.content_type === "torrent";
 
   useEffect(() => {

@@ -101,6 +101,20 @@ export function isChineseGroup(group: string | undefined): group is ChineseGroup
   return Boolean(group && (CHINESE_GROUPS as readonly string[]).includes(group));
 }
 
+/** Websites inside the Chinese category — same multi-source pattern as
+ *  OnlyFans (each source gets its own section, database, and video routes). */
+export const CHINESE_SITES = ["95da", "fangsung"] as const;
+export type ChineseSite = (typeof CHINESE_SITES)[number];
+
+export const CHINESE_SITE_LABELS: Record<ChineseSite, string> = {
+  "95da": "95da Network",
+  fangsung: "Fangsung",
+};
+
+export function isChineseSite(site: string | undefined): site is ChineseSite {
+  return Boolean(site && (CHINESE_SITES as readonly string[]).includes(site));
+}
+
 export type ChineseSortOption = "newest" | "oldest" | "quality";
 
 export interface UseChineseVideosOptions {

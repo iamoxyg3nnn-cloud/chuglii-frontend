@@ -1,11 +1,12 @@
 import { useState, useEffect, useCallback } from "react";
-import { useLocation } from "wouter";
+import { useLocation, Link } from "wouter";
 import { Layout } from "@/components/Layout";
 import {
   useFangsungVideos,
   FANGSUNG_REGIONS,
   type FangsungSortOption,
 } from "@/hooks/useFangsungVideos";
+import { CHINESE_SITES, CHINESE_SITE_LABELS } from "@/hooks/useChineseVideos";
 import { FangsungCard, FangsungCardSkeleton } from "@/components/FangsungCard";
 import { AppPagination } from "@/components/ui/app-pagination";
 import {
@@ -52,7 +53,7 @@ export default function FangsungFeed() {
       if (sort !== "newest") params.set("sort", sort);
       if (search) params.set("q", search);
       const queryString = params.toString();
-      setLocation(`/fangsung${queryString ? `?${queryString}` : ""}`, { replace: true });
+      setLocation(`/chinese/fangsung${queryString ? `?${queryString}` : ""}`, { replace: true });
     },
     [setLocation]
   );
@@ -91,7 +92,7 @@ export default function FangsungFeed() {
                 <div className="flex items-center gap-2 mb-1.5">
                   <span className="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-amber-500/15 text-amber-400 border border-amber-500/30 flex items-center gap-1.5">
                     <MonitorPlay size={13} weight="fill" className="text-amber-400" />
-                    <span>Isolated Category Database</span>
+                    <span>Chinese · Fangsung</span>
                   </span>
                 </div>
                 <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight text-foreground">
@@ -111,6 +112,22 @@ export default function FangsungFeed() {
                 </div>
               </div>
             </div>
+
+            {/* Website sections (multi-source nav) */}
+            <nav aria-label="Chinese websites" className="flex items-center gap-2 overflow-x-auto pt-1 pb-1">
+              <Link href="/chinese">
+                <span className="shrink-0 px-3 py-1.5 rounded-lg text-xs font-medium bg-card/60 text-muted-foreground hover:text-foreground border border-border/40 cursor-pointer">
+                  All websites
+                </span>
+              </Link>
+              {CHINESE_SITES.map((s) => (
+                <Link key={s} href={`/chinese/${s}`} aria-current={s === "fangsung" ? "page" : undefined}>
+                  <span className={`shrink-0 px-3 py-1.5 rounded-lg text-xs font-medium border cursor-pointer ${s === "fangsung" ? "bg-amber-500 text-white border-amber-500" : "bg-card/60 text-muted-foreground hover:text-foreground border-border/40"}`}>
+                    {CHINESE_SITE_LABELS[s]}
+                  </span>
+                </Link>
+              ))}
+            </nav>
 
             {/* Region chips */}
             <nav

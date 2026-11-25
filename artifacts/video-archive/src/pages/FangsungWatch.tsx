@@ -91,7 +91,7 @@ export default function FangsungWatch() {
     });
   };
 
-  const backHref = "/fangsung";
+  const backHref = "/chinese/fangsung";
 
   useEffect(() => {
     if (!video) return;

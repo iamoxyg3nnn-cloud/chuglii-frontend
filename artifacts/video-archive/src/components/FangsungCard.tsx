@@ -19,7 +19,7 @@ export function FangsungCard({ video, isSaved = false, onToggleSave }: FangsungC
   const proxiedThumb = rawThumb.startsWith("http") ? (proxyImageUrl(rawThumb) || rawThumb) : rawThumb;
   const thumbSrc = imageError ? "/placeholder-thumb.jpg" : (proxiedThumb || "/placeholder-thumb.jpg");
 
-  const watchHref = `/fangsung/video/${video.id}`;
+  const watchHref = `/chinese/fangsung/video/${video.id}`;
   const regionLabel = video.region_en || "Fangsung";
 
   const handleSaveClick = (e: React.MouseEvent) => {

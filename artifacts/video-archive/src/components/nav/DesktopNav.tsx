@@ -1,6 +1,6 @@
 import { Link } from "wouter";
 import { useCallback, memo, useState, useRef } from "react";
-import { PaperPlaneTilt, Flame, GlobeHemisphereWest, FilmStrip, CaretDown, Broadcast, Eye, Magnet, MonitorPlay } from "@phosphor-icons/react";
+import { PaperPlaneTilt, Flame, GlobeHemisphereWest, FilmStrip, CaretDown, Broadcast, Eye, Magnet } from "@phosphor-icons/react";
 import { prefetchRoute } from "@/lib/route-chunks";
 import { isActiveNavigationRoute } from "@/lib/navigation";
 
@@ -52,15 +52,8 @@ export const SCRAPER_CATEGORIES = [
     id: "chinese",
     name: "Chinese",
     href: "/chinese",
-    count: "HD+MG",
+    count: "2 SRC",
     icon: Magnet,
-  },
-  {
-    id: "fangsung",
-    name: "Fangsung",
-    href: "/fangsung",
-    count: "HD",
-    icon: MonitorPlay,
   },
 ] as const;
 
@@ -155,8 +148,11 @@ export const DesktopNav = memo(function DesktopNav({ location, onRequestOpen }: 
                 (cat.id === "japanese" && isActiveNavigationRoute("/japanese", location)) ||
                 (cat.id === "myanmar" && (isActiveNavigationRoute("/myanmar", location) || location.includes("category=myanmar"))) ||
                 (cat.id === "voyeurhouse" && isActiveNavigationRoute("/voyeurhouse", location)) ||
-                (cat.id === "chinese" && isActiveNavigationRoute("/chinese", location)) ||
-                (cat.id === "fangsung" && isActiveNavigationRoute("/fangsung", location)) ||
+                (cat.id === "chinese" &&
+                  (isActiveNavigationRoute("/chinese", location) ||
+                    isActiveNavigationRoute("/fangsung", location) ||
+                    location.includes("/chinese") ||
+                    location.includes("/fangsung"))) ||
                 (cat.id === "viral-mms" && (isActiveNavigationRoute("/leak", location) || location.includes("category=viral-mms")));
               return (
                 <Link key={cat.id} href={cat.href}>

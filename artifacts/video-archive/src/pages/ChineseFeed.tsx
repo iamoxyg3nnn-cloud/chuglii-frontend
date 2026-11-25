@@ -1,16 +1,20 @@
 import { useState, useEffect, useCallback } from "react";
-import { useLocation } from "wouter";
+import { useLocation, useParams, Link } from "wouter";
 import { Layout } from "@/components/Layout";
 import {
   useChineseVideos,
   CHINESE_GROUPS,
   CHINESE_GROUP_LABELS,
   CHINESE_ZONES,
+  CHINESE_SITES,
+  CHINESE_SITE_LABELS,
   isChineseGroup,
+  isChineseSite,
   type ChineseGroup,
   type ChineseSortOption,
 } from "@/hooks/useChineseVideos";
 import { ChineseCard, ChineseCardSkeleton } from "@/components/ChineseCard";
+import FangsungFeed from "@/pages/FangsungFeed";
 import { AppPagination } from "@/components/ui/app-pagination";
 import {
   Sparkle,
@@ -44,7 +48,49 @@ function zonesForGroup(group: string) {
 
 const ITEMS_PER_PAGE = 24;
 
+/** Multi-source hub — mirrors the OnlyFans category: `/chinese` shows the
+ *  source chooser, `/chinese/:site` renders that website's own feed with its
+ *  own database, filters, and video routes. */
 export default function ChineseFeed() {
+  const { site: routeSite } = useParams<{ site: string }>();
+  const site = isChineseSite(routeSite) ? routeSite : undefined;
+
+  if (!site) {
+    return (
+      <Layout>
+        <div className="min-h-screen bg-background text-foreground pb-20">
+          <section className="border-b border-border/40 bg-gradient-to-b from-amber-950/20 via-background to-background py-10 px-4 sm:px-6 lg:px-8">
+            <div className="max-w-7xl mx-auto space-y-3">
+              <span className="text-xs font-semibold uppercase tracking-wider text-amber-400">Chinese</span>
+              <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight">Choose a website</h1>
+              <p className="text-sm text-muted-foreground max-w-2xl">
+                Each website has its own section, database, and video routes — same layout as the other multi-source
+                categories.
+              </p>
+            </div>
+          </section>
+          <section aria-label="Chinese websites" className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+              {CHINESE_SITES.map((s) => (
+                <Link key={s} href={`/chinese/${s}`}>
+                  <span className="block h-full rounded-2xl border border-border/50 bg-card/60 p-5 hover:border-amber-500/50 hover:bg-card transition-colors cursor-pointer">
+                    <span className="block text-base font-semibold text-foreground">{CHINESE_SITE_LABELS[s]}</span>
+                    <span className="block mt-2 text-xs text-muted-foreground">Open this website section</span>
+                  </span>
+                </Link>
+              ))}
+            </div>
+          </section>
+        </div>
+      </Layout>
+    );
+  }
+
+  if (site === "fangsung") return <FangsungFeed />;
+  return <Chinese95daFeed />;
+}
+
+function Chinese95daFeed() {
   const [, setLocation] = useLocation();
   const searchString = window.location.search;
 
@@ -75,7 +121,7 @@ export default function ChineseFeed() {
       if (sort !== "newest") params.set("sort", sort);
       if (search) params.set("q", search);
       const queryString = params.toString();
-      setLocation(`/chinese${queryString ? `?${queryString}` : ""}`, { replace: true });
+      setLocation(`/chinese/95da${queryString ? `?${queryString}` : ""}`, { replace: true });
     },
     [setLocation]
   );
@@ -136,6 +182,22 @@ export default function ChineseFeed() {
                 </div>
               </div>
             </div>
+
+            {/* Website sections (multi-source nav) */}
+            <nav aria-label="Chinese websites" className="flex items-center gap-2 overflow-x-auto pt-1 pb-1">
+              <Link href="/chinese">
+                <span className="shrink-0 px-3 py-1.5 rounded-lg text-xs font-medium bg-card/60 text-muted-foreground hover:text-foreground border border-border/40 cursor-pointer">
+                  All websites
+                </span>
+              </Link>
+              {CHINESE_SITES.map((s) => (
+                <Link key={s} href={`/chinese/${s}`} aria-current={s === "95da" ? "page" : undefined}>
+                  <span className={`shrink-0 px-3 py-1.5 rounded-lg text-xs font-medium border cursor-pointer ${s === "95da" ? "bg-amber-500 text-white border-amber-500" : "bg-card/60 text-muted-foreground hover:text-foreground border-border/40"}`}>
+                    {CHINESE_SITE_LABELS[s]}
+                  </span>
+                </Link>
+              ))}
+            </nav>
 
             {/* Group tabs */}
             <nav aria-label="Chinese category groups" className="flex items-center gap-1.5 overflow-x-auto no-scrollbar pt-1 pb-1">

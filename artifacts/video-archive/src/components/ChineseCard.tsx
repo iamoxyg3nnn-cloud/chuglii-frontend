@@ -19,7 +19,7 @@ export function ChineseCard({ video, isSaved = false, onToggleSave }: ChineseCar
   const proxiedThumb = rawThumb.startsWith("http") ? (proxyImageUrl(rawThumb) || rawThumb) : rawThumb;
   const thumbSrc = imageError ? "/placeholder-thumb.jpg" : (proxiedThumb || "/placeholder-thumb.jpg");
 
-  const watchHref = `/chinese/video/${video.id}`;
+  const watchHref = `/chinese/95da/video/${video.id}`;
   const isTorrent = video.content_type === "torrent";
   const groupLabel = isChineseGroup(video.category_group || undefined)
     ? CHINESE_GROUP_LABELS[video.category_group as keyof typeof CHINESE_GROUP_LABELS]

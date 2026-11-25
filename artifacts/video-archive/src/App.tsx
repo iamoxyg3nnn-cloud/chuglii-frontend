@@ -1,5 +1,5 @@
 import { Component, Suspense, useEffect, type ErrorInfo, type ReactNode } from "react";
-import { Switch, Route, Router as WouterRouter, useLocation } from "wouter";
+import { Switch, Route, Router as WouterRouter, useLocation, Redirect } from "wouter";
 import { WarningCircle, ArrowClockwise } from "@phosphor-icons/react";
 import { QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
@@ -74,7 +74,6 @@ const VoyeurhouseFeed = lazyWithSkeleton(() => import("@/pages/VoyeurhouseFeed")
 const VoyeurhouseWatch = lazyWithSkeleton(() => import("@/pages/VoyeurhouseWatch"), <SkeletonDetailPage />, "VoyeurhouseWatch");
 const ChineseFeed = lazyWithSkeleton(() => import("@/pages/ChineseFeed"), <SkeletonGridPage count={12} />, "ChineseFeed");
 const ChineseWatch = lazyWithSkeleton(() => import("@/pages/ChineseWatch"), <SkeletonDetailPage />, "ChineseWatch");
-const FangsungFeed = lazyWithSkeleton(() => import("@/pages/FangsungFeed"), <SkeletonGridPage count={12} />, "FangsungFeed");
 const FangsungWatch = lazyWithSkeleton(() => import("@/pages/FangsungWatch"), <SkeletonDetailPage />, "FangsungWatch");
 
 const NotFound = lazyWithSkeleton(() => import("@/pages/not-found"), <SkeletonSimplePage rows={3} />, "NotFound");
@@ -255,9 +254,14 @@ function Router() {
         <Route path="/voyeurhouse/:site" component={VoyeurhouseFeed} />
         <Route path="/voyeurhouse" component={VoyeurhouseFeed} />
         <Route path="/chinese/video/:id" component={ChineseWatch} />
+        <Route path="/chinese/95da/video/:id" component={ChineseWatch} />
+        <Route path="/chinese/fangsung/video/:id" component={FangsungWatch} />
+        <Route path="/chinese/:site" component={ChineseFeed} />
         <Route path="/chinese" component={ChineseFeed} />
         <Route path="/fangsung/video/:id" component={FangsungWatch} />
-        <Route path="/fangsung" component={FangsungFeed} />
+        <Route path="/fangsung">
+          <Redirect to="/chinese/fangsung" replace />
+        </Route>
         <Route path="/premium" component={Premium} />
         <Route path="/login" component={Login} />
         <Route path="/signup" component={Signup} />
