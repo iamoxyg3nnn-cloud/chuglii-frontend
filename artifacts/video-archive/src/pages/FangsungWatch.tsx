@@ -166,11 +166,12 @@ export default function FangsungWatch() {
   // HLS candidates for the in-page native player. bbcdn.xianshipian.com
   // blocks Cloudflare-worker egress entirely, but serves browsers directly:
   // it reflects any Origin in CORS and 403s only FOREIGN referers — and
-  // index.html sets no-referrer, so the browser sends none. Direct URL
-  // first, proxied edge route as fallback. cvid.aomcyou.site sends no CORS
-  // headers at all, so it must always go through the proxy. Plain
-  // computation (not useMemo) — this sits after conditional early returns,
-  // so hooks are not allowed here.
+  // index.html sets no-referrer, so the browser sends none. The apianmeng
+  // subdomain CDNs (kk55, cdnYYYYMMDD, ...) and atukjhesk.com also send
+  // CORS * with open segments, so they get the same direct-first treatment.
+  // cvid.aomcyou.site sends no CORS headers at all, so it must always go
+  // through the proxy. Plain computation (not useMemo) — this sits after
+  // conditional early returns, so hooks are not allowed here.
   const hlsCandidates = (() => {
     const primary = video.full_video_url || "";
     if (!primary) return [];
@@ -181,7 +182,11 @@ export default function FangsungWatch() {
       host = "";
     }
     const proxied = `/api/player/stream?url=${encodeURIComponent(primary)}`;
-    if (/(^|\.)xianshipian\.com$/i.test(host)) return [primary, proxied];
+    if (
+      /(^|\.)(xianshipian\.com|apianmeng\.com|atukjhesk\.com)$/i.test(host)
+    ) {
+      return [primary, proxied];
+    }
     return [proxied];
   })();
 

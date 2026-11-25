@@ -1754,6 +1754,7 @@ async function resolveHotScopesEmbed(targetUrl, searchParams) {
       "reallifecam.to", "reallifecams.net", "hotscopes.net",
       "lulustream.com", "vidara.so", "vidara.to", "whitetrafsa.com",
       "tiktokcdn.com", "838238.xyz", "xianshipian.com", "aomcyou.site",
+      "apianmeng.com", "atukjhesk.com",
     ];
     const hostMatch = streamUpstreamUrl.match(/^https?:\/\/([^/?#]+)/i);
     const reqHost = hostMatch ? hostMatch[1].toLowerCase() : "";
@@ -1850,10 +1851,12 @@ async function resolveHotScopesEmbed(targetUrl, searchParams) {
         referer = "https://sheeshfans.com/";
       } else if (targetObj.hostname.includes("internetchicks")) {
         referer = "https://internetchicks.com/";
-      } else if (targetObj.hostname.includes("xianshipian") || targetObj.hostname.includes("aomcyou")) {
-        // fangsung CDN: bbcdn 403s any FOREIGN referer but allows none at all
+      } else if (targetObj.hostname.includes("xianshipian") || targetObj.hostname.includes("aomcyou") || targetObj.hostname.includes("apianmeng") || targetObj.hostname.includes("atukjhesk")) {
+        // fangsung CDNs: bbcdn 403s any FOREIGN referer but allows none at all
         // (it also 403s Cloudflare-worker egress even with the site referer,
-        // so send no Referer header at all for these hosts).
+        // so send no Referer header at all for these hosts). The apianmeng
+        // subdomain CDNs (kk55, cdnYYYYMMDD, ...) and atukjhesk also send
+        // CORS * and ignore Referer, so empty is safe for all of them.
         referer = "";
       }
 
