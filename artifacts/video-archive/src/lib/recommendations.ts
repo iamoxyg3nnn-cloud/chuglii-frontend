@@ -21,8 +21,9 @@ export interface RecommendationCandidate {
 
 function normalizeTitle(title: string | null | undefined): string {
   return (title || "")
+    .normalize("NFKC")
     .toLowerCase()
-    .replace(/[^a-z0-9]+/g, " ")
+    .replace(/[^\p{L}\p{N}]+/gu, " ")
     .trim();
 }
 
@@ -67,7 +68,11 @@ export function rankRelatedVideos<T extends RecommendationCandidate>(
   const categoryFreq = buildFrequency(candidates.flatMap((v) => v.categories || []));
 
   const scored = candidates
-    .filter((v) => v.id !== current.id && normalizeTitle(v.title) !== currentTitleKey)
+    .filter(
+      (v) =>
+        v.id !== current.id &&
+        (!currentTitleKey || normalizeTitle(v.title) !== currentTitleKey),
+    )
     .map((video) => {
       let score = 0;
       for (const tag of new Set((video.tags || []).map((t) => t.toLowerCase().trim()))) {

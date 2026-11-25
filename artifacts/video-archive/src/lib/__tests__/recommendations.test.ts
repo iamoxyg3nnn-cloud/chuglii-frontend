@@ -48,6 +48,42 @@ describe("rankRelatedVideos", () => {
     expect(result.map((v) => v.id)).toEqual(["dup-high", "other"]);
   });
 
+  it("keeps non-Latin titles distinct instead of collapsing them", () => {
+    const current = video({ id: "current", title: "မြန်မာ ဗီဒီယို", tags: ["myanmar"] });
+    const candidates = [
+      video({ id: "mirror", title: "မြန်မာ ဗီဒီယို", tags: ["myanmar"] }),
+      video({
+        id: "same-title",
+        title: "တူညီသော ခေါင်းစဉ်",
+        tags: ["myanmar"],
+        scraped_at: "2026-02-01T00:00:00Z",
+      }),
+      video({
+        id: "same-title-copy",
+        title: "တူညီသော ခေါင်းစဉ်",
+        tags: ["myanmar"],
+        scraped_at: "2026-01-01T00:00:00Z",
+      }),
+      video({ id: "different", title: "အခြား ဗီဒီယို", tags: ["myanmar"] }),
+    ];
+    expect(rankRelatedVideos(current, candidates, 8).map((v) => v.id)).toEqual([
+      "same-title",
+      "different",
+    ]);
+  });
+
+  it("does not drop recommendations when the current title has no letters or numbers", () => {
+    const current = video({ id: "current", title: "!!!", tags: ["desi"] });
+    const candidates = [
+      video({ id: "empty-a", title: "", tags: ["desi"], scraped_at: "2026-02-01T00:00:00Z" }),
+      video({ id: "empty-b", title: "???", tags: ["desi"], scraped_at: "2026-01-01T00:00:00Z" }),
+    ];
+    expect(rankRelatedVideos(current, candidates, 8).map((v) => v.id)).toEqual([
+      "empty-a",
+      "empty-b",
+    ]);
+  });
+
   it("uses scrape time for ties and honours the requested limit", () => {
     const current = video({ id: "current" });
     const candidates = [
