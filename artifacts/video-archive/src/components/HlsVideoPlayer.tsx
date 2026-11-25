@@ -8,6 +8,9 @@ interface HlsVideoPlayerProps {
   poster?: string;
   title?: string;
   autoPlay?: boolean;
+  /** Quality label from the DB probe (e.g. "660p") used when the manifest
+   *  carries no RESOLUTION attribute (single-rendition playlists). */
+  sourceQualityLabel?: string;
   /** Fired when every candidate failed — parent should fall back. */
   onExhausted?: () => void;
  }
@@ -32,6 +35,7 @@ export function HlsVideoPlayer({
   poster,
   title,
   autoPlay = true,
+  sourceQualityLabel,
   onExhausted,
 }: HlsVideoPlayerProps) {
   const videoRef = useRef<HTMLVideoElement>(null);
@@ -111,8 +115,10 @@ export function HlsVideoPlayer({
         retriesRef.current = 0;
       });
 
-      hls.on(Hls.Events.MANIFEST_PARSED, () => {
-        retriesRef.current = 0;
+      // Build the quality list from manifest levels. hls.js only knows real
+      // heights after the first fragments are parsed, so (re)build on
+      // LEVEL_UPDATED too.
+      const buildLevels = () => {
         const parsed = (hls.levels || [])
           .map((lvl, idx) => ({
             idx,
@@ -122,17 +128,25 @@ export function HlsVideoPlayer({
           .sort((a, b) =>
             b.height !== a.height ? b.height - a.height : b.bitrate - a.bitrate,
           );
-        if (parsed.length > 1) {
-          setLevels([
-            { url: AUTO, label: "Auto (Best)" },
-            ...parsed.map((item) => {
-              let label = item.height ? `${item.height}p` : `Level ${item.idx + 1}`;
-              if (item.height >= 1080) label += " Full HD";
-              else if (item.height >= 720) label += " HD";
-              return { url: levelTag(item.idx), label };
-            }),
-          ]);
-        }
+        if (!parsed.length) return;
+        const options: VideoQualityOption[] = parsed.length > 1
+          ? [
+              { url: AUTO, label: "Auto (Best)" },
+              ...parsed.map((item) => {
+                let label = item.height ? `${item.height}p` : `Level ${item.idx + 1}`;
+                if (item.height >= 1080) label += " Full HD";
+                else if (item.height >= 720) label += " HD";
+                return { url: levelTag(item.idx), label };
+              }),
+            ]
+          : [{ url: levelTag(parsed[0].idx), label: parsed[0].height ? `${parsed[0].height}p` : (sourceQualityLabel || "Source") }];
+        setLevels((prev) => (JSON.stringify(prev) === JSON.stringify(options) ? prev : options));
+      };
+      hls.on(Hls.Events.MANIFEST_PARSED, buildLevels);
+      hls.on(Hls.Events.LEVEL_UPDATED, buildLevels);
+
+      hls.on(Hls.Events.MANIFEST_PARSED, () => {
+        retriesRef.current = 0;
         hls.currentLevel = -1; // adaptive start
         if (resumeAt > 0) {
           try {

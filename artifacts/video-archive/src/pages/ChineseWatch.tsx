@@ -275,6 +275,7 @@ export default function ChineseWatch() {
                 poster={video.clean_thumbnail_url || video.thumbnail_url || undefined}
                 title={chineseDisplayTitle(video)}
                 autoPlay
+                sourceQualityLabel={video.quality_label || undefined}
                 onExhausted={() => setUseIframeFallback(true)}
               />
             ) : playerFrameSrc ? (

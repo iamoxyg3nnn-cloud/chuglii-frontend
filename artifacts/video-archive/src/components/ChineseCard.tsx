@@ -112,7 +112,7 @@ export function ChineseCard({ video, isSaved = false, onToggleSave }: ChineseCar
         <div className="flex items-center justify-between text-xs text-muted-foreground pt-1 border-t border-border/30">
           <span className="truncate max-w-[140px]">{groupLabel}</span>
           <span className="text-[11px] text-muted-foreground/75">
-            {video.resolution || video.quality_label || ""}
+            {video.quality_label || video.resolution || ""}
           </span>
         </div>
       </div>

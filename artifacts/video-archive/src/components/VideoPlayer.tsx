@@ -98,6 +98,8 @@ export function VideoPlayer({
   const [playbackRate, setPlaybackRate] = useState(1);
   const [hoverTime, setHoverTime] = useState<number | null>(null);
   const [hoverX, setHoverX] = useState(0);
+  const [mainDims, setMainDims] = useState<{ w: number; h: number } | null>(null);
+  const seekRowRef = useRef<HTMLDivElement | null>(null);
   const [stallNotice, setStallNotice] = useState<string | null>(null);
   const stallTimer = useRef<number | null>(null);
   const startupStallTimer = useRef<number | null>(null);
@@ -466,7 +468,23 @@ export function VideoPlayer({
   const progress = duration > 0 ? (currentTime / duration) * 100 : 0;
   const bufferedPct = duration > 0 ? (buffered / duration) * 100 : 0;
   const VolumeIcon = muted || volume === 0 ? SpeakerSlash : volume < 0.5 ? SpeakerLow : SpeakerHigh;
-  const activeQuality = qualities.find((q) => q.url === (activeQualityUrl || src))?.label || "Quality";
+  const activeQuality = qualities.length === 1
+    ? qualities[0].label
+    : (qualities.find((q) => q.url === (activeQualityUrl || src))?.label || "Quality");
+
+  // Live hover preview box: fixed size derived from the MAIN video's aspect
+  // ratio (same content, same AR), so the box never jumps when the preview
+  // decoder loads and works for both portrait and landscape sources.
+  const previewAr = mainDims && mainDims.w > 0 ? mainDims.w / mainDims.h : 16 / 9;
+  const PREVIEW_MAX_W = 200;
+  const PREVIEW_MAX_H = 170;
+  const previewBoxW = Math.round(Math.min(PREVIEW_MAX_W, PREVIEW_MAX_H * previewAr));
+  const previewBoxH = Math.round(previewBoxW / previewAr);
+  // Keep the floating preview inside the seek-bar bounds at the edges.
+  const seekRowW = seekRowRef.current?.offsetWidth || 0;
+  const clampedHoverX = hoverTime !== null && seekRowW > 0
+    ? Math.min(Math.max(hoverX, previewBoxW / 2 + 6), seekRowW - previewBoxW / 2 - 6)
+    : hoverX;
 
   return (
     <div
@@ -506,7 +524,7 @@ export function VideoPlayer({
         onTimeUpdate={onTimeUpdate}
         onVolumeChange={() => { const v = videoRef.current; if (v) { setMuted(v.muted); setVolume(v.volume); } }}
         onDurationChange={() => setDuration(videoRef.current?.duration || 0)}
-        onLoadedMetadata={() => { setDuration(videoRef.current?.duration || 0); setLoading(false); }}
+        onLoadedMetadata={() => { const mv = videoRef.current; setDuration(mv?.duration || 0); if (mv && mv.videoWidth && mv.videoHeight) setMainDims({ w: mv.videoWidth, h: mv.videoHeight }); setLoading(false); }}
         onLoadedData={() => { setLoading(false); if (playRequested.current) armStartupStallTimer(9000); }}
         onWaiting={() => {
           setLoading(true);
@@ -590,37 +608,48 @@ export function VideoPlayer({
 
       <div className={`absolute inset-x-0 top-0 p-3 sm:p-4 flex items-start justify-between gap-3 transition-opacity duration-300 ${showControls || !playing ? "opacity-100" : "opacity-0 pointer-events-none"}`}>
         <div className="min-w-0 flex-1">{title && <p className="text-sm sm:text-base font-semibold text-white/95 line-clamp-1 drop-shadow">{title}</p>}</div>
-        {qualities.length > 1 && (
-          <div className="relative shrink-0">
-            <button type="button" onClick={() => setShowSettings((s) => !s)} className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-black/45 hover:bg-black/65 backdrop-blur-md border border-white/10 text-white text-xs font-semibold transition-colors" aria-label="Video settings">
-              <GearSix size={15} weight="bold" /><span>{activeQuality}</span>
-            </button>
-            {showSettings && (
-              <div className="absolute right-0 top-full mt-2 w-52 rounded-xl bg-zinc-950/95 backdrop-blur-xl border border-white/10 shadow-2xl p-2 z-20">
-                <p className="px-2 py-1.5 text-[11px] font-semibold uppercase tracking-wider text-white/45">Quality</p>
-                {qualities.map((q) => {
-                  const active = q.url === (activeQualityUrl || src);
-                  return (
-                    <button key={q.url} type="button" onClick={() => { onQualityChange?.(q.url); setShowSettings(false); }} className={`w-full flex items-center justify-between px-2.5 py-2 rounded-lg text-sm transition-colors ${active ? "bg-cyan-500/20 text-cyan-300" : "text-white/85 hover:bg-white/10"}`}>
-                      <span>{q.label}</span>{active && <span className="w-1.5 h-1.5 rounded-full bg-cyan-400" />}
-                    </button>
-                  );
-                })}
-                <div className="my-1.5 border-t border-white/10" />
-                <p className="px-2 py-1.5 text-[11px] font-semibold uppercase tracking-wider text-white/45">Speed</p>
-                <div className="flex flex-wrap gap-1 px-1 pb-1">
-                  {[0.5, 0.75, 1, 1.25, 1.5, 2].map((r) => (
-                    <button key={r} type="button" onClick={() => setRate(r)} className={`px-2 py-1 rounded-md text-xs font-medium transition-colors ${playbackRate === r ? "bg-cyan-500/20 text-cyan-300" : "text-white/70 hover:bg-white/10 hover:text-white"}`}>{r}x</button>
-                  ))}
-                </div>
+        <div className="relative shrink-0">
+          <button type="button" onClick={() => setShowSettings((s) => !s)} className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-black/45 hover:bg-black/65 backdrop-blur-md border border-white/10 text-white text-xs font-semibold transition-colors" aria-label="Video settings">
+            <GearSix size={15} weight="bold" /><span>{qualities.length > 0 ? activeQuality : "Settings"}</span>
+          </button>
+          {showSettings && (
+            <div className="absolute right-0 top-full mt-2 w-52 rounded-xl bg-zinc-950/95 backdrop-blur-xl border border-white/10 shadow-2xl p-2 z-20">
+              {qualities.length > 1 && (
+                <>
+                  <p className="px-2 py-1.5 text-[11px] font-semibold uppercase tracking-wider text-white/45">Quality</p>
+                  {qualities.map((q) => {
+                    const active = q.url === (activeQualityUrl || src);
+                    return (
+                      <button key={q.url} type="button" onClick={() => { onQualityChange?.(q.url); setShowSettings(false); }} className={`w-full flex items-center justify-between px-2.5 py-2 rounded-lg text-sm transition-colors ${active ? "bg-cyan-500/20 text-cyan-300" : "text-white/85 hover:bg-white/10 hover:text-white"}`}>
+                        <span>{q.label}</span>{active && <span className="w-1.5 h-1.5 rounded-full bg-cyan-400" />}
+                      </button>
+                    );
+                  })}
+                  <div className="my-1.5 border-t border-white/10" />
+                </>
+              )}
+              {qualities.length === 1 && (
+                <>
+                  <p className="px-2 py-1.5 text-[11px] font-semibold uppercase tracking-wider text-white/45">Quality</p>
+                  <div className="w-full flex items-center justify-between px-2.5 py-2 rounded-lg text-sm text-white/85">
+                    <span>{qualities[0].label}</span><span className="text-[10px] text-white/40">source</span>
+                  </div>
+                  <div className="my-1.5 border-t border-white/10" />
+                </>
+              )}
+              <p className="px-2 py-1.5 text-[11px] font-semibold uppercase tracking-wider text-white/45">Speed</p>
+              <div className="flex flex-wrap gap-1 px-1 pb-1">
+                {[0.5, 0.75, 1, 1.25, 1.5, 2].map((r) => (
+                  <button key={r} type="button" onClick={() => setRate(r)} className={`px-2 py-1 rounded-md text-xs font-medium transition-colors ${playbackRate === r ? "bg-cyan-500/20 text-cyan-300" : "text-white/70 hover:bg-white/10 hover:text-white"}`}>{r}x</button>
+                ))}
               </div>
-            )}
-          </div>
-        )}
+            </div>
+          )}
+        </div>
       </div>
 
       <div className={`absolute inset-x-0 bottom-0 px-3 sm:px-4 pb-3 sm:pb-4 transition-opacity duration-300 ${showControls || !playing ? "opacity-100" : "opacity-0 pointer-events-none"}`}>
-        <div className="group/seek relative mb-3 h-5 flex items-center"
+        <div ref={seekRowRef} className="group/seek relative mb-3 h-5 flex items-center"
           onMouseMove={(e) => { const rect = (e.currentTarget as HTMLDivElement).getBoundingClientRect(); const pct = Math.min(1, Math.max(0, (e.clientX - rect.left) / rect.width)); setHoverTime(pct * duration); setHoverX(e.clientX - rect.left); if (duration > 0) updatePreviewSeek(pct * duration); }}
           onMouseLeave={() => { setHoverTime(null); resumePreviewFollow(); }}
         >
@@ -629,22 +658,18 @@ export function VideoPlayer({
               so its warm hls.js buffer survives between hovers. */}
           <div
             className="absolute bottom-full mb-1 -translate-x-1/2 flex flex-col items-center pointer-events-none z-30"
-            style={{ left: hoverTime !== null ? hoverX : -9999, visibility: hoverTime !== null ? "visible" : "hidden" }}
+            style={{ left: hoverTime !== null ? clampedHoverX : -9999, visibility: hoverTime !== null ? "visible" : "hidden" }}
           >
-            <video
-              ref={previewVideoRef}
-              muted
-              playsInline
-              preload="auto"
-              className="mb-1 rounded-md border border-white/20 shadow-lg bg-black"
-              style={{
-                width: "auto",
-                height: "auto",
-                maxWidth: "200px",
-                maxHeight: "170px",
-              }}
-              aria-hidden
-            />
+            <div className="mb-1 rounded-md border border-white/20 shadow-lg bg-black overflow-hidden" style={{ width: `${previewBoxW}px`, height: `${previewBoxH}px` }}>
+              <video
+                ref={previewVideoRef}
+                muted
+                playsInline
+                preload="auto"
+                className="w-full h-full object-contain"
+                aria-hidden
+              />
+            </div>
             <div className="px-2 py-1 rounded-md bg-black/90 border border-white/10 text-[11px] font-medium text-white tabular-nums">
               {hoverTime !== null && duration > 0 ? formatTime(hoverTime) : ""}
             </div>
