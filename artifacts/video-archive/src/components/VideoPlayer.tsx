@@ -50,6 +50,21 @@ interface VideoPlayerProps {
   className?: string;
 }
 
+// Scale guard: skip all background warming/prefetch for data-saver users
+// and very slow connections - at fleet scale this is the difference between
+// polite background traffic and a bandwidth incident on metered networks.
+const isConstrainedConnection = (): boolean => {
+  try {
+    const conn = (navigator as unknown as { connection?: { saveData?: boolean; effectiveType?: string } }).connection;
+    if (!conn) return false;
+    if (conn.saveData) return true;
+    const et = conn.effectiveType || "";
+    return et === "slow-2g" || et === "2g";
+  } catch {
+    return false;
+  }
+};
+
 function formatTime(seconds: number): string {
   if (!Number.isFinite(seconds) || seconds < 0) return "0:00";
   const h = Math.floor(seconds / 3600);
@@ -362,6 +377,7 @@ export function VideoPlayer({
   const maybePrefetchDirectFile = useCallback(() => {
     if (prefetchStartedRef.current || !src) return;
     prefetchStartedRef.current = true;
+    if (isConstrainedConnection()) return;
     const kickoff = async () => {
       try {
         // Wait until the main video is actually playing so startup isn't
@@ -538,6 +554,7 @@ export function VideoPlayer({
     if (warmStartedRef.current === manifestUrl) return;
     warmStartedRef.current = manifestUrl;
     warmerAbortRef.current = false;
+    if (isConstrainedConnection()) return;
     try {
       const res = await fetch(manifestUrl);
       const text = await res.text();

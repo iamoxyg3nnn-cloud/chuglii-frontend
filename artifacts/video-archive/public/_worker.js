@@ -1505,6 +1505,11 @@ async function resolveGounlimitedStream(nestedUrl, referer) {
 
 const AVS_CHAIN_HOST_RE = /(^|\.)(hotscopes\.(io|net|com|org)|reallifecam\.to|reallifecams\.net|voyeur-house\.org|clicknplay\.to)$/i;
 const AVS_DIRECT_HOST_RE = /(^|\.)clicknplay\.to$/i;
+
+// Stampede guard: many users hitting the same cold segment in the same colo
+// share one origin fetch per isolate instead of fanning out N identical
+// upstream requests. Entries self-expire; bounded map size.
+const streamInflight = new Map();
 const AVS_DEAD_GATE_RE = /(gounlimited\.to|parklogic\.com|headlinelogic\.com|click-v4\.com|junimedclk\.com|plarclck\.com|adorarama\.com)/i;
 
 function extractIframeSources(html, pageUrl) {
@@ -1738,6 +1743,24 @@ async function resolveHotScopesEmbed(targetUrl, searchParams) {
       return errorResponse("Missing or invalid stream url parameter", 400);
     }
 
+    // Scale guard: this route is a public proxy endpoint. Without a host
+    // allowlist it is an open anonymizing proxy that bots will abuse at
+    // scale (origin bandwidth, Cloudflare ToS risk, origin-CDN IP bans).
+    // Only hosts that actually appear in stored media URLs are proxied.
+    const STREAM_HOST_SUFFIXES = [
+      "taobao-cdn.com", "supjav.com", "supremejav.com", "clicknplay.to",
+      "sheeshfans.com", "internetchicks.com", "influencersgonewild.com",
+      "influencersgonewild.net", "mmsvibex.fit", "voyeur-house.org",
+      "reallifecam.to", "reallifecams.net", "hotscopes.net",
+      "lulustream.com", "vidara.so", "vidara.to", "whitetrafsa.com",
+      "tiktokcdn.com", "838238.xyz",
+    ];
+    const hostMatch = streamUpstreamUrl.match(/^https?:\/\/([^/?#]+)/i);
+    const reqHost = hostMatch ? hostMatch[1].toLowerCase() : "";
+    if (!STREAM_HOST_SUFFIXES.some((s) => reqHost === s || reqHost.endsWith("." + s))) {
+      return errorResponse("Stream host not allowed", 403);
+    }
+
     try {
       // Edge cache: segments and playlists are immutable, so serve repeat
       // fetches straight from the Cloudflare colo (~30ms) instead of paying
@@ -1751,24 +1774,58 @@ async function resolveHotScopesEmbed(targetUrl, searchParams) {
           const rangeHdr = request.headers.get("Range");
           const rm = rangeHdr ? rangeHdr.match(/^bytes=(\d+)-(\d*)$/) : null;
           if (rm) {
-            const fullBuf = await cachedStream.arrayBuffer();
             const start = parseInt(rm[1], 10);
-            const end = Math.min(rm[2] ? parseInt(rm[2], 10) : fullBuf.byteLength - 1, fullBuf.byteLength - 1);
-            if (start < fullBuf.byteLength && start <= end) {
-              const slice = fullBuf.slice(start, end + 1);
-              const sliceHeaders = new Headers();
-              sliceHeaders.set("Content-Type", cachedStream.headers.get("Content-Type") || "video/mp4");
-              sliceHeaders.set("Access-Control-Allow-Origin", "*");
-              sliceHeaders.set("Access-Control-Allow-Methods", "GET, HEAD, OPTIONS");
-              sliceHeaders.set("Access-Control-Allow-Headers", "*");
-              sliceHeaders.set("Accept-Ranges", "bytes");
-              sliceHeaders.set("Content-Range", `bytes ${start}-${end}/${fullBuf.byteLength}`);
-              sliceHeaders.set("Content-Length", String(slice.byteLength));
-              sliceHeaders.set("Cache-Control", "public, max-age=604800");
-              sliceHeaders.set("X-Edge-Cache", "range-hit");
-              return new Response(slice, { status: 206, headers: sliceHeaders });
+            const total = parseInt(cachedStream.headers.get("Content-Length") || "0", 10);
+            if (total && start < total) {
+              const end = Math.min(rm[2] ? parseInt(rm[2], 10) : total - 1, total - 1);
+              if (start <= end) {
+                // Stream the slice instead of materializing the whole cached
+                // object: per-request memory stays at one chunk no matter how
+                // many concurrent scrubs hit this colo. The cached body is
+                // colo-local, so skipping over bytes is cheap.
+                const sliceHeaders = new Headers();
+                sliceHeaders.set("Content-Type", cachedStream.headers.get("Content-Type") || "video/mp4");
+                sliceHeaders.set("Access-Control-Allow-Origin", "*");
+                sliceHeaders.set("Access-Control-Allow-Methods", "GET, HEAD, OPTIONS");
+                sliceHeaders.set("Access-Control-Allow-Headers", "*");
+                sliceHeaders.set("Accept-Ranges", "bytes");
+                sliceHeaders.set("Content-Range", `bytes ${start}-${end}/${total}`);
+                sliceHeaders.set("Content-Length", String(end - start + 1));
+                sliceHeaders.set("Cache-Control", "public, max-age=604800");
+                sliceHeaders.set("X-Edge-Cache", "range-hit");
+                try {
+                  const reader = cachedStream.body.getReader();
+                  const ts = new TransformStream();
+                  const writer = ts.writable.getWriter();
+                  const pump = async () => {
+                    let skipped = 0;
+                    let toEmit = end - start + 1;
+                    try {
+                      while (toEmit > 0) {
+                        const { done, value } = await reader.read();
+                        if (done) break;
+                        let chunk = value;
+                        if (skipped < start) {
+                          if (skipped + chunk.length <= start) { skipped += chunk.length; continue; }
+                          chunk = chunk.subarray(start - skipped);
+                          skipped = start;
+                        }
+                        if (chunk.length > toEmit) chunk = chunk.subarray(0, toEmit);
+                        toEmit -= chunk.length;
+                        await writer.write(chunk);
+                      }
+                    } catch { /* client aborted */ }
+                    finally {
+                      try { await writer.close(); } catch { /* already closed */ }
+                      try { reader.cancel(); } catch { /* already done */ }
+                    }
+                  };
+                  if (ctx) ctx.waitUntil(pump()); else pump();
+                  return new Response(ts.readable, { status: 206, headers: sliceHeaders });
+                } catch { /* fall back below */ }
+              }
             }
-            // Malformed/out-of-range request: fall through to origin.
+            // Unknown total or streaming failed: fall through to origin.
           } else {
             const hitHeaders = new Headers(cachedStream.headers);
             hitHeaders.set("X-Edge-Cache", "hit");
@@ -1822,9 +1879,30 @@ async function resolveHotScopesEmbed(targetUrl, searchParams) {
         reqHeaders["Range"] = effectiveRange;
       }
 
-      const upstreamRes = await fetch(streamUpstreamUrl, {
+      // Stampede dedup (plain media only - m3u8 needs per-request rewriting).
+      const inflightKey = !streamUpstreamUrl.includes(".m3u8")
+        ? streamUpstreamUrl + "|" + effectiveRange
+        : "";
+      if (inflightKey && streamInflight.has(inflightKey)) {
+        const shared = await streamInflight.get(inflightKey).catch(() => null);
+        if (shared) {
+          const h = new Headers(shared.headers);
+          h.set("Access-Control-Allow-Origin", "*");
+          h.set("Cache-Control", shared.status === 206 ? "no-store" : "public, max-age=604800, immutable");
+          h.set("X-Edge-Cache", "inflight");
+          return new Response(shared.clone().body, { status: shared.status, headers: h });
+        }
+      }
+
+      const upstreamP = fetch(streamUpstreamUrl, {
         headers: reqHeaders,
       });
+      if (inflightKey) {
+        streamInflight.set(inflightKey, upstreamP.then((r) => r.clone()).catch((e) => { streamInflight.delete(inflightKey); throw e; }));
+        if (streamInflight.size > 500) streamInflight.clear();
+        setTimeout(() => streamInflight.delete(inflightKey), 20000);
+      }
+      const upstreamRes = await upstreamP;
 
       if (!upstreamRes.ok && upstreamRes.status !== 206) {
         return new Response(upstreamRes.body, { status: upstreamRes.status, headers: CORS_HEADERS });
