@@ -4,6 +4,7 @@ import { Layout } from "@/components/Layout";
 import {
   useStudiosVideos,
   MADOUER_SECTIONS,
+  DASJ91_SECTIONS,
   type StudiosSortOption,
 } from "@/hooks/useStudiosVideos";
 import { StudiosCard, StudiosCardSkeleton } from "@/components/StudiosCard";
@@ -32,11 +33,15 @@ export default function StudiosFeed() {
   const searchString = window.location.search;
 
   const queryParams = new URLSearchParams(searchString);
+  const initialSite = queryParams.get("site") || "madouer";
   const initialCategory = queryParams.get("cat") || "all";
   const initialPage = parseInt(queryParams.get("page") || "1", 10);
   const initialSort = (queryParams.get("sort") as StudiosSortOption) || "newest";
   const initialSearch = queryParams.get("q") || "";
 
+  const [activeSite, setActiveSite] = useState<string>(
+    initialSite === "dasj91" ? "dasj91" : "madouer"
+  );
   const [activeCategory, setActiveCategory] = useState<string>(initialCategory);
   const [currentPage, setCurrentPage] = useState<number>(initialPage);
   const [activeSort, setActiveSort] = useState<StudiosSortOption>(initialSort);
@@ -45,8 +50,9 @@ export default function StudiosFeed() {
   const [sortOpen, setSortOpen] = useState(false);
 
   const updateUrl = useCallback(
-    (cat: string, page: number, sort: StudiosSortOption, search: string) => {
+    (site: string, cat: string, page: number, sort: StudiosSortOption, search: string) => {
       const params = new URLSearchParams();
+      if (site !== "madouer") params.set("site", site);
       if (cat !== "all") params.set("cat", cat);
       if (page > 1) params.set("page", page.toString());
       if (sort !== "newest") params.set("sort", sort);
@@ -66,11 +72,11 @@ export default function StudiosFeed() {
   }, [searchQuery]);
 
   useEffect(() => {
-    updateUrl(activeCategory, currentPage, activeSort, debouncedSearch);
-  }, [activeCategory, currentPage, activeSort, debouncedSearch, updateUrl]);
+    updateUrl(activeSite, activeCategory, currentPage, activeSort, debouncedSearch);
+  }, [activeSite, activeCategory, currentPage, activeSort, debouncedSearch, updateUrl]);
 
   const { data, isLoading, isError, refetch } = useStudiosVideos({
-    site: "madouer",
+    site: activeSite,
     category: activeCategory !== "all" ? activeCategory : undefined,
     search: debouncedSearch || undefined,
     sort: activeSort,
@@ -92,7 +98,7 @@ export default function StudiosFeed() {
                 <div className="flex items-center gap-2 mb-1.5">
                   <span className="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-amber-500/15 text-amber-400 border border-amber-500/30 flex items-center gap-1.5">
                     <MonitorPlay size={13} weight="fill" className="text-amber-400" />
-                    <span>Studios · Madou</span>
+                    <span>Studios · {activeSite === "dasj91" ? "91 Dasj" : "Madou"}</span>
                   </span>
                 </div>
                 <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight text-foreground">
@@ -113,7 +119,42 @@ export default function StudiosFeed() {
               </div>
             </div>
 
-            {/* Section chips (madouer.cc whitelisted types) */}
+            {/* Site tabs + section chips (madouer.cc types / 91dasj.com zones) */}
+            <nav
+              aria-label="Studios sites"
+              className="flex items-center gap-1.5 overflow-x-auto no-scrollbar pt-1"
+            >
+              <button
+                onClick={() => {
+                  setActiveSite("madouer");
+                  setActiveCategory("all");
+                  setCurrentPage(1);
+                }}
+                aria-current={activeSite === "madouer" ? "true" : undefined}
+                className={`px-3.5 py-1.5 rounded-lg text-xs font-semibold whitespace-nowrap transition-all cursor-pointer ${
+                  activeSite === "madouer"
+                    ? "bg-amber-500/20 text-amber-300 border border-amber-500/40"
+                    : "bg-card/60 text-muted-foreground hover:text-foreground hover:bg-card border border-border/40"
+                }`}
+              >
+                Madou
+              </button>
+              <button
+                onClick={() => {
+                  setActiveSite("dasj91");
+                  setActiveCategory("all");
+                  setCurrentPage(1);
+                }}
+                aria-current={activeSite === "dasj91" ? "true" : undefined}
+                className={`px-3.5 py-1.5 rounded-lg text-xs font-semibold whitespace-nowrap transition-all cursor-pointer ${
+                  activeSite === "dasj91"
+                    ? "bg-amber-500/20 text-amber-300 border border-amber-500/40"
+                    : "bg-card/60 text-muted-foreground hover:text-foreground hover:bg-card border border-border/40"
+                }`}
+              >
+                91 Dasj
+              </button>
+            </nav>
             <nav
               aria-label="Studios sections"
               className="flex items-center gap-1.5 overflow-x-auto no-scrollbar pt-1 pb-1"
@@ -131,7 +172,7 @@ export default function StudiosFeed() {
               >
                 All Sections
               </button>
-              {MADOUER_SECTIONS.map((r) => {
+              {(activeSite === "dasj91" ? DASJ91_SECTIONS : MADOUER_SECTIONS).map((r) => {
                 const active = activeCategory === r.id;
                 return (
                   <button

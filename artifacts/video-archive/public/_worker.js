@@ -1727,6 +1727,109 @@ async function resolveHotScopesEmbed(targetUrl, searchParams) {
     return res;
   }
 
+  // ─── Studios play-time resolver (/api/studios/resolve) ───────────────
+  // dasj91 stream URLs carry ~1h auth_key tokens, so nothing is stored at
+  // ingest. At play time this route fetches the archive page, extracts the
+  // fresh part m3u8 URLs from the data-config blocks, merges them into one
+  // media playlist (multi-part posts get #EXT-X-DISCONTINUITY between
+  // parts), and rewrites every segment/key through /api/player/stream.
+  // Edge-cached ~25 min — safely inside the 1h token TTL.
+  if (path === "/api/studios/resolve") {
+    const pageUrl = url.searchParams.get("url") || "";
+    if (!/^https:\/\/([^/]*\.)?91dasj\.com\/archives\/\d+\/?($|\?)/.test(pageUrl)) {
+      return errorResponse("Missing or invalid dasj91 archive url", 400);
+    }
+
+    const resolveCache = caches.default;
+    // rv= bumps the cached-playlist format version (cache key only, not sent upstream).
+    const resolveKey = new Request(url.toString() + "&rv=3", { method: "GET" });
+    try {
+      const cachedResolve = await resolveCache.match(resolveKey);
+      if (cachedResolve) return cachedResolve;
+    } catch (e) {}
+
+    const dasjUa = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36";
+    const pageResp = await fetch(pageUrl, { headers: { "User-Agent": dasjUa } });
+    if (!pageResp.ok) return errorResponse("Archive fetch failed", 502);
+    const pageHtml = await pageResp.text();
+
+    const partUrls = [];
+    // Attribute quoting varies per post: data-config="..." or data-config='...'.
+    const configMatches = pageHtml.match(/data-config=(["'])([\s\S]+?)\1/g) || [];
+    for (const cm of configMatches) {
+      try {
+        const raw = cm.slice(13, -1)
+          .replace(/&quot;/g, '"').replace(/&#0*39;/g, "'").replace(/&amp;/g, "&");
+        const cfg = JSON.parse(raw);
+        const vurl = cfg.video && cfg.video.url;
+        if (typeof vurl === "string" && vurl.startsWith("http")) partUrls.push(vurl);
+      } catch (e) {}
+    }
+    if (!partUrls.length) return errorResponse("No playable parts found", 404);
+
+    const partGroups = [];
+    let maxTargetDuration = 0;
+    for (const partUrl of partUrls) {
+      try {
+        const partResp = await fetch(partUrl, { headers: { "User-Agent": dasjUa } });
+        if (!partResp.ok) continue;
+        const partText = await partResp.text();
+        const parsed = new URL(partUrl);
+        const partOrigin = parsed.origin;
+        const partBase = parsed.pathname.substring(0, parsed.pathname.lastIndexOf("/") + 1);
+        const group = [];
+        for (const line of partText.split("\n")) {
+          const trimmed = line.trim();
+          if (!trimmed) continue;
+          if (trimmed.startsWith("#EXT-X-KEY:")) {
+            group.push(trimmed.replace(/URI=["']([^"']+)["']/, (mm, uri) => {
+              const abs = uri.startsWith("http") ? uri : (uri.startsWith("/") ? partOrigin + uri : partOrigin + partBase + uri);
+              return `URI="/api/player/stream?url=${encodeURIComponent(abs)}"`;
+            }));
+            continue;
+          }
+          if (trimmed.startsWith("#")) {
+            // Track the largest part TARGETDURATION, then strip part-level
+            // playlist headers; the merged playlist emits its own.
+            const tdm = trimmed.match(/^#EXT-X-TARGETDURATION:(\d+)/);
+            if (tdm) maxTargetDuration = Math.max(maxTargetDuration, parseInt(tdm[1], 10));
+            if (/^#(EXTM3U|EXT-X-VERSION|EXT-X-MEDIA-SEQUENCE|EXT-X-PLAYLIST-TYPE|EXT-X-TARGETDURATION)/.test(trimmed)) continue;
+            group.push(trimmed); continue;
+          }
+          const abs = trimmed.startsWith("http") ? trimmed : (trimmed.startsWith("/") ? partOrigin + trimmed : partOrigin + partBase + trimmed);
+          group.push(`/api/player/stream?url=${encodeURIComponent(abs)}`);
+        }
+        if (group.length) partGroups.push(group);
+      } catch (e) {}
+    }
+    if (!partGroups.length) return errorResponse("No playable parts found", 502);
+
+    const lines = [
+      "#EXTM3U",
+      "#EXT-X-VERSION:3",
+      `#EXT-X-TARGETDURATION:${maxTargetDuration || 10}`,
+      "#EXT-X-MEDIA-SEQUENCE:0",
+    ];
+    partGroups.forEach((group, i) => {
+      if (i > 0) lines.push("#EXT-X-DISCONTINUITY");
+      lines.push(...group);
+    });
+    lines.push("#EXT-X-ENDLIST");
+
+    const resolveResp = new Response(lines.join("\n"), {
+      status: 200,
+      headers: {
+        "Content-Type": "application/vnd.apple.mpegurl",
+        "Access-Control-Allow-Origin": "*",
+        "Access-Control-Allow-Methods": "GET, HEAD, OPTIONS",
+        "Access-Control-Allow-Headers": "*",
+        "Cache-Control": "public, max-age=1500",
+      },
+    });
+    try { await resolveCache.put(resolveKey, resolveResp.clone()); } catch (e) {}
+    return resolveResp;
+  }
+
   // ─── Edge HLS Stream Manifest Proxy (/api/player/stream) ───────────
   // Proxies M3U8 master/variant manifests, AES encryption keys, and TS segments for LuluStream, FC2Stream, and EarnVids.
   // Spoofs User-Agent: Mozilla/5.0 to bypass tnmr.org bot blocking, and adds CORS Access-Control-Allow-Origin: *
@@ -1757,7 +1860,7 @@ async function resolveHotScopesEmbed(targetUrl, searchParams) {
       "apianmeng.com", "atukjhesk.com",
       // studios category (madouer Phase A; dasj91/madouhd hosts pre-added for
       // Phase B/C): all verified 200 + CORS * with no Referer.
-      "cdn2020.com", "97img.com", "thm3u8.co", "sxtmo.com", "micgqv.cn", "mkimfs.cn",
+      "cdn2020.com", "97img.com", "thm3u8.co", "sxtmo.com", "micgqv.cn", "mkimfs.cn", "ucjosl.cn",
     ];
     const hostMatch = streamUpstreamUrl.match(/^https?:\/\/([^/?#]+)/i);
     const reqHost = hostMatch ? hostMatch[1].toLowerCase() : "";
@@ -1854,7 +1957,7 @@ async function resolveHotScopesEmbed(targetUrl, searchParams) {
         referer = "https://sheeshfans.com/";
       } else if (targetObj.hostname.includes("internetchicks")) {
         referer = "https://internetchicks.com/";
-      } else if (targetObj.hostname.includes("xianshipian") || targetObj.hostname.includes("aomcyou") || targetObj.hostname.includes("apianmeng") || targetObj.hostname.includes("atukjhesk") || targetObj.hostname.includes("cdn2020") || targetObj.hostname.includes("97img") || targetObj.hostname.includes("thm3u8") || targetObj.hostname.includes("sxtmo") || targetObj.hostname.includes("micgqv") || targetObj.hostname.includes("mkimfs")) {
+      } else if (targetObj.hostname.includes("xianshipian") || targetObj.hostname.includes("aomcyou") || targetObj.hostname.includes("apianmeng") || targetObj.hostname.includes("atukjhesk") || targetObj.hostname.includes("cdn2020") || targetObj.hostname.includes("97img") || targetObj.hostname.includes("thm3u8") || targetObj.hostname.includes("sxtmo") || targetObj.hostname.includes("micgqv") || targetObj.hostname.includes("mkimfs") || targetObj.hostname.includes("ucjosl")) {
         // fangsung CDNs: bbcdn 403s any FOREIGN referer but allows none at all
         // (it also 403s Cloudflare-worker egress even with the site referer,
         // so send no Referer header at all for these hosts). The apianmeng

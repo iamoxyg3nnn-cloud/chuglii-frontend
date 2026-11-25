@@ -156,7 +156,7 @@ export default function StudiosWatch() {
     );
   }
 
-  const playerFrameSrc = video.full_video_url
+  const playerFrameSrc = video.full_video_url && video.full_video_url !== "resolve"
     ? buildEdgePlayerUrl(video.full_video_url, {
         title: studiosDisplayTitle(video),
         poster: video.clean_thumbnail_url || video.thumbnail_url || "",
@@ -165,14 +165,20 @@ export default function StudiosWatch() {
     : null;
 
   // HLS candidates for the in-page native player. madouer stream CDNs
-  // (t{N}.cdn2020.com, t{N}.97img.com) serve browsers directly with CORS *
-  // and no Referer requirement, so they get the direct-first treatment; the
-  // Worker proxy is the fallback (and the only path for any other host).
+  // (t{N}.cdn2020.com, t{N}.97img.com, thm3u8.co) serve browsers directly
+  // with CORS * and no Referer requirement, so they get the direct-first
+  // treatment; the Worker proxy is the fallback (and the only path for any
+  // other host). dasj91 rows carry the "resolve" sentinel instead of a URL:
+  // their auth_key tokens expire in ~1h, so playback goes through the
+  // Worker resolver, which fetches a fresh playlist at play time.
   // Plain computation (not useMemo) — this sits after conditional early
   // returns, so hooks are not allowed here.
   const hlsCandidates = (() => {
     const primary = video.full_video_url || "";
     if (!primary) return [];
+    if (primary === "resolve") {
+      return [`/api/studios/resolve?url=${encodeURIComponent(video.detail_url)}`];
+    }
     let host = "";
     try {
       host = new URL(primary).hostname;

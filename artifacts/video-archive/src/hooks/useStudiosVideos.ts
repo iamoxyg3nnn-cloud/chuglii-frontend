@@ -42,7 +42,7 @@ export function studiosDisplayTitle(video: Pick<StudiosVideo, "title" | "title_e
  *  source module are selectable; the rest render as "coming soon". */
 export const STUDIO_SITES = [
   { site: "madouer", label: "Madou", enabled: true },
-  { site: "dasj91", label: "91 Dasj", enabled: false },
+  { site: "dasj91", label: "91 Dasj", enabled: true },
   { site: "madouhd", label: "Madou HD", enabled: false },
 ] as const;
 
@@ -71,6 +71,17 @@ export const MADOUER_SECTIONS = [
   { id: "22", cn: "华语原创", en: "Chinese Original" },
   { id: "31", cn: "推特女神", en: "Twitter Girls" },
   { id: "32", cn: "国产系列", en: "Chinese Series" },
+] as const;
+
+/** 91dasj.com zones crawled (whitelisted slugs). Mirrors
+ *  scraper/categories/studios/categories.py DASJ91_CATEGORIES. All 吃瓜
+ *  (real-person leak) zones, 学生校园 and 每日大赛 are excluded at the source. */
+export const DASJ91_SECTIONS = [
+  { id: "aifl", cn: "AI短剧", en: "AI Dramas" },
+  { id: "rmbg", cn: "反差女神", en: "Contrast Goddess" },
+  { id: "jxth", cn: "探花大神", en: "Tanhua Masters" },
+  { id: "ldcz", cn: "绿帽磁场", en: "Cuckold Stories" },
+  { id: "qwys", cn: "伦理猎奇", en: "Taboo Drama" },
 ] as const;
 
 export type StudiosSortOption = "newest" | "oldest" | "quality";
