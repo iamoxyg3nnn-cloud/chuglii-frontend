@@ -230,6 +230,11 @@ export function VideoPlayer({
   const seek = useCallback((time: number) => {
     const v = videoRef.current; if (!v || !Number.isFinite(time)) return;
     v.currentTime = Math.min(Math.max(0, time), v.duration || time); setCurrentTime(v.currentTime);
+    // Keep the preview decoder mirrored so its buffer stays warm.
+    const pv = previewVideoRef.current;
+    if (pv && previewInitRef.current && !previewHoveringRef.current) {
+      try { pv.currentTime = v.currentTime; } catch { /* not ready */ }
+    }
   }, [videoRef]);
 
   const emitProgress = useCallback((playing: boolean) => {
@@ -287,6 +292,7 @@ export function VideoPlayer({
   const previewHlsRef = useRef<{ destroy: () => void } | null>(null);
   const previewInitRef = useRef(false);
   const lastPreviewSeekRef = useRef(0);
+  const previewHoveringRef = useRef(false);
   const [previewReady, setPreviewReady] = useState(false);
 
   const drawPreviewFrame = useCallback(() => {
@@ -309,16 +315,20 @@ export function VideoPlayer({
     const pv = previewVideoRef.current;
     if (!pv) return;
     pv.muted = true;
-    if (hasHlsCandidates && !pv.canPlayType("application/vnd.apple.mpegurl")) {
-      // Lazy-load hls.js so non-HLS pages never pay for it.
+    if (hasHlsCandidates) {
+      // Always drive HLS previews through hls.js (even where the browser claims
+      // native HLS support): native HLS VOD buffering downloads the whole stream,
+      // while hls.js keeps a bounded warm buffer around the playhead.
       import("hls.js").then(({ default: Hls }) => {
         if (previewHlsRef.current) return;
         const hls = new Hls({
           enableWorker: false,
           autoStartLoad: true,
-          maxBufferLength: 4,
-          maxMaxBufferLength: 8,
-          backBufferLength: 0,
+          // Keep a large warm buffer around the playhead so hover-seeks inside
+          // it are instant local MSE seeks instead of network fragment fetches.
+          maxBufferLength: 30,
+          maxMaxBufferLength: 60,
+          backBufferLength: Infinity,
         });
         previewHlsRef.current = hls;
         hls.on(Hls.Events.MANIFEST_PARSED, () => {
@@ -330,21 +340,68 @@ export function VideoPlayer({
         hls.loadSource(previewCandidates![0]);
         hls.attachMedia(pv);
       }).catch(() => { /* preview unavailable */ });
-    } else {
-      pv.src = (hasHlsCandidates ? previewCandidates![0] : src) || "";
+    } else if (src) {
+      pv.src = src;
     }
   }, [previewCandidates, src]);
+
+  // Resume the follow-the-playhead loop after a hover ends: re-sync to the
+  // main position and keep buffering so future hovers stay instant.
+  const resumePreviewFollow = useCallback(() => {
+    previewHoveringRef.current = false;
+    const pv = previewVideoRef.current;
+    const v = videoRef.current;
+    if (!pv || !v) return;
+    try {
+      if (Math.abs(pv.currentTime - v.currentTime) > 1) pv.currentTime = v.currentTime;
+      if (!v.paused && !v.ended && pv.paused) pv.play().catch(() => { /* autoplay guard */ });
+    } catch { /* not ready */ }
+  }, [videoRef]);
 
   const updatePreviewSeek = useCallback((time: number) => {
     ensurePreviewEngine();
     const pv = previewVideoRef.current;
     if (!pv || !Number.isFinite(time) || time <= 0) return;
+    previewHoveringRef.current = true;
     const now = Date.now();
-    if (now - lastPreviewSeekRef.current < 220) return;
+    if (now - lastPreviewSeekRef.current < 100) return;
     lastPreviewSeekRef.current = now;
-    if (Math.abs(pv.currentTime - time) < 0.8) { drawPreviewFrame(); return; }
-    try { pv.currentTime = Math.min(time, pv.duration || time); } catch { /* not seekable yet */ }
+    try {
+      // Freeze the preview at the hovered frame while the cursor is on the bar.
+      if (!pv.paused) pv.pause();
+      const target = Math.min(time, pv.duration || time);
+      if (Math.abs(pv.currentTime - target) < 0.25) { drawPreviewFrame(); return; }
+      // Inside the warm buffer this is an instant local seek; outside it
+      // fetches just the one fragment and stays buffered from then on.
+      pv.currentTime = target;
+    } catch { /* not seekable yet */ }
   }, [drawPreviewFrame, ensurePreviewEngine]);
+
+  // Follow loop: the preview decoder plays (muted, lowest rendition) mirrored
+  // to the main playhead whenever the main video plays, so its buffer is
+  // always warm around the current position and hover previews feel realtime.
+  useEffect(() => {
+    const id = window.setInterval(() => {
+      const pv = previewVideoRef.current;
+      const v = videoRef.current;
+      if (!pv || !v || !previewInitRef.current || previewHoveringRef.current) return;
+      try {
+        if (v.paused || v.ended) { if (!pv.paused) pv.pause(); return; }
+        if (pv.paused) pv.play().catch(() => { /* autoplay guard */ });
+        if (Math.abs(pv.currentTime - v.currentTime) > 6) pv.currentTime = v.currentTime;
+      } catch { /* not ready */ }
+    }, 3000);
+    return () => window.clearInterval(id);
+  }, [videoRef]);
+
+  // Pre-warm: start the preview decoder shortly after the main video begins
+  // loading so the first hover is already instant near the playhead.
+  useEffect(() => {
+    const hasPreview = Boolean(previewCandidates && previewCandidates.length > 0) || Boolean(src);
+    if (!hasPreview) return;
+    const t = window.setTimeout(() => ensurePreviewEngine(), 5000);
+    return () => window.clearTimeout(t);
+  }, [ensurePreviewEngine, previewCandidates, src]);
 
   useEffect(() => () => {
     if (previewHlsRef.current) { try { previewHlsRef.current.destroy(); } catch { /* noop */ } previewHlsRef.current = null; }
@@ -550,7 +607,7 @@ export function VideoPlayer({
       <div className={`absolute inset-x-0 bottom-0 px-3 sm:px-4 pb-3 sm:pb-4 transition-opacity duration-300 ${showControls || !playing ? "opacity-100" : "opacity-0 pointer-events-none"}`}>
         <div className="group/seek relative mb-3 h-5 flex items-center"
           onMouseMove={(e) => { const rect = (e.currentTarget as HTMLDivElement).getBoundingClientRect(); const pct = Math.min(1, Math.max(0, (e.clientX - rect.left) / rect.width)); setHoverTime(pct * duration); setHoverX(e.clientX - rect.left); if (duration > 0) updatePreviewSeek(pct * duration); }}
-          onMouseLeave={() => setHoverTime(null)}
+          onMouseLeave={() => { setHoverTime(null); resumePreviewFollow(); }}
         >
           {hoverTime !== null && duration > 0 && (
             <div className="absolute bottom-full mb-1 -translate-x-1/2 flex flex-col items-center pointer-events-none" style={{ left: hoverX }}>
