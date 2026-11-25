@@ -10,6 +10,7 @@ import {
   PictureInPicture,
   GearSix,
   ArrowClockwise,
+  ArrowCounterClockwise,
   SpinnerGap,
   WarningCircle,
 } from "@phosphor-icons/react";
@@ -29,6 +30,9 @@ interface VideoPlayerProps {
   /** Direct media URL. Omit when an external engine (e.g. hls.js/MSE)
    *  attaches to the video element itself. */
   src?: string;
+  /** Ordered proxied manifest URLs for the hover timeline preview player
+   *  (HLS). When omitted, the preview clones `src` instead. */
+  previewCandidates?: string[];
   poster?: string;
   title?: string;
   autoPlay?: boolean;
@@ -56,6 +60,7 @@ function formatTime(seconds: number): string {
 
 export function VideoPlayer({
   src,
+  previewCandidates,
   poster,
   title,
   autoPlay = false,
@@ -136,6 +141,11 @@ export function VideoPlayer({
     if (stallTimer.current) { window.clearTimeout(stallTimer.current); stallTimer.current = null; }
     if (startupStallTimer.current) { window.clearTimeout(startupStallTimer.current); startupStallTimer.current = null; }
     clearNoticeTimer();
+    // Reset the hover preview engine so it re-initializes for the new source.
+    previewInitRef.current = false;
+    setPreviewReady(false);
+    lastPreviewSeekRef.current = 0;
+    if (previewHlsRef.current) { try { previewHlsRef.current.destroy(); } catch { /* noop */ } previewHlsRef.current = null; }
     playRequested.current = autoPlay;
     lastProgressValue.current = 0;
   }, [src, autoPlay, startMuted, clearNoticeTimer]);
@@ -254,6 +264,92 @@ export function VideoPlayer({
     v.playbackRate = rate; setPlaybackRate(rate); setShowSettings(false);
   }, [videoRef]);
 
+  // ─── Skip ±N seconds (buttons, keyboard, double-tap zones) ────────────
+  const [skipFlash, setSkipFlash] = useState<{ dir: number; delta: number; nonce: number } | null>(null);
+  const flashTimer = useRef<number | null>(null);
+
+  const seekRelative = useCallback((delta: number) => {
+    const v = videoRef.current; if (!v) return;
+    seek(v.currentTime + delta);
+    setSkipFlash({ dir: delta < 0 ? -1 : 1, delta: Math.abs(delta), nonce: Date.now() });
+    if (flashTimer.current) window.clearTimeout(flashTimer.current);
+    flashTimer.current = window.setTimeout(() => setSkipFlash(null), 650);
+    revealControls();
+  }, [revealControls, seek, videoRef]);
+
+  useEffect(() => () => {
+    if (flashTimer.current) window.clearTimeout(flashTimer.current);
+  }, []);
+
+  // ─── Hover timeline preview (thumbnail + time) ────────────────────────
+  const previewVideoRef = useRef<HTMLVideoElement | null>(null);
+  const previewCanvasRef = useRef<HTMLCanvasElement | null>(null);
+  const previewHlsRef = useRef<{ destroy: () => void } | null>(null);
+  const previewInitRef = useRef(false);
+  const lastPreviewSeekRef = useRef(0);
+  const [previewReady, setPreviewReady] = useState(false);
+
+  const drawPreviewFrame = useCallback(() => {
+    const pv = previewVideoRef.current;
+    const canvas = previewCanvasRef.current;
+    if (!pv || !canvas || !pv.videoWidth) return;
+    const w = 336;
+    const h = Math.round(w * (pv.videoHeight / pv.videoWidth)) || 192;
+    if (canvas.width !== w || canvas.height !== h) { canvas.width = w; canvas.height = h; }
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return;
+    try { ctx.drawImage(pv, 0, 0, w, h); setPreviewReady(true); } catch { /* frame not ready */ }
+  }, []);
+
+  const ensurePreviewEngine = useCallback(() => {
+    if (previewInitRef.current) return;
+    const hasHlsCandidates = Boolean(previewCandidates && previewCandidates.length > 0);
+    if (!hasHlsCandidates && !src) return;
+    previewInitRef.current = true;
+    const pv = previewVideoRef.current;
+    if (!pv) return;
+    pv.muted = true;
+    if (hasHlsCandidates && !pv.canPlayType("application/vnd.apple.mpegurl")) {
+      // Lazy-load hls.js so non-HLS pages never pay for it.
+      import("hls.js").then(({ default: Hls }) => {
+        if (previewHlsRef.current) return;
+        const hls = new Hls({
+          enableWorker: false,
+          autoStartLoad: true,
+          maxBufferLength: 4,
+          maxMaxBufferLength: 8,
+          backBufferLength: 0,
+        });
+        previewHlsRef.current = hls;
+        hls.on(Hls.Events.MANIFEST_PARSED, () => {
+          try { hls.currentLevel = 0; } catch { /* lowest rendition */ }
+        });
+        hls.on(Hls.Events.ERROR, (_e, data) => {
+          if (data?.fatal) { try { hls.destroy(); } catch { /* noop */ } previewHlsRef.current = null; }
+        });
+        hls.loadSource(previewCandidates![0]);
+        hls.attachMedia(pv);
+      }).catch(() => { /* preview unavailable */ });
+    } else {
+      pv.src = (hasHlsCandidates ? previewCandidates![0] : src) || "";
+    }
+  }, [previewCandidates, src]);
+
+  const updatePreviewSeek = useCallback((time: number) => {
+    ensurePreviewEngine();
+    const pv = previewVideoRef.current;
+    if (!pv || !Number.isFinite(time) || time <= 0) return;
+    const now = Date.now();
+    if (now - lastPreviewSeekRef.current < 220) return;
+    lastPreviewSeekRef.current = now;
+    if (Math.abs(pv.currentTime - time) < 0.8) { drawPreviewFrame(); return; }
+    try { pv.currentTime = Math.min(time, pv.duration || time); } catch { /* not seekable yet */ }
+  }, [drawPreviewFrame, ensurePreviewEngine]);
+
+  useEffect(() => () => {
+    if (previewHlsRef.current) { try { previewHlsRef.current.destroy(); } catch { /* noop */ } previewHlsRef.current = null; }
+  }, []);
+
   const onTimeUpdate = () => {
     const v = videoRef.current; if (!v) return;
     setCurrentTime(v.currentTime);
@@ -274,8 +370,8 @@ export function VideoPlayer({
     if (tag === "input" || tag === "select" || tag === "textarea" || tag === "button" || tag === "a" || target?.isContentEditable) return;
     switch (e.key.toLowerCase()) {
       case " ": case "k": e.preventDefault(); togglePlay(); break;
-      case "arrowleft": case "j": e.preventDefault(); seek((videoRef.current?.currentTime || 0) - 5); revealControls(); break;
-      case "arrowright": case "l": e.preventDefault(); seek((videoRef.current?.currentTime || 0) + 5); revealControls(); break;
+      case "arrowleft": case "j": e.preventDefault(); seekRelative(-5); break;
+      case "arrowright": case "l": e.preventDefault(); seekRelative(5); break;
       case "arrowup": e.preventDefault(); changeVolume(volume + 0.05); revealControls(); break;
       case "arrowdown": e.preventDefault(); changeVolume(volume - 0.05); revealControls(); break;
       case "m": e.preventDefault(); toggleMute(); break;
@@ -311,7 +407,15 @@ export function VideoPlayer({
         {...({ referrerPolicy: "no-referrer" } as any)}
         className="w-full h-full object-contain"
         onClick={togglePlay}
-        onDoubleClick={toggleFullscreen}
+        onDoubleClick={(e) => {
+          // YouTube-style zones: left/right thirds skip ±10s, center fullscreen.
+          const rect = containerRef.current?.getBoundingClientRect();
+          if (!rect) { toggleFullscreen(); return; }
+          const x = e.clientX - rect.left;
+          if (x < rect.width * 0.33) seekRelative(-10);
+          else if (x > rect.width * 0.67) seekRelative(10);
+          else toggleFullscreen();
+        }}
         onPlay={() => { setPlaying(true); emitProgress(true); scheduleHide(); if (playRequested.current) armStartupStallTimer(9000); }}
         onPause={() => { setPlaying(false); emitProgress(false); setShowControls(true); clearHideTimer(); }}
         onEnded={() => { setPlaying(false); emitProgress(false); setShowControls(true); playRequested.current = false; clearStartupStallTimer(); }}
@@ -358,6 +462,29 @@ export function VideoPlayer({
           <div className="inline-flex items-center gap-2 rounded-lg bg-black/70 backdrop-blur-md border border-white/10 px-3 py-1.5 text-[11px] sm:text-xs text-white/90 shadow-lg">
             <SpinnerGap size={13} className="animate-spin text-cyan-400" />
             <span>{stallNotice}</span>
+          </div>
+        </div>
+      )}
+
+      {/* Hidden preview decoder for the hover timeline thumbnail. */}
+      <video
+        ref={previewVideoRef}
+        muted
+        playsInline
+        preload="auto"
+        onSeeked={drawPreviewFrame}
+        onLoadedData={drawPreviewFrame}
+        className="absolute left-0 top-0 h-px w-px opacity-0 pointer-events-none"
+        aria-hidden
+      />
+
+      {/* Skip feedback ripple (buttons / keyboard / double-tap zones). */}
+      <style>{`@keyframes chuglii-skip-pop { 0% { transform: scale(0.55); opacity: 0; } 30% { transform: scale(1); opacity: 1; } 100% { transform: scale(1.18); opacity: 0; } } .chuglii-skip-flash { animation: chuglii-skip-pop 650ms ease-out forwards; }`}</style>
+      {skipFlash && (
+        <div key={skipFlash.nonce} className={`chuglii-skip-flash pointer-events-none absolute top-1/2 -translate-y-1/2 z-20 ${skipFlash.dir < 0 ? "left-6 sm:left-10" : "right-6 sm:right-10"}`}>
+          <div className="flex flex-col items-center justify-center w-16 h-16 rounded-full bg-black/60 backdrop-blur-md border border-white/20 text-white">
+            {skipFlash.dir < 0 ? <ArrowCounterClockwise size={24} weight="fill" /> : <ArrowClockwise size={24} weight="fill" />}
+            <span className="text-[10px] font-bold">{skipFlash.delta}s</span>
           </div>
         </div>
       )}
@@ -422,11 +549,19 @@ export function VideoPlayer({
 
       <div className={`absolute inset-x-0 bottom-0 px-3 sm:px-4 pb-3 sm:pb-4 transition-opacity duration-300 ${showControls || !playing ? "opacity-100" : "opacity-0 pointer-events-none"}`}>
         <div className="group/seek relative mb-3 h-5 flex items-center"
-          onMouseMove={(e) => { const rect = (e.currentTarget as HTMLDivElement).getBoundingClientRect(); const pct = Math.min(1, Math.max(0, (e.clientX - rect.left) / rect.width)); setHoverTime(pct * duration); setHoverX(e.clientX - rect.left); }}
+          onMouseMove={(e) => { const rect = (e.currentTarget as HTMLDivElement).getBoundingClientRect(); const pct = Math.min(1, Math.max(0, (e.clientX - rect.left) / rect.width)); setHoverTime(pct * duration); setHoverX(e.clientX - rect.left); if (duration > 0) updatePreviewSeek(pct * duration); }}
           onMouseLeave={() => setHoverTime(null)}
         >
           {hoverTime !== null && duration > 0 && (
-            <div className="absolute -top-7 -translate-x-1/2 px-2 py-1 rounded-md bg-black/90 border border-white/10 text-[11px] font-medium text-white tabular-nums" style={{ left: hoverX }}>{formatTime(hoverTime)}</div>
+            <div className="absolute bottom-full mb-1 -translate-x-1/2 flex flex-col items-center pointer-events-none" style={{ left: hoverX }}>
+              <canvas
+                ref={previewCanvasRef}
+                className="mb-1 rounded-md border border-white/25 shadow-xl bg-black"
+                style={{ width: 168, height: "auto", visibility: previewReady ? "visible" : "hidden" }}
+                aria-hidden
+              />
+              <div className="px-2 py-1 rounded-md bg-black/90 border border-white/10 text-[11px] font-medium text-white tabular-nums">{formatTime(hoverTime)}</div>
+            </div>
           )}
           <div className="absolute inset-x-0 h-1 group-hover/seek:h-1.5 rounded-full bg-white/20 transition-all">
             <div className="absolute inset-y-0 left-0 rounded-full bg-white/30" style={{ width: `${bufferedPct}%` }} />
@@ -439,6 +574,14 @@ export function VideoPlayer({
         <div className="flex items-center gap-2 sm:gap-3">
           <button type="button" onClick={togglePlay} className="p-2 rounded-lg text-white hover:bg-white/10 transition-colors" aria-label={playing ? "Pause" : "Play"}>
             {playing ? <Pause size={22} weight="fill" /> : <Play size={22} weight="fill" />}
+          </button>
+          <button type="button" onClick={() => seekRelative(-5)} className="relative p-2 rounded-lg text-white hover:bg-white/10 transition-colors" aria-label="Back 5 seconds">
+            <ArrowCounterClockwise size={19} weight="fill" />
+            <span className="absolute inset-0 flex items-center justify-center text-[9px] font-bold pt-0.5 pointer-events-none">5</span>
+          </button>
+          <button type="button" onClick={() => seekRelative(5)} className="relative p-2 rounded-lg text-white hover:bg-white/10 transition-colors" aria-label="Forward 5 seconds">
+            <ArrowClockwise size={19} weight="fill" />
+            <span className="absolute inset-0 flex items-center justify-center text-[9px] font-bold pt-0.5 pointer-events-none">5</span>
           </button>
           <div className="flex items-center gap-1 group/vol">
             <button type="button" onClick={toggleMute} className="p-2 rounded-lg text-white hover:bg-white/10 transition-colors" aria-label={muted ? "Unmute" : "Mute"}>

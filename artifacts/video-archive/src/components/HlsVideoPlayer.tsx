@@ -230,6 +230,7 @@ export function HlsVideoPlayer({
       onAutoDowngrade={handleAutoDowngrade}
       onError={handleError}
       videoRef={videoRef}
+      previewCandidates={candidates}
     />
   );
 }
