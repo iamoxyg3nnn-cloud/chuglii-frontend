@@ -540,3 +540,7 @@ function embedUrl(video: VoyeurhouseVideo | null | undefined): string | null {
   if (video.video_mime_type === "embed/iframe" && video.full_video_url) return video.full_video_url;
   return null;
 }
+
+// asset-cache-bust: 2026-11-25T2 (poisoned /assets/* immutable entries)
+
+if (typeof window !== "undefined") { (window as unknown as { __chunkBuilds?: Record<string, number> }).__chunkBuilds = { b2: 1 }; }

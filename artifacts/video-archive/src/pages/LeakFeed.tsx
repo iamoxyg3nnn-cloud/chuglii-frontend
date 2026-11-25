@@ -423,3 +423,7 @@ export default function LeakFeed() {
     </Layout>
   );
 }
+
+// asset-cache-bust: 2026-11-25T2 (poisoned /assets/* immutable entries)
+
+if (typeof window !== "undefined") { (window as unknown as { __chunkBuilds?: Record<string, number> }).__chunkBuilds = { b2: 1 }; }

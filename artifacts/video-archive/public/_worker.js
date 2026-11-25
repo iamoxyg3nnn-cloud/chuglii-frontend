@@ -447,7 +447,28 @@ export default {
     }
 
     // 5. Fallback to Cloudflare Pages static assets & SPA routing
-    return env.ASSETS.fetch(request);
+    const assetResponse = await env.ASSETS.fetch(request);
+
+    // Guard: never let the SPA fallback masquerade as a hashed static asset.
+    // During deploy propagation a not-yet-uploaded /assets/<chunk>.js request
+    // gets the index.html fallback — and the /assets/* _headers rule stamps it
+    // `immutable`, so the browser caches HTML in place of the JS chunk for a
+    // year and every later module import fails the MIME check. Serve a
+    // non-cacheable 404 instead so clients retry against the next deployment.
+    if (url.pathname.startsWith("/assets/") && assetResponse.status === 200) {
+      const ct = assetResponse.headers.get("content-type") || "";
+      if (ct.includes("text/html")) {
+        return new Response("Asset not found", {
+          status: 404,
+          headers: {
+            "Content-Type": "text/plain; charset=utf-8",
+            "Cache-Control": "no-store",
+            "Access-Control-Allow-Origin": "*",
+          },
+        });
+      }
+    }
+    return assetResponse;
   },
 
   // Automated Cron Trigger handler for Cloudflare Workers
@@ -800,7 +821,7 @@ function renderCleanHlsPlayer(streamingUrl, title = "", poster = "") {
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
   <title>${safeTitle}</title>
-  ${isHls ? '<script src="https://cdn.jsdelivr.net/npm/hls.js@1.5.8/dist/hls.min.js"></script>' : ''}
+  ${isHls ? '<script src="/api/player/hls.js"></script>' : ''}
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
     html, body { width: 100%; height: 100%; background: #000; overflow: hidden; display: flex; align-items: center; justify-content: center; position: relative; }
@@ -967,7 +988,7 @@ function renderCleanHlsPlayerMulti(candidates, title = "", poster = "") {
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
   <title>${safeTitle}</title>
-  <script src="https://cdn.jsdelivr.net/npm/hls.js@1.5.8/dist/hls.min.js"></script>
+  <script src="/api/player/hls.js" onerror="var s=document.createElement('script');s.src='https://unpkg.com/hls.js@1.5.8/dist/hls.min.js';document.head.appendChild(s);"></script>
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
     html, body { width: 100%; height: 100%; background: #000; overflow: hidden; display: flex; align-items: center; justify-content: center; position: relative; }
@@ -1103,7 +1124,14 @@ function renderCleanHlsPlayerMulti(candidates, title = "", poster = "") {
         if (!hls) nextCandidate();
       });
 
-      startPlayback(false);
+      // hls.js may still be downloading (script onerror fallback chain);
+      // wait briefly for it before booting so the native-HLS fallback is a
+      // last resort rather than a race loser.
+      function bootWhenReady(attempt) {
+        if (typeof Hls !== 'undefined' || attempt > 50) startPlayback(false);
+        else setTimeout(function() { bootWhenReady(attempt + 1); }, 100);
+      }
+      bootWhenReady(0);
     })();
   </script>
 </body>
@@ -1609,6 +1637,44 @@ async function resolveHotScopesEmbed(targetUrl, searchParams) {
 
   return renderUnavailablePlayer(title, finalPoster, detailUrl || nestedUrl);
 }
+
+  // ─── Self-hosted hls.js (/api/player/hls.js) ─────────────────────────
+  // Some regions/ISPs block cdn.jsdelivr.net, which would leave the custom
+  // player rendered but without the HLS engine. Serve hls.js through our own
+  // edge (Cloudflare egress reaches the CDN even when the visitor cannot) and
+  // cache it hard at both the edge and the browser.
+  if (path === "/api/player/hls.js") {
+    const HLS_VERSION = "1.5.8";
+    const cacheKey = new Request(`https://hlsjs.chuglii.internal/${HLS_VERSION}.min.js`);
+    const cache = caches.default;
+    try {
+      const hit = await cache.match(cacheKey);
+      if (hit) return hit;
+    } catch (e) { /* cache API unavailable — fetch through */ }
+    let body = null;
+    for (const src of [
+      `https://cdn.jsdelivr.net/npm/hls.js@${HLS_VERSION}/dist/hls.min.js`,
+      `https://unpkg.com/hls.js@${HLS_VERSION}/dist/hls.min.js`,
+    ]) {
+      try {
+        const res = await fetch(src, { redirect: "follow" });
+        if (res.ok) { body = await res.text(); break; }
+      } catch (e) { /* try next mirror */ }
+    }
+    if (!body) {
+      return errorResponse("hls.js unavailable", 502);
+    }
+    const res = new Response(body, {
+      status: 200,
+      headers: {
+        "Content-Type": "application/javascript; charset=utf-8",
+        "Cache-Control": "public, max-age=604800, immutable",
+        "Access-Control-Allow-Origin": "*",
+      },
+    });
+    try { await cache.put(cacheKey, res.clone()); } catch (e) { /* ignore */ }
+    return res;
+  }
 
   // ─── Streamtape same-request MP4 proxy (/api/player/streamtape) ─────
   // Streamtape's /get_video URL is bound to the egress IP that requested the
