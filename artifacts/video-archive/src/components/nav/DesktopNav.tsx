@@ -55,6 +55,13 @@ export const SCRAPER_CATEGORIES = [
     count: "2 SRC",
     icon: Magnet,
   },
+  {
+    id: "studios",
+    name: "Studios",
+    href: "/studios",
+    count: "New",
+    icon: FilmStrip,
+  },
 ] as const;
 
 interface DesktopNavProps {
@@ -148,6 +155,8 @@ export const DesktopNav = memo(function DesktopNav({ location, onRequestOpen }: 
                 (cat.id === "japanese" && isActiveNavigationRoute("/japanese", location)) ||
                 (cat.id === "myanmar" && (isActiveNavigationRoute("/myanmar", location) || location.includes("category=myanmar"))) ||
                 (cat.id === "voyeurhouse" && isActiveNavigationRoute("/voyeurhouse", location)) ||
+                (cat.id === "studios" &&
+                  (isActiveNavigationRoute("/studios", location) || location.includes("/studios"))) ||
                 (cat.id === "chinese" &&
                   (isActiveNavigationRoute("/chinese", location) ||
                     isActiveNavigationRoute("/fangsung", location) ||
