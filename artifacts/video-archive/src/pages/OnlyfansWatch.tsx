@@ -141,6 +141,8 @@ export default function OnlyfansWatch() {
       "vidoza.net",
       "bysejpadsk.com",
       "playmogo.com",
+      "mixdrop.ch",
+      "mixdrop.vc",
     ];
     const isDemoted = (url: string) => DEAD_FIRST_HOSTS.some((h) => url.toLowerCase().includes(h));
     return [...list.filter((s) => !isDemoted(s.url)), ...list.filter((s) => isDemoted(s.url))];
