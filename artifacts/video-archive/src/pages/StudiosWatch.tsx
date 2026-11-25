@@ -48,7 +48,7 @@ function setMeta(name: string, content: string, isProp = false) {
 
 export default function StudiosWatch({ site: siteProp }: { site?: string }) {
   const { id } = useParams<{ id: string }>();
-  const site = siteProp === "dasj91" ? "dasj91" : "madouer";
+  const site = ["dasj91", "madouhd"].includes(siteProp || "") ? siteProp! : "madouer";
   const [copied, setCopied] = useState(false);
   const [copiedStream, setCopiedStream] = useState(false);
   const [retryNonce, setRetryNonce] = useState(0);

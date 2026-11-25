@@ -1893,6 +1893,9 @@ async function resolveHotScopesEmbed(targetUrl, searchParams) {
       // studios category (madouer Phase A; dasj91/madouhd hosts pre-added for
       // Phase B/C): all verified 200 + CORS * with no Referer.
       "cdn2020.com", "97img.com", "thm3u8.co", "sxtmo.com", "micgqv.cn", "mkimfs.cn", "ucjosl.cn",
+      // madouhd (Phase C): playlists live on sxtmo but segments rotate across
+      // CloudFront distributions (e.g. d194uwh9agusk5.cloudfront.net).
+      "cloudfront.net",
     ];
     const hostMatch = streamUpstreamUrl.match(/^https?:\/\/([^/?#]+)/i);
     const reqHost = hostMatch ? hostMatch[1].toLowerCase() : "";
@@ -1989,7 +1992,7 @@ async function resolveHotScopesEmbed(targetUrl, searchParams) {
         referer = "https://sheeshfans.com/";
       } else if (targetObj.hostname.includes("internetchicks")) {
         referer = "https://internetchicks.com/";
-      } else if (targetObj.hostname.includes("xianshipian") || targetObj.hostname.includes("aomcyou") || targetObj.hostname.includes("apianmeng") || targetObj.hostname.includes("atukjhesk") || targetObj.hostname.includes("cdn2020") || targetObj.hostname.includes("97img") || targetObj.hostname.includes("thm3u8") || targetObj.hostname.includes("sxtmo") || targetObj.hostname.includes("micgqv") || targetObj.hostname.includes("mkimfs") || targetObj.hostname.includes("ucjosl")) {
+      } else if (targetObj.hostname.includes("xianshipian") || targetObj.hostname.includes("aomcyou") || targetObj.hostname.includes("apianmeng") || targetObj.hostname.includes("atukjhesk") || targetObj.hostname.includes("cdn2020") || targetObj.hostname.includes("97img") || targetObj.hostname.includes("thm3u8") || targetObj.hostname.includes("sxtmo") || targetObj.hostname.includes("micgqv") || targetObj.hostname.includes("mkimfs") || targetObj.hostname.includes("ucjosl") || targetObj.hostname.includes("cloudfront")) {
         // fangsung CDNs: bbcdn 403s any FOREIGN referer but allows none at all
         // (it also 403s Cloudflare-worker egress even with the site referer,
         // so send no Referer header at all for these hosts). The apianmeng
