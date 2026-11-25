@@ -1635,8 +1635,20 @@ async function resolveHotScopesEmbed(targetUrl, searchParams) {
         "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
         "Referer": "https://internetchicks.com/",
       };
+      // Buffer a bounded range instead of streaming the upstream body: cloud
+      // platforms reject some streamed 206 responses once Content-Length is
+      // forwarded, and capping the chunk keeps every response atomic.
+      const CHUNK_SIZE = 4 * 1024 * 1024;
       const range = request.headers.get("Range");
-      if (range) headers["Range"] = range;
+      const match = range && range.match(/^bytes=(\d+)-(\d*)$/);
+      let start = 0;
+      let end = CHUNK_SIZE - 1;
+      if (match) {
+        start = parseInt(match[1], 10);
+        end = match[2] ? parseInt(match[2], 10) : start + CHUNK_SIZE - 1;
+        end = Math.min(end, start + CHUNK_SIZE - 1);
+      }
+      headers["Range"] = `bytes=${start}-${end}`;
 
       const mediaRes = await fetch(gate, { headers, redirect: "follow" });
       if (!mediaRes.ok && mediaRes.status !== 206) {
@@ -1644,6 +1656,7 @@ async function resolveHotScopesEmbed(targetUrl, searchParams) {
         return errorResponse(`Streamtape proxy error: ${mediaRes.status} ${detail.slice(0, 120)}`, 502);
       }
 
+      const body = await mediaRes.arrayBuffer();
       const resHeaders = new Headers();
       resHeaders.set("Content-Type", mediaRes.headers.get("content-type") || "video/mp4");
       resHeaders.set("Access-Control-Allow-Origin", "*");
@@ -1652,12 +1665,10 @@ async function resolveHotScopesEmbed(targetUrl, searchParams) {
       if (mediaRes.headers.get("Content-Range")) {
         resHeaders.set("Content-Range", mediaRes.headers.get("Content-Range"));
       }
-      if (mediaRes.headers.get("Content-Length")) {
-        resHeaders.set("Content-Length", mediaRes.headers.get("Content-Length"));
-      }
+      resHeaders.set("Content-Length", String(body.byteLength));
       resHeaders.set("Cache-Control", "no-store");
 
-      return new Response(mediaRes.body, { status: mediaRes.status, headers: resHeaders });
+      return new Response(body, { status: mediaRes.status, headers: resHeaders });
     } catch (err) {
       return errorResponse("Streamtape proxy error: " + (err.message || err), 502);
     }
