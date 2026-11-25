@@ -571,7 +571,10 @@ export function VideoPlayer({
     || Boolean(mainDims && mainDims.w > 0);
   const previewAr = mainDims && mainDims.w > 0 ? mainDims.w / mainDims.h : 16 / 9;
   const PREVIEW_MAX_W = 200;
-  const PREVIEW_MAX_H = 170;
+  // Height cap is the binding constraint for portrait sources (a 270x481
+  // portrait box would otherwise tower ~170px over the seek bar); landscape
+  // boxes are width-bound and unaffected.
+  const PREVIEW_MAX_H = 130;
   const previewBoxW = Math.round(Math.min(PREVIEW_MAX_W, PREVIEW_MAX_H * previewAr));
   const previewBoxH = Math.round(previewBoxW / previewAr);
   // Keep the floating preview inside the seek-bar bounds at the edges.
