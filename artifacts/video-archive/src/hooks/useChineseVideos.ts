@@ -104,7 +104,7 @@ export function isChineseGroup(group: string | undefined): group is ChineseGroup
 
 /** Websites inside the Chinese category — same multi-source pattern as
  *  OnlyFans (each source gets its own section, database, and video routes). */
-export const CHINESE_SITES = ["95da", "fangsung", "madouer", "dasj91"] as const;
+export const CHINESE_SITES = ["95da", "fangsung", "madouer", "dasj91", "madouhd"] as const;
 export type ChineseSite = (typeof CHINESE_SITES)[number];
 
 export const CHINESE_SITE_LABELS: Record<ChineseSite, string> = {
@@ -112,6 +112,7 @@ export const CHINESE_SITE_LABELS: Record<ChineseSite, string> = {
   fangsung: "Fangsung",
   madouer: "Madou (麻豆)",
   dasj91: "91 Dasj",
+  madouhd: "Madou HD",
 };
 
 export function isChineseSite(site: string | undefined): site is ChineseSite {

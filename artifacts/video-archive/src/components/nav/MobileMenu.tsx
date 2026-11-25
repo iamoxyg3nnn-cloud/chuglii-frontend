@@ -228,7 +228,7 @@ export function MobileMenu({
                     Chinese
                   </span>
                   <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-sky-500/20 text-sky-400 uppercase">
-                    4 SRC
+                    5 SRC
                   </span>
                 </span>
               </Link>

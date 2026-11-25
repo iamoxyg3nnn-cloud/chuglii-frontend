@@ -260,6 +260,7 @@ function Router() {
         <Route path="/chinese/fangsung/video/:id" component={FangsungWatch} />
         <Route path="/chinese/madouer/video/:id" component={(props) => <StudiosWatch {...props} site="madouer" />} />
         <Route path="/chinese/dasj91/video/:id" component={(props) => <StudiosWatch {...props} site="dasj91" />} />
+        <Route path="/chinese/madouhd/video/:id" component={(props) => <StudiosWatch {...props} site="madouhd" />} />
         <Route path="/chinese/:site" component={ChineseFeed} />
         <Route path="/chinese" component={ChineseFeed} />
         <Route path="/fangsung/video/:id" component={FangsungWatch} />

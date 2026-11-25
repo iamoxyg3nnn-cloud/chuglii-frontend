@@ -44,7 +44,7 @@ export function studiosDisplayTitle(video: Pick<StudiosVideo, "title" | "title_e
 export const STUDIO_SITES = [
   { site: "madouer", label: "Madou", enabled: true },
   { site: "dasj91", label: "91 Dasj", enabled: true },
-  { site: "madouhd", label: "Madou HD", enabled: false },
+  { site: "madouhd", label: "Madou HD", enabled: true },
 ] as const;
 
 /** Site sections crawled from madouer.cc (whitelisted MacCMS type ids).
@@ -82,6 +82,35 @@ export const DASJ91_SECTIONS = [
   { id: "jxth", cn: "探花大神", en: "Tanhua Masters" },
   { id: "ldcz", cn: "绿帽磁场", en: "Cuckold Stories" },
   { id: "qwys", cn: "伦理猎奇", en: "Taboo Drama" },
+] as const;
+
+/** Site sections crawled from madouhd.cc (whitelisted cateN ids). Mirrors
+ *  scraper/categories/studios/categories.py MADOUHD_CATEGORIES. Real-person
+ *  risk sections (cate7 网红黑料, cate9 强奸迷奸, cate10 校园猛料, cate16
+ *  摄像偷拍, cate25 人兽激情) are excluded at the source. */
+export const MADOUHD_SECTIONS = [
+  { id: "cate3", cn: "真实乱伦", en: "Taboo Drama" },
+  { id: "cate4", cn: "自慰喷水", en: "Solo & Squirting" },
+  { id: "cate5", cn: "巨乳肥臀", en: "Busty & Curvy" },
+  { id: "cate6", cn: "嫩穴白虎", en: "Smooth & Tight" },
+  { id: "cate8", cn: "扫街探店", en: "Street Pickup" },
+  { id: "cate11", cn: "制服诱惑", en: "Uniform Temptation" },
+  { id: "cate12", cn: "媚黑淫女", en: "Interracial" },
+  { id: "cate13", cn: "sm调教", en: "BDSM" },
+  { id: "cate14", cn: "美女主播", en: "Cam Girls" },
+  { id: "cate15", cn: "绿帽换妻", en: "Cuckold & Swinging" },
+  { id: "cate17", cn: "明星淫梦", en: "Celebrity Dreams" },
+  { id: "cate18", cn: "男同/女同", en: "LGBT" },
+  { id: "cate19", cn: "成人综艺", en: "Adult Variety" },
+  { id: "cate20", cn: "足交口交", en: "Footjob & Oral" },
+  { id: "cate21", cn: "勾引搭讪", en: "Pickup & Seduction" },
+  { id: "cate23", cn: "户外野战", en: "Outdoor" },
+  { id: "cate24", cn: "颅内高潮", en: "Mindgasm" },
+  { id: "cate26", cn: "淫语歌曲", en: "Erotic Songs" },
+  { id: "cate28", cn: "Cosplay", en: "Cosplay" },
+  { id: "cate29", cn: "VR影片", en: "VR Films" },
+  { id: "cate30", cn: "18禁三级", en: "Softcore III" },
+  { id: "cate31", cn: "伪娘人妖", en: "Femboy & Ladyboy" },
 ] as const;
 
 export type StudiosSortOption = "newest" | "oldest" | "quality";

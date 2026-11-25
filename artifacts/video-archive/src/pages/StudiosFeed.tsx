@@ -5,6 +5,7 @@ import {
   useStudiosVideos,
   MADOUER_SECTIONS,
   DASJ91_SECTIONS,
+  MADOUHD_SECTIONS,
   type StudiosSortOption,
 } from "@/hooks/useStudiosVideos";
 import { StudiosCard, StudiosCardSkeleton } from "@/components/StudiosCard";
@@ -39,11 +40,16 @@ const SITE_META: Record<string, { label: string; blurb: string }> = {
     blurb:
       "91 Dasj archive — studio and drama productions streamed through play-time resolution, with English titles and section filters.",
   },
+  madouhd: {
+    label: "Madou HD",
+    blurb:
+      "Madou HD productions — direct HLS streams with instant playback, English titles and section filters.",
+  },
 };
 
 export default function StudiosFeed({ site: siteProp }: { site?: string }) {
   const [, setLocation] = useLocation();
-  const site = siteProp === "dasj91" ? "dasj91" : "madouer";
+  const site = ["dasj91", "madouhd"].includes(siteProp || "") ? siteProp! : "madouer";
   const searchString = window.location.search;
 
   const queryParams = new URLSearchParams(searchString);
@@ -147,7 +153,11 @@ export default function StudiosFeed({ site: siteProp }: { site?: string }) {
               >
                 All Sections
               </button>
-              {(activeSite === "dasj91" ? DASJ91_SECTIONS : MADOUER_SECTIONS).map((r) => {
+              {(activeSite === "dasj91"
+                ? DASJ91_SECTIONS
+                : activeSite === "madouhd"
+                  ? MADOUHD_SECTIONS
+                  : MADOUER_SECTIONS).map((r) => {
                 const active = activeCategory === r.id;
                 return (
                   <button

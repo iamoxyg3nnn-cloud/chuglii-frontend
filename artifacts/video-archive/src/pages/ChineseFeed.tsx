@@ -88,7 +88,7 @@ export default function ChineseFeed() {
   }
 
   if (site === "fangsung") return <FangsungFeed />;
-  if (site === "madouer" || site === "dasj91") return <StudiosFeed site={site} />;
+  if (site === "madouer" || site === "dasj91" || site === "madouhd") return <StudiosFeed site={site} />;
   return <Chinese95daFeed />;
 }
 

@@ -52,7 +52,7 @@ export const SCRAPER_CATEGORIES = [
     id: "chinese",
     name: "Chinese",
     href: "/chinese",
-    count: "4 SRC",
+    count: "5 SRC",
     icon: Magnet,
   },
 ] as const;
