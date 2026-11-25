@@ -47,7 +47,7 @@ export function chineseDisplayTitle(video: Pick<ChineseVideo, "title" | "title_e
 
 /** Coarse website-browse groups inside the isolated chinese table.
  *  JAV and livestream zones are excluded from the scraper and the UI. */
-export const CHINESE_GROUPS = ["chinese", "western"] as const;
+export const CHINESE_GROUPS = ["chinese", "western", "studios"] as const;
 export type ChineseGroup = (typeof CHINESE_GROUPS)[number];
 
 /** Source-site zones (subcategories). Mirrors scraper categories.py — each zone
@@ -90,11 +90,41 @@ export const CHINESE_ZONES = [
   { id: "19980497", en: "Web Goddesses Magnet", cn: "网黄女神", group: "chinese", contentType: "torrent" },
   { id: "19990497", en: "Cuckold Magnet", cn: "绿帽淫妻", group: "chinese", contentType: "torrent" },
   { id: "19950497", en: "Western Magnet", cn: "欧美色情", group: "western", contentType: "torrent" },
+
+  // Studios sites (madouer.cc + 91dasj.com), unioned into this category's
+  // RPCs from scraper.studios_videos. Mirrors scraper studios categories.py.
+  { id: "1", en: "Madou Videos", cn: "麻豆视频", group: "studios", contentType: "video" },
+  { id: "2", en: "Japanese Videos", cn: "日本视频", group: "studios", contentType: "video" },
+  { id: "3", en: "Western Videos", cn: "欧美视频", group: "studios", contentType: "video" },
+  { id: "4", en: "Anime Videos", cn: "动漫视频", group: "studios", contentType: "video" },
+  { id: "5", en: "Chinese Amateur", cn: "国产视频", group: "studios", contentType: "video" },
+  { id: "6", en: "Madou Original", cn: "麻豆原创", group: "studios", contentType: "video" },
+  { id: "7", en: "91 Studio", cn: "91制片厂", group: "studios", contentType: "video" },
+  { id: "8", en: "Tianmei Media", cn: "天美传媒", group: "studios", contentType: "video" },
+  { id: "9", en: "Peach Images", cn: "蜜桃影像", group: "studios", contentType: "video" },
+  { id: "10", en: "Starlight Media", cn: "星光传媒", group: "studios", contentType: "video" },
+  { id: "11", en: "Royal Chinese", cn: "皇家华人", group: "studios", contentType: "video" },
+  { id: "12", en: "Jingdong Studio", cn: "精东影业", group: "studios", contentType: "video" },
+  { id: "13", en: "Lebo Media", cn: "乐播传媒", group: "studios", contentType: "video" },
+  { id: "14", en: "Adult Headlines", cn: "成人头条", group: "studios", contentType: "video" },
+  { id: "15", en: "Mr. Rabbit", cn: "兔子先生", group: "studios", contentType: "video" },
+  { id: "16", en: "Xingba Original", cn: "杏吧原创", group: "studios", contentType: "video" },
+  { id: "17", en: "HongKongDoll", cn: "玩偶姐姐", group: "studios", contentType: "video" },
+  { id: "18", en: "Tangxin Vlog", cn: "糖心Vlog", group: "studios", contentType: "video" },
+  { id: "22", en: "Chinese Original", cn: "华语原创", group: "studios", contentType: "video" },
+  { id: "31", en: "Twitter Girls", cn: "推特女神", group: "studios", contentType: "video" },
+  { id: "32", en: "Chinese Series", cn: "国产系列", group: "studios", contentType: "video" },
+  { id: "aifl", en: "AI Dramas", cn: "AI短剧", group: "studios", contentType: "video" },
+  { id: "rmbg", en: "Contrast Goddess", cn: "反差女神", group: "studios", contentType: "video" },
+  { id: "jxth", en: "Tanhua Masters", cn: "探花大神", group: "studios", contentType: "video" },
+  { id: "ldcz", en: "Cuckold Stories", cn: "绿帽磁场", group: "studios", contentType: "video" },
+  { id: "qwys", en: "Taboo Drama", cn: "伦理猎奇", group: "studios", contentType: "video" },
 ] as const;
 
 export const CHINESE_GROUP_LABELS: Record<ChineseGroup, string> = {
   chinese: "Chinese",
   western: "Western",
+  studios: "Studios",
 };
 
 export function isChineseGroup(group: string | undefined): group is ChineseGroup {

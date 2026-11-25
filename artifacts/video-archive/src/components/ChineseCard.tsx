@@ -19,11 +19,19 @@ export function ChineseCard({ video, isSaved = false, onToggleSave }: ChineseCar
   const proxiedThumb = rawThumb.startsWith("http") ? (proxyImageUrl(rawThumb) || rawThumb) : rawThumb;
   const thumbSrc = imageError ? "/placeholder-thumb.jpg" : (proxiedThumb || "/placeholder-thumb.jpg");
 
-  const watchHref = `/chinese/95da/video/${video.id}`;
+  // Studios rows (madouer/dasj91, unioned into this category's RPCs) play
+  // through the Studios watch page, which owns their playback paths
+  // (direct HLS for madouer CDNs, /api/studios/resolve for dasj91).
+  const isStudiosRow = video.source_site === "madouer" || video.source_site === "dasj91";
+  const watchHref = isStudiosRow
+    ? `/studios/video/${video.id}`
+    : `/chinese/95da/video/${video.id}`;
   const isTorrent = video.content_type === "torrent";
-  const groupLabel = isChineseGroup(video.category_group || undefined)
-    ? CHINESE_GROUP_LABELS[video.category_group as keyof typeof CHINESE_GROUP_LABELS]
-    : "Chinese";
+  const groupLabel = isStudiosRow
+    ? (video.category_name_en || "Studios")
+    : isChineseGroup(video.category_group || undefined)
+      ? CHINESE_GROUP_LABELS[video.category_group as keyof typeof CHINESE_GROUP_LABELS]
+      : "Chinese";
   const typeBadge = isTorrent ? "Magnet" : "HD";
 
   const handleSaveClick = (e: React.MouseEvent) => {
