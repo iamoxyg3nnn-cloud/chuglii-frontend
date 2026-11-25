@@ -258,14 +258,15 @@ function Router() {
         <Route path="/chinese/video/:id" component={ChineseWatch} />
         <Route path="/chinese/95da/video/:id" component={ChineseWatch} />
         <Route path="/chinese/fangsung/video/:id" component={FangsungWatch} />
+        <Route path="/chinese/madouer/video/:id" component={(props) => <StudiosWatch {...props} site="madouer" />} />
+        <Route path="/chinese/dasj91/video/:id" component={(props) => <StudiosWatch {...props} site="dasj91" />} />
         <Route path="/chinese/:site" component={ChineseFeed} />
         <Route path="/chinese" component={ChineseFeed} />
         <Route path="/fangsung/video/:id" component={FangsungWatch} />
         <Route path="/fangsung">
           <Redirect to="/chinese/fangsung" replace />
         </Route>
-        <Route path="/studios/video/:id" component={StudiosWatch} />
-        <Route path="/studios" component={StudiosFeed} />
+        <Route path="/studios" component={() => <Redirect to="/chinese" replace />} />
         <Route path="/premium" component={Premium} />
         <Route path="/login" component={Login} />
         <Route path="/signup" component={Signup} />

@@ -46,8 +46,9 @@ function setMeta(name: string, content: string, isProp = false) {
   }
 }
 
-export default function StudiosWatch() {
+export default function StudiosWatch({ site: siteProp }: { site?: string }) {
   const { id } = useParams<{ id: string }>();
+  const site = siteProp === "dasj91" ? "dasj91" : "madouer";
   const [copied, setCopied] = useState(false);
   const [copiedStream, setCopiedStream] = useState(false);
   const [retryNonce, setRetryNonce] = useState(0);
@@ -55,9 +56,9 @@ export default function StudiosWatch() {
   const [useIframeFallback, setUseIframeFallback] = useState(false);
   const [savedIds, setSavedIds] = useState<string[]>([]);
 
-  const { data: video, isLoading, error } = useStudiosVideoById(id);
+  const { data: video, isLoading, error } = useStudiosVideoById(id, site);
   const { data: relatedPool } = useStudiosVideos({
-    site: video?.source_site || undefined,
+    site: video?.source_site || site,
     category: video?.region || undefined,
     limit: 24,
     page: 1,
@@ -92,7 +93,7 @@ export default function StudiosWatch() {
     });
   };
 
-  const backHref = "/studios";
+  const backHref = `/chinese/${site}`;
 
   useEffect(() => {
     if (!video) return;
@@ -201,7 +202,7 @@ export default function StudiosWatch() {
           <div className="flex items-center justify-between gap-4 mb-4">
             <Link href={backHref}>
               <span className="inline-flex items-center gap-1.5 text-xs sm:text-sm font-medium text-muted-foreground hover:text-amber-400 transition-colors cursor-pointer">
-                <ArrowLeft size={15} /> Back to Studios Feed
+                <ArrowLeft size={15} /> Back to Feed
               </span>
             </Link>
 

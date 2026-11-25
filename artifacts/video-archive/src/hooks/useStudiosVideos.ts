@@ -37,9 +37,10 @@ export function studiosDisplayTitle(video: Pick<StudiosVideo, "title" | "title_e
   return en || video.title;
 }
 
-/** Source sites in the studios category. Mirrors
- *  scraper/categories/studios/categories.py SITES. Only sites with a live
- *  source module are selectable; the rest render as "coming soon". */
+/** Source sites in the studios family. Each site has its OWN isolated table
+ *  and RPC family (scraper_*_madouer_videos / scraper_*_dasj91_videos) and is
+ *  listed in the Chinese category site picker (fangsung pattern). Mirrors
+ *  scraper/categories/studios/categories.py SITES. */
 export const STUDIO_SITES = [
   { site: "madouer", label: "Madou", enabled: true },
   { site: "dasj91", label: "91 Dasj", enabled: true },
@@ -117,23 +118,20 @@ export function useStudiosVideos(options: UseStudiosVideosOptions = {}) {
     queryKey,
     queryFn: async () => {
       const sb = await getSupabase();
-      const p_source_site = site && site.toLowerCase() !== "all" ? site.trim() : null;
       const p_category =
         category && category.toLowerCase() !== "all" ? category.trim() : null;
       const p_tag = tag && tag.toLowerCase() !== "all" ? tag.trim() : null;
       const p_search = search && search.trim().length > 0 ? search.trim() : null;
 
       const rpcParams = {
-        p_source_site,
-        p_content_type: null,
         p_category,
         p_tag,
         p_search,
       };
 
       const [itemsResp, countResp] = await Promise.all([
-        sb.rpc("scraper_get_studios_videos", { ...rpcParams, p_sort: sort, p_limit: limit, p_offset: offset }),
-        sb.rpc("scraper_count_studios_videos", rpcParams),
+        sb.rpc(`scraper_get_${site}_videos`, { ...rpcParams, p_sort: sort, p_limit: limit, p_offset: offset }),
+        sb.rpc(`scraper_count_${site}_videos`, rpcParams),
       ]);
 
       if (itemsResp.error) throw itemsResp.error;
@@ -148,14 +146,14 @@ export function useStudiosVideos(options: UseStudiosVideosOptions = {}) {
   });
 }
 
-export function useStudiosVideoById(id: string | undefined) {
+export function useStudiosVideoById(id: string | undefined, site: string = "madouer") {
   return useQuery({
-    queryKey: ["studios-video-detail", id],
+    queryKey: ["studios-video-detail", site, id],
     enabled: Boolean(id),
     queryFn: async (): Promise<StudiosVideo | null> => {
       if (!id) return null;
       const sb = await getSupabase();
-      const { data, error } = await sb.rpc("scraper_get_studios_video_by_id", { p_id: id });
+      const { data, error } = await sb.rpc(`scraper_get_${site}_video_by_id`, { p_id: id });
       if (error) throw error;
       const list = (data as StudiosVideo[]) || [];
       return list.length > 0 ? list[0] : null;

@@ -19,7 +19,7 @@ export function StudiosCard({ video, isSaved = false, onToggleSave }: StudiosCar
   const proxiedThumb = rawThumb.startsWith("http") ? (proxyImageUrl(rawThumb) || rawThumb) : rawThumb;
   const thumbSrc = imageError ? "/placeholder-thumb.jpg" : (proxiedThumb || "/placeholder-thumb.jpg");
 
-  const watchHref = `/studios/video/${video.id}`;
+  const watchHref = `/chinese/${video.source_site}/video/${video.id}`;
   const regionLabel = video.region_en || "Studios";
 
   const handleSaveClick = (e: React.MouseEvent) => {
