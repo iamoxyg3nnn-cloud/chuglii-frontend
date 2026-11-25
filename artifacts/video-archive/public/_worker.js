@@ -1746,9 +1746,34 @@ async function resolveHotScopesEmbed(targetUrl, searchParams) {
       try {
         const cachedStream = await streamCache.match(new Request(url.toString(), { method: "GET" }));
         if (cachedStream) {
-          const hitHeaders = new Headers(cachedStream.headers);
-          hitHeaders.set("X-Edge-Cache", "hit");
-          return new Response(cachedStream.body, { status: cachedStream.status, headers: hitHeaders });
+          // Range request against a cached full object: slice locally and
+          // answer 206 (~30ms) - this is the MP4 scrubbing fast path.
+          const rangeHdr = request.headers.get("Range");
+          const rm = rangeHdr ? rangeHdr.match(/^bytes=(\d+)-(\d*)$/) : null;
+          if (rm) {
+            const fullBuf = await cachedStream.arrayBuffer();
+            const start = parseInt(rm[1], 10);
+            const end = Math.min(rm[2] ? parseInt(rm[2], 10) : fullBuf.byteLength - 1, fullBuf.byteLength - 1);
+            if (start < fullBuf.byteLength && start <= end) {
+              const slice = fullBuf.slice(start, end + 1);
+              const sliceHeaders = new Headers();
+              sliceHeaders.set("Content-Type", cachedStream.headers.get("Content-Type") || "video/mp4");
+              sliceHeaders.set("Access-Control-Allow-Origin", "*");
+              sliceHeaders.set("Access-Control-Allow-Methods", "GET, HEAD, OPTIONS");
+              sliceHeaders.set("Access-Control-Allow-Headers", "*");
+              sliceHeaders.set("Accept-Ranges", "bytes");
+              sliceHeaders.set("Content-Range", `bytes ${start}-${end}/${fullBuf.byteLength}`);
+              sliceHeaders.set("Content-Length", String(slice.byteLength));
+              sliceHeaders.set("Cache-Control", "public, max-age=604800");
+              sliceHeaders.set("X-Edge-Cache", "range-hit");
+              return new Response(slice, { status: 206, headers: sliceHeaders });
+            }
+            // Malformed/out-of-range request: fall through to origin.
+          } else {
+            const hitHeaders = new Headers(cachedStream.headers);
+            hitHeaders.set("X-Edge-Cache", "hit");
+            return new Response(cachedStream.body, { status: cachedStream.status, headers: hitHeaders });
+          }
         }
       } catch { /* cache lookup best-effort */ }
 
@@ -1855,7 +1880,7 @@ async function resolveHotScopesEmbed(targetUrl, searchParams) {
         // the colo instead of the slow origin CDN. Bounded to small media
         // (segments/keys); huge full-file MP4 downloads are skipped.
         const contentLength = parseInt(upstreamRes.headers.get("Content-Length") || "0", 10);
-        if (upstreamRes.status === 200 && !effectiveRange && upstreamRes.body && (!contentLength || contentLength <= 8 * 1024 * 1024)) {
+        if (upstreamRes.status === 200 && !effectiveRange && upstreamRes.body && (!contentLength || contentLength <= 32 * 1024 * 1024)) {
           try {
             const [clientBody, cacheBody] = upstreamRes.body.tee();
             const cachePromise = streamCache.put(
@@ -1871,6 +1896,37 @@ async function resolveHotScopesEmbed(targetUrl, searchParams) {
           status: upstreamRes.status,
           headers: resHeaders,
         });
+      }
+
+      // Background full-warm: the first Range request against a mid-size MP4
+      // triggers a one-time full fetch into the edge cache (bounded), after
+      // which every future Range request - from any visitor - is sliced
+      // locally from the colo cache by the fast path above.
+      if (upstreamRes.status === 206 && !isAvsDirect) {
+        const cr = upstreamRes.headers.get("Content-Range") || "";
+        const total = parseInt(cr.split("/")[1] || "0", 10);
+        if (total > 0 && total <= 32 * 1024 * 1024) {
+          const warmFull = (async () => {
+            try {
+              const key = new Request(url.toString(), { method: "GET" });
+              if (await streamCache.match(key)) return;
+              // Fresh headers WITHOUT the incoming Range: a full-object GET
+              // must return 200 for the cache put to happen.
+              const fullHeaders = {
+                "User-Agent": reqHeaders["User-Agent"],
+                "Referer": reqHeaders["Referer"],
+              };
+              const full = await fetch(streamUpstreamUrl, { headers: fullHeaders });
+              if (full.status === 200 && full.body) {
+                const warmHeaders = new Headers();
+                warmHeaders.set("Content-Type", full.headers.get("content-type") || "video/mp4");
+                warmHeaders.set("Cache-Control", "public, max-age=604800, immutable");
+                await streamCache.put(key, new Response(full.body, { status: 200, headers: warmHeaders }));
+              }
+            } catch { /* full-warm best-effort */ }
+          })();
+          if (ctx && typeof ctx.waitUntil === "function") ctx.waitUntil(warmFull);
+        }
       }
 
       // For M3U8 playlists (master and variant): rewrite URLs to route through /api/player/stream

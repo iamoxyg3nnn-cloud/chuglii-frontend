@@ -351,11 +351,14 @@ export function VideoPlayer({
   }, [previewCandidates, src, videoRef]);
 
   // Whole-file prefetch for short direct files (MP4 leaks): a single
-  // background fetch populates the browser HTTP cache (the proxy serves these
-  // with long-lived immutable headers), after which every timeline position
-  // - hover preview or main seek - is served from disk cache instantly.
+  // background fetch populates the browser HTTP cache AND the Cloudflare
+  // edge cache (the proxy serves these with long-lived immutable headers),
+  // after which every timeline position - hover preview or main seek - is
+  // instant. Larger files get a spread prefetch: chunks at 8 anchor points
+  // across the timeline so random scrub positions land near warm data.
   const prefetchStartedRef = useRef(false);
   const prefetchAbortRef = useRef<AbortController | null>(null);
+  const mediaSizeRef = useRef(0);
   const maybePrefetchDirectFile = useCallback(() => {
     if (prefetchStartedRef.current || !src) return;
     prefetchStartedRef.current = true;
@@ -375,10 +378,40 @@ export function VideoPlayer({
         const cr = probe.headers.get("Content-Range");
         probe.body?.cancel().catch(() => {});
         const total = cr ? parseInt(cr.split("/")[1] || "0", 10) : 0;
-        if (!total || total > 40 * 1024 * 1024) return; // only short files
-        const ac = new AbortController();
-        prefetchAbortRef.current = ac;
-        await fetch(src, { signal: ac.signal }); // warms the HTTP cache
+        mediaSizeRef.current = total;
+        if (!total) return;
+        if (total <= 64 * 1024 * 1024) {
+          // Small/medium file: fetch fully once. This 200 response is stored
+          // in the browser HTTP cache and (via the worker) the edge cache,
+          // making every seek and hover instant everywhere.
+          const ac = new AbortController();
+          prefetchAbortRef.current = ac;
+          await fetch(src, { signal: ac.signal }); // warms the HTTP cache
+          return;
+        }
+        // Large file: spread 2MB chunks across 8 anchor points so random
+        // timeline positions land near prefetched data, plus the worker's
+        // background full-warm kicks in from the first range request.
+        const CHUNK = 2 * 1024 * 1024;
+        const SPREADS = 8;
+        for (let i = 0; i < SPREADS; i++) {
+          if (prefetchAbortRef.current?.signal.aborted) return;
+          // Adaptive: pause while the main player is buffer-starved.
+          for (let waits = 0; waits < 15; waits++) {
+            const mv = videoRef.current;
+            const buf = mv?.buffered;
+            const ahead = mv && buf && buf.length ? buf.end(buf.length - 1) - mv.currentTime : 99;
+            if (!mv || mv.paused || ahead >= 15) break;
+            if (prefetchAbortRef.current?.signal.aborted) return;
+            await new Promise((r) => setTimeout(r, 2000));
+          }
+          const frac = (i + 0.5) / SPREADS;
+          const start = Math.max(0, Math.floor(frac * total - CHUNK / 2));
+          try {
+            const r = await fetch(src, { headers: { Range: `bytes=${start}-${start + CHUNK - 1}` } });
+            await r.arrayBuffer();
+          } catch { /* skip failed chunk */ }
+        }
       } catch { /* prefetch is best-effort */ }
     };
     window.setTimeout(kickoff, 8000);
@@ -420,6 +453,49 @@ export function VideoPlayer({
     } catch { /* not seekable yet */ }
   }, [ensurePreviewEngine]);
 
+  // Predictive hover prefetch: while the cursor moves over the timeline, warm
+  // the exact region under it BEFORE the preview decoder seeks there - this
+  // is what makes scrubbing to arbitrary ("random") durations feel instant.
+  // HLS: fetch the covering fragment + the next one from the warmer's parsed
+  // list. MP4: range-fetch ~1.5MB at the hovered fraction (which also kicks
+  // off the worker's one-time background full-warm). Skipped when the preview
+  // buffer already covers the target.
+  const hoverPrefetchAtRef = useRef(0);
+  const prefetchHoverRegion = useCallback((time: number) => {
+    const now = Date.now();
+    if (now - hoverPrefetchAtRef.current < 400) return;
+    hoverPrefetchAtRef.current = now;
+    try {
+      const pv = previewVideoRef.current;
+      if (pv) {
+        for (let i = 0; i < pv.buffered.length; i++) {
+          if (time >= pv.buffered.start(i) - 2 && time <= pv.buffered.end(i)) return; // already warm
+        }
+      }
+      const segs = warmSegmentsRef.current;
+      if (segs && segs.length) {
+        let acc = 0;
+        let idx = -1;
+        for (let i = 0; i < segs.length; i++) {
+          if (time < acc + segs[i].dur) { idx = i; break; }
+          acc += segs[i].dur;
+        }
+        if (idx === -1) idx = segs.length - 1;
+        void fetch(segs[idx].url).then((r) => r.arrayBuffer()).catch(() => { /* best-effort */ });
+        void fetch(segs[Math.min(idx + 1, segs.length - 1)].url).then((r) => r.arrayBuffer()).catch(() => { /* best-effort */ });
+        return;
+      }
+      const total = mediaSizeRef.current;
+      const v = videoRef.current;
+      if (total > 0 && v && Number.isFinite(v.duration) && v.duration > 0 && src) {
+        const frac = Math.min(0.99, Math.max(0, time / v.duration));
+        const start = Math.max(0, Math.floor(frac * total - 256 * 1024));
+        void fetch(src, { headers: { Range: `bytes=${start}-${start + 1500000}` } })
+          .then((r) => r.arrayBuffer()).catch(() => { /* best-effort */ });
+      }
+    } catch { /* best-effort */ }
+  }, [previewVideoRef, videoRef, src]);
+
   // Follow loop: the preview decoder plays (muted, lowest rendition) mirrored
   // to the main playhead whenever the main video plays, so its buffer is
   // always warm around the current position and hover previews feel realtime.
@@ -455,6 +531,9 @@ export function VideoPlayer({
   // the main player is buffer-starved so playback is never sacrificed.
   const warmerAbortRef = useRef(false);
   const warmStartedRef = useRef<string | null>(null);
+  // Parsed segment list shared with the hover-prefetcher so hovering a cold
+  // region can instantly warm exactly the fragments under the cursor.
+  const warmSegmentsRef = useRef<{ url: string; dur: number }[] | null>(null);
   const warmSegmentCache = useCallback(async (manifestUrl: string) => {
     if (warmStartedRef.current === manifestUrl) return;
     warmStartedRef.current = manifestUrl;
@@ -474,6 +553,7 @@ export function VideoPlayer({
         }
       }
       if (!segs.length) return;
+      warmSegmentsRef.current = segs;
 
       // Start at the segment nearest the current playhead, then wrap around
       // so the region the user is actually watching warms first.
@@ -487,25 +567,32 @@ export function VideoPlayer({
 
       const BUDGET_BYTES = 120 * 1024 * 1024;
       let fetchedBytes = 0;
-      for (const i of order) {
-        if (warmerAbortRef.current) return;
-        // Adaptive backoff: don't compete with a buffer-starved main player.
-        for (let waits = 0; waits < 30; waits++) {
-          const v = videoRef.current;
-          const buf = v?.buffered;
-          const ahead = v && buf && buf.length ? buf.end(buf.length - 1) - v.currentTime : 99;
-          if (!v || v.paused || ahead >= 15) break;
+      // Two parallel fetch lanes double the warm coverage rate; segments are
+      // small and the edge cache makes repeats cheap.
+      let next = 0;
+      const lane = async () => {
+        while (true) {
+          if (warmerAbortRef.current || fetchedBytes > BUDGET_BYTES) return;
+          const i = order[next]; next += 1;
+          if (i === undefined) return;
+          // Adaptive backoff: don't compete with a buffer-starved main player.
+          for (let waits = 0; waits < 30; waits++) {
+            const v = videoRef.current;
+            const buf = v?.buffered;
+            const ahead = v && buf && buf.length ? buf.end(buf.length - 1) - v.currentTime : 99;
+            if (!v || v.paused || ahead >= 15) break;
+            if (warmerAbortRef.current) return;
+            await new Promise((r) => setTimeout(r, 2000));
+          }
           if (warmerAbortRef.current) return;
-          await new Promise((r) => setTimeout(r, 2000));
+          try {
+            const r = await fetch(segs[i].url);
+            const ab = await r.arrayBuffer(); // consume -> stored in HTTP cache
+            fetchedBytes += ab.byteLength;
+          } catch { /* skip failed segment */ }
         }
-        if (warmerAbortRef.current) return;
-        try {
-          const r = await fetch(segs[i].url);
-          const ab = await r.arrayBuffer(); // consume -> stored in HTTP cache
-          fetchedBytes += ab.byteLength;
-          if (fetchedBytes > BUDGET_BYTES) return;
-        } catch { /* skip failed segment */ }
-      }
+      };
+      await Promise.all([lane(), lane()]);
     } catch { /* warming is best-effort */ }
   }, [videoRef]);
 
@@ -518,7 +605,7 @@ export function VideoPlayer({
     if (!hasPreview) return;
     const t = window.setTimeout(() => ensurePreviewEngine(), 5000);
     const t2 = previewCandidates?.length
-      ? window.setTimeout(() => warmSegmentCache(previewCandidates[0]), 8000)
+      ? window.setTimeout(() => warmSegmentCache(previewCandidates[0]), 4000)
       : undefined;
     return () => { window.clearTimeout(t); if (t2) window.clearTimeout(t2); };
   }, [ensurePreviewEngine, previewCandidates, src, warmSegmentCache]);
@@ -747,7 +834,7 @@ export function VideoPlayer({
 
       <div className={`absolute inset-x-0 bottom-0 px-3 sm:px-4 pb-3 sm:pb-4 transition-opacity duration-300 ${showControls || !playing ? "opacity-100" : "opacity-0 pointer-events-none"}`}>
         <div ref={seekRowRef} className="group/seek relative mb-3 h-5 flex items-center"
-          onMouseMove={(e) => { const rect = (e.currentTarget as HTMLDivElement).getBoundingClientRect(); const pct = Math.min(1, Math.max(0, (e.clientX - rect.left) / rect.width)); setHoverTime(pct * duration); setHoverX(e.clientX - rect.left); if (duration > 0) updatePreviewSeek(pct * duration); }}
+          onMouseMove={(e) => { const rect = (e.currentTarget as HTMLDivElement).getBoundingClientRect(); const pct = Math.min(1, Math.max(0, (e.clientX - rect.left) / rect.width)); setHoverTime(pct * duration); setHoverX(e.clientX - rect.left); if (duration > 0) { updatePreviewSeek(pct * duration); prefetchHoverRegion(pct * duration); } }}
           onMouseLeave={() => { setHoverTime(null); resumePreviewFollow(); }}
         >
           {/* Live hover preview: the muted low-rendition decoder plays at
