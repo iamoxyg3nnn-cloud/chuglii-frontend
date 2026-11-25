@@ -122,6 +122,8 @@ export function VideoPlayer({
   const lastDowngradeAt = useRef(0);
   const playRequested = useRef(false);
   const lastProgressValue = useRef(0);
+  // Probed total byte size of the current direct media (from Content-Range).
+  const mediaSizeRef = useRef(0);
 
   const clearHideTimer = useCallback(() => {
     if (hideTimer.current) { window.clearTimeout(hideTimer.current); hideTimer.current = null; }
@@ -248,6 +250,11 @@ export function VideoPlayer({
 
   const seek = useCallback((time: number) => {
     const v = videoRef.current; if (!v || !Number.isFinite(time)) return;
+    // Seek-intent prefetch: warm the exact target region BEFORE the decoder
+    // issues its own request, so the seek lands on data that is already in
+    // flight or in cache. Forced (no throttle) - an explicit seek is the
+    // strongest possible signal of where data is needed next.
+    prefetchRegionAt(time, true);
     v.currentTime = Math.min(Math.max(0, time), v.duration || time); setCurrentTime(v.currentTime);
     // Keep the preview decoder mirrored so its buffer stays warm.
     const pv = previewVideoRef.current;
@@ -369,11 +376,11 @@ export function VideoPlayer({
   // background fetch populates the browser HTTP cache AND the Cloudflare
   // edge cache (the proxy serves these with long-lived immutable headers),
   // after which every timeline position - hover preview or main seek - is
-  // instant. Larger files get a spread prefetch: chunks at 8 anchor points
-  // across the timeline so random scrub positions land near warm data.
+  // instant. Larger files get a spread prefetch: grid-aligned 2MB chunks at
+  // 8 anchor points across the timeline so random scrub positions land near
+  // warm data (and seed the worker's edge chunk cache for everyone).
   const prefetchStartedRef = useRef(false);
   const prefetchAbortRef = useRef<AbortController | null>(null);
-  const mediaSizeRef = useRef(0);
   const maybePrefetchDirectFile = useCallback(() => {
     if (prefetchStartedRef.current || !src) return;
     prefetchStartedRef.current = true;
@@ -422,7 +429,7 @@ export function VideoPlayer({
             await new Promise((r) => setTimeout(r, 2000));
           }
           const frac = (i + 0.5) / SPREADS;
-          const start = Math.max(0, Math.floor(frac * total - CHUNK / 2));
+          const start = Math.max(0, Math.floor((frac * total) / CHUNK) * CHUNK);
           try {
             const r = await fetch(src, { headers: { Range: `bytes=${start}-${start + CHUNK - 1}` } });
             await r.arrayBuffer();
@@ -469,17 +476,21 @@ export function VideoPlayer({
     } catch { /* not seekable yet */ }
   }, [ensurePreviewEngine]);
 
-  // Predictive hover prefetch: while the cursor moves over the timeline, warm
-  // the exact region under it BEFORE the preview decoder seeks there - this
-  // is what makes scrubbing to arbitrary ("random") durations feel instant.
-  // HLS: fetch the covering fragment + the next one from the warmer's parsed
-  // list. MP4: range-fetch ~1.5MB at the hovered fraction (which also kicks
-  // off the worker's one-time background full-warm). Skipped when the preview
-  // buffer already covers the target.
+  // ─── Region prefetcher (hover + seek-intent) ─────────────────────────
+  // Warms the exact region under the cursor / seek target BEFORE the decoder
+  // requests it - this is what makes scrubbing to arbitrary ("random")
+  // durations feel instant.
+  //   HLS: fetch the covering fragment + the next one from the warmer's
+  //   parsed list. MP4: range-fetch a 2MB GRID-ALIGNED chunk at the target
+  //   position - the alignment matches the worker's chunk-cache keys, so a
+  //   warmed chunk is a colo cache hit for every later request that touches
+  //   the same 2MB window (and kicks the worker's one-time full-warm for
+  //   small files). Skipped when the preview buffer already covers the
+  //   target. `force` bypasses the hover throttle (used by explicit seeks).
   const hoverPrefetchAtRef = useRef(0);
-  const prefetchHoverRegion = useCallback((time: number) => {
+  const prefetchRegionAt = useCallback((time: number, force: boolean) => {
     const now = Date.now();
-    if (now - hoverPrefetchAtRef.current < 400) return;
+    if (!force && now - hoverPrefetchAtRef.current < 400) return;
     hoverPrefetchAtRef.current = now;
     try {
       const pv = previewVideoRef.current;
@@ -505,12 +516,16 @@ export function VideoPlayer({
       const v = videoRef.current;
       if (total > 0 && v && Number.isFinite(v.duration) && v.duration > 0 && src) {
         const frac = Math.min(0.99, Math.max(0, time / v.duration));
-        const start = Math.max(0, Math.floor(frac * total - 256 * 1024));
-        void fetch(src, { headers: { Range: `bytes=${start}-${start + 1500000}` } })
+        // Grid-aligned 2MB chunk: matches the worker's chunk-cache keys.
+        const CHUNK = 2 * 1024 * 1024;
+        const start = Math.max(0, Math.floor((frac * total) / CHUNK) * CHUNK);
+        void fetch(src, { headers: { Range: `bytes=${start}-${start + CHUNK - 1}` } })
           .then((r) => r.arrayBuffer()).catch(() => { /* best-effort */ });
       }
     } catch { /* best-effort */ }
   }, [previewVideoRef, videoRef, src]);
+
+  const prefetchHoverRegion = useCallback((time: number) => prefetchRegionAt(time, false), [prefetchRegionAt]);
 
   // Follow loop: the preview decoder plays (muted, lowest rendition) mirrored
   // to the main playhead whenever the main video plays, so its buffer is
@@ -584,8 +599,8 @@ export function VideoPlayer({
 
       const BUDGET_BYTES = 120 * 1024 * 1024;
       let fetchedBytes = 0;
-      // Two parallel fetch lanes double the warm coverage rate; segments are
-      // small and the edge cache makes repeats cheap.
+      // Three parallel fetch lanes triple the warm coverage rate; segments
+      // are small and the edge cache makes repeats cheap.
       let next = 0;
       const lane = async () => {
         while (true) {
@@ -609,7 +624,7 @@ export function VideoPlayer({
           } catch { /* skip failed segment */ }
         }
       };
-      await Promise.all([lane(), lane()]);
+      await Promise.all([lane(), lane(), lane()]);
     } catch { /* warming is best-effort */ }
   }, [videoRef]);
 

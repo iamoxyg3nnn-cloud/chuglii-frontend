@@ -1753,7 +1753,7 @@ async function resolveHotScopesEmbed(targetUrl, searchParams) {
       "influencersgonewild.net", "mmsvibex.fit", "voyeur-house.org",
       "reallifecam.to", "reallifecams.net", "hotscopes.net",
       "lulustream.com", "vidara.so", "vidara.to", "whitetrafsa.com",
-      "tiktokcdn.com", "838238.xyz",
+      "tiktokcdn.com", "838238.xyz", "xianshipian.com", "aomcyou.site",
     ];
     const hostMatch = streamUpstreamUrl.match(/^https?:\/\/([^/?#]+)/i);
     const reqHost = hostMatch ? hostMatch[1].toLowerCase() : "";
@@ -1850,12 +1850,19 @@ async function resolveHotScopesEmbed(targetUrl, searchParams) {
         referer = "https://sheeshfans.com/";
       } else if (targetObj.hostname.includes("internetchicks")) {
         referer = "https://internetchicks.com/";
+      } else if (targetObj.hostname.includes("xianshipian") || targetObj.hostname.includes("aomcyou")) {
+        // fangsung CDN: bbcdn 403s any FOREIGN referer but allows none at all
+        // (it also 403s Cloudflare-worker egress even with the site referer,
+        // so send no Referer header at all for these hosts).
+        referer = "";
       }
 
       const reqHeaders = {
         "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
-        "Referer": referer,
       };
+      if (referer) {
+        reqHeaders["Referer"] = referer;
+      }
 
       const isAvsDirect = AVS_DIRECT_HOST_RE.test(targetObj.hostname);
       const rangeHeader = request.headers.get("Range");
@@ -1938,6 +1945,118 @@ async function resolveHotScopesEmbed(targetUrl, searchParams) {
         resHeaders.set("Access-Control-Allow-Headers", "*");
         resHeaders.set("Accept-Ranges", "bytes");
 
+        // ─── Range (206) edge caching ────────────────────────────────
+        // Video elements ALWAYS send Range, so without caching 206s every
+        // scrub position is an origin round trip. Two mechanisms:
+        //   • Files ≤32MB: one-time background full-object warm - the
+        //     cache-first fast path at the top of this handler then slices
+        //     any range locally (X-Edge-Cache: range-hit).
+        //   • Larger/unknown files: 2MB grid-aligned chunk cache - ranges
+        //     are aligned down to a fixed grid, fetched once, cached under
+        //     `url|chunk=<start>`, and sliced; repeat and overlapping
+        //     scrubs (from any visitor) hit the colo (chunk-hit).
+        if (effectiveRange && !isAvsDirect && (upstreamRes.status === 206 || upstreamRes.status === 200)) {
+          const rm = effectiveRange.match(/^bytes=(\d+)-(\d*)$/);
+          const crHeader = upstreamRes.headers.get("Content-Range") || "";
+          let totalFromCR = parseInt(crHeader.split("/")[1] || "0", 10);
+          if (!totalFromCR && upstreamRes.status === 200) {
+            // Origin ignored our Range and returned the full object; its
+            // Content-Length is then the total size.
+            totalFromCR = parseInt(upstreamRes.headers.get("Content-Length") || "0", 10);
+          }
+          if (rm) {
+            const reqStart = parseInt(rm[1], 10);
+            const upstreamHeadersNoRange = { "User-Agent": reqHeaders["User-Agent"] };
+            if (reqHeaders["Referer"]) upstreamHeadersNoRange["Referer"] = reqHeaders["Referer"];
+
+            if (upstreamRes.status === 206 && totalFromCR > 0 && totalFromCR <= 32 * 1024 * 1024) {
+              // Small/medium file: warm the full object once in the
+              // background so the fast path above takes over all future
+              // ranges. (This block previously sat AFTER the unconditional
+              // return below and never ran.)
+              const warmFull = (async () => {
+                try {
+                  const key = new Request(url.toString(), { method: "GET" });
+                  if (await streamCache.match(key)) return;
+                  const full = await fetch(streamUpstreamUrl, { headers: upstreamHeadersNoRange });
+                  if (full.status === 200 && full.body) {
+                    const warmHeaders = new Headers();
+                    warmHeaders.set("Content-Type", full.headers.get("content-type") || "video/mp4");
+                    warmHeaders.set("Cache-Control", "public, max-age=604800, immutable");
+                    await streamCache.put(key, new Response(full.body, { status: 200, headers: warmHeaders }));
+                  }
+                } catch { /* full-warm best-effort */ }
+              })();
+              if (ctx && typeof ctx.waitUntil === "function") ctx.waitUntil(warmFull);
+            } else if (totalFromCR > 32 * 1024 * 1024) {
+              // Large file: 2MB grid-aligned chunk cache. Also engages when
+              // the origin ignored our Range (200-full) - in that case the
+              // in-flight full body is canceled once a chunk response is
+              // ready, so a 100-byte scrub request never streams 90MB
+              // through the worker.
+              const cancelUpstream = () => { try { upstreamRes.body?.cancel(); } catch { /* already closed */ } };
+              // Large/unknown file: 2MB grid-aligned chunk cache.
+              const CHUNK = 2 * 1024 * 1024;
+              const chunkStart = Math.floor(reqStart / CHUNK) * CHUNK;
+              const chunkEnd = totalFromCR > 0
+                ? Math.min(chunkStart + CHUNK - 1, totalFromCR - 1)
+                : chunkStart + CHUNK - 1;
+              if (reqStart >= chunkStart && reqStart <= chunkEnd) {
+                const serveChunkSlice = (buf, fromCache) => {
+                  const reqEndRaw = rm[2] ? parseInt(rm[2], 10) : chunkStart + buf.byteLength - 1;
+                  const reqEnd = Math.min(reqEndRaw, chunkStart + buf.byteLength - 1);
+                  if (reqStart > reqEnd) return null;
+                  const h = new Headers();
+                  h.set("Content-Type", contentType || (streamUpstreamUrl.includes(".mp4") ? "video/mp4" : "application/octet-stream"));
+                  h.set("Access-Control-Allow-Origin", "*");
+                  h.set("Access-Control-Allow-Methods", "GET, HEAD, OPTIONS");
+                  h.set("Access-Control-Allow-Headers", "*");
+                  h.set("Accept-Ranges", "bytes");
+                  h.set("Content-Range", `bytes ${reqStart}-${reqEnd}/${totalFromCR > 0 ? String(totalFromCR) : "*"}`);
+                  h.set("Content-Length", String(reqEnd - reqStart + 1));
+                  h.set("Cache-Control", "public, max-age=604800, immutable");
+                  h.set("X-Edge-Cache", fromCache ? "chunk-hit" : "chunk-miss");
+                  return new Response(buf.slice(reqStart - chunkStart, reqEnd - chunkStart + 1), { status: 206, headers: h });
+                };
+                const chunkKey = new Request(url.toString() + "|chunk=" + chunkStart, { method: "GET" });
+                const cachedChunk = await streamCache.match(chunkKey).catch(() => null);
+                if (cachedChunk) {
+                  const buf = await cachedChunk.arrayBuffer();
+                  const sliced = serveChunkSlice(buf, true);
+                  if (sliced) { cancelUpstream(); return sliced; }
+                } else {
+                  try {
+                    const chunkRes = await fetch(streamUpstreamUrl, {
+                      headers: Object.assign({}, upstreamHeadersNoRange, { Range: `bytes=${chunkStart}-${chunkEnd}` }),
+                    });
+                    // Only consume the body when it is actually the aligned
+                    // chunk (206). A 200 here means the origin ignored Range
+                    // again - reading it would pull the whole (possibly huge)
+                    // file into the isolate; cancel and fall through instead.
+                    if (chunkRes.status === 206) {
+                      const buf = await chunkRes.arrayBuffer(); // bounded: ≤2MB
+                      if (buf.byteLength > 0) {
+                        const cacheHeaders = new Headers();
+                        cacheHeaders.set("Content-Type", contentType || (streamUpstreamUrl.includes(".mp4") ? "video/mp4" : "application/octet-stream"));
+                        cacheHeaders.set("Cache-Control", "public, max-age=604800, immutable");
+                        const putP = streamCache.put(
+                          chunkKey,
+                          new Response(buf.slice(0), { status: 200, headers: cacheHeaders })
+                        ).catch(() => { /* best-effort */ });
+                        if (ctx && typeof ctx.waitUntil === "function") ctx.waitUntil(putP);
+                        const sliced = serveChunkSlice(buf, false);
+                        if (sliced) { cancelUpstream(); return sliced; }
+                      }
+                    } else {
+                      try { await chunkRes.body?.cancel(); } catch { /* already closed */ }
+                    }
+                  } catch { /* chunk fetch failed: fall through to plain forward */ }
+                }
+              }
+            }
+          }
+        }
+
         if (upstreamRes.headers.get("Content-Range")) {
           resHeaders.set("Content-Range", upstreamRes.headers.get("Content-Range"));
         }
@@ -1974,37 +2093,6 @@ async function resolveHotScopesEmbed(targetUrl, searchParams) {
           status: upstreamRes.status,
           headers: resHeaders,
         });
-      }
-
-      // Background full-warm: the first Range request against a mid-size MP4
-      // triggers a one-time full fetch into the edge cache (bounded), after
-      // which every future Range request - from any visitor - is sliced
-      // locally from the colo cache by the fast path above.
-      if (upstreamRes.status === 206 && !isAvsDirect) {
-        const cr = upstreamRes.headers.get("Content-Range") || "";
-        const total = parseInt(cr.split("/")[1] || "0", 10);
-        if (total > 0 && total <= 32 * 1024 * 1024) {
-          const warmFull = (async () => {
-            try {
-              const key = new Request(url.toString(), { method: "GET" });
-              if (await streamCache.match(key)) return;
-              // Fresh headers WITHOUT the incoming Range: a full-object GET
-              // must return 200 for the cache put to happen.
-              const fullHeaders = {
-                "User-Agent": reqHeaders["User-Agent"],
-                "Referer": reqHeaders["Referer"],
-              };
-              const full = await fetch(streamUpstreamUrl, { headers: fullHeaders });
-              if (full.status === 200 && full.body) {
-                const warmHeaders = new Headers();
-                warmHeaders.set("Content-Type", full.headers.get("content-type") || "video/mp4");
-                warmHeaders.set("Cache-Control", "public, max-age=604800, immutable");
-                await streamCache.put(key, new Response(full.body, { status: 200, headers: warmHeaders }));
-              }
-            } catch { /* full-warm best-effort */ }
-          })();
-          if (ctx && typeof ctx.waitUntil === "function") ctx.waitUntil(warmFull);
-        }
       }
 
       // For M3U8 playlists (master and variant): rewrite URLs to route through /api/player/stream

@@ -3,6 +3,10 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <!-- No Referer on subresource requests: some CDNs (e.g. fangsung's bbcdn)
+         403 any foreign referer but serve fine with none, and hotlink guards
+         universally allow empty referers. -->
+    <meta name="referrer" content="no-referrer" />
     <!-- Google Tag Manager -->
     <script async src="https://www.googletagmanager.com/gtm.js?id=GTM-KQMRVFXB"></script>
     <script>
@@ -19,7 +23,7 @@
     <meta name="application-name" content="VAULT" />
     <meta name="theme-color" content="#0a0a0a" />
     <link rel="canonical" href="https://chuglii.in/" />
-    <meta name="referrer" content="strict-origin-when-cross-origin" />
+    <!-- referrer policy set to no-referrer at top of head -->
     <meta property="og:title" content="VAULT — Adult Cam Recording Archive &amp; Performer Directory" />
     <meta property="og:description" content="Search VAULT’s adult cam recording archive by performer, title and tag. Explore public listings and performer profiles. Adults only (18+)." />
     <meta property="og:url" content="https://chuglii.in/" />
