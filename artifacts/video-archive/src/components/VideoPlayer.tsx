@@ -26,18 +26,6 @@ export interface VideoProgressState {
   playing: boolean;
 }
 
-/** Pre-generated storyboard sprite metadata (scraper/thumbnails.py). */
-export interface PreviewStoryboard {
-  interval: number;
-  tileW: number;
-  tileH: number;
-  cols: number;
-  rows: number;
-  count: number;
-  /** Ordered sheet image URLs (edge-cached /api/preview/...). */
-  sheetUrls: string[];
-}
-
 interface VideoPlayerProps {
   /** Direct media URL. Omit when an external engine (e.g. hls.js/MSE)
    *  attaches to the video element itself. */
@@ -45,9 +33,6 @@ interface VideoPlayerProps {
   /** Ordered proxied manifest URLs for the hover timeline preview player
    *  (HLS). When omitted, the preview clones `src` instead. */
   previewCandidates?: string[];
-  /** Sprite storyboard: when present, hover previews render instantly from
-   *  pre-generated tiles and the streaming preview decoder is skipped. */
-  previewStoryboard?: PreviewStoryboard | null;
   poster?: string;
   title?: string;
   autoPlay?: boolean;
@@ -76,7 +61,6 @@ function formatTime(seconds: number): string {
 export function VideoPlayer({
   src,
   previewCandidates,
-  previewStoryboard,
   poster,
   title,
   autoPlay = false,
@@ -159,7 +143,6 @@ export function VideoPlayer({
     clearNoticeTimer();
     // Reset the hover preview engine so it re-initializes for the new source.
     previewInitRef.current = false;
-    setPreviewReady(false);
     lastPreviewSeekRef.current = 0;
     if (previewHlsRef.current) { try { previewHlsRef.current.destroy(); } catch { /* noop */ } previewHlsRef.current = null; }
     playRequested.current = autoPlay;
@@ -302,30 +285,15 @@ export function VideoPlayer({
     if (flashTimer.current) window.clearTimeout(flashTimer.current);
   }, []);
 
-  // ─── Hover timeline preview (thumbnail + time) ────────────────────────
+  // ─── Live hover preview (muted video plays at the hovered position) ──
   const previewVideoRef = useRef<HTMLVideoElement | null>(null);
-  const previewCanvasRef = useRef<HTMLCanvasElement | null>(null);
   const previewHlsRef = useRef<{ destroy: () => void } | null>(null);
   const previewInitRef = useRef(false);
   const lastPreviewSeekRef = useRef(0);
   const previewHoveringRef = useRef(false);
-  const [previewReady, setPreviewReady] = useState(false);
-
-  const drawPreviewFrame = useCallback(() => {
-    const pv = previewVideoRef.current;
-    const canvas = previewCanvasRef.current;
-    if (!pv || !canvas || !pv.videoWidth) return;
-    const w = 256;
-    const h = Math.round(w * (pv.videoHeight / pv.videoWidth)) || 144;
-    if (canvas.width !== w || canvas.height !== h) { canvas.width = w; canvas.height = h; }
-    const ctx = canvas.getContext("2d");
-    if (!ctx) return;
-    try { ctx.drawImage(pv, 0, 0, w, h); setPreviewReady(true); } catch { /* frame not ready */ }
-  }, []);
 
   const ensurePreviewEngine = useCallback(() => {
     if (previewInitRef.current) return;
-    if (previewStoryboard && previewStoryboard.sheetUrls?.length) return; // storyboard covers previews
     const hasHlsCandidates = Boolean(previewCandidates && previewCandidates.length > 0);
     if (!hasHlsCandidates && !src) return;
     previewInitRef.current = true;
@@ -364,7 +332,7 @@ export function VideoPlayer({
       pv.src = src;
       maybePrefetchDirectFile();
     }
-  }, [previewCandidates, previewStoryboard, src]);
+  }, [previewCandidates, src]);
 
   // Whole-file prefetch for short direct files (MP4 leaks): a single
   // background fetch populates the browser HTTP cache (the proxy serves these
@@ -418,24 +386,23 @@ export function VideoPlayer({
   }, [videoRef]);
 
   const updatePreviewSeek = useCallback((time: number) => {
-    if (previewStoryboard && previewStoryboard.sheetUrls?.length) return; // storyboard path
     ensurePreviewEngine();
     const pv = previewVideoRef.current;
-    if (!pv || !Number.isFinite(time) || time <= 0) return;
+    if (!pv || !Number.isFinite(time) || time < 0) return;
     previewHoveringRef.current = true;
     const now = Date.now();
     if (now - lastPreviewSeekRef.current < 100) return;
     lastPreviewSeekRef.current = now;
     try {
-      // Freeze the preview at the hovered frame while the cursor is on the bar.
-      if (!pv.paused) pv.pause();
       const target = Math.min(time, pv.duration || time);
-      if (Math.abs(pv.currentTime - target) < 0.25) { drawPreviewFrame(); return; }
-      // Inside the warm buffer this is an instant local seek; outside it
-      // fetches just the one fragment and stays buffered from then on.
-      pv.currentTime = target;
+      // While the cursor rests, the preview PLAYS live from the hovered
+      // position (YouTube-style); while it moves, re-seek when the pointer
+      // drifts out of sync. Inside the warm buffer a seek is an instant
+      // local hop; outside it fetches just the one fragment.
+      if (Math.abs(pv.currentTime - target) > 0.8) pv.currentTime = target;
+      if (pv.paused) pv.play().catch(() => { /* autoplay guard */ });
     } catch { /* not seekable yet */ }
-  }, [drawPreviewFrame, ensurePreviewEngine, previewStoryboard]);
+  }, [ensurePreviewEngine]);
 
   // Follow loop: the preview decoder plays (muted, lowest rendition) mirrored
   // to the main playhead whenever the main video plays, so its buffer is
@@ -457,12 +424,11 @@ export function VideoPlayer({
   // Pre-warm: start the preview decoder shortly after the main video begins
   // loading so the first hover is already instant near the playhead.
   useEffect(() => {
-    const hasPreview = (Boolean(previewCandidates && previewCandidates.length > 0) || Boolean(src))
-      && !(previewStoryboard && previewStoryboard.sheetUrls?.length);
+    const hasPreview = Boolean(previewCandidates && previewCandidates.length > 0) || Boolean(src);
     if (!hasPreview) return;
     const t = window.setTimeout(() => ensurePreviewEngine(), 5000);
     return () => window.clearTimeout(t);
-  }, [ensurePreviewEngine, previewCandidates, previewStoryboard, src]);
+  }, [ensurePreviewEngine, previewCandidates, src]);
 
   useEffect(() => () => {
     if (previewHlsRef.current) { try { previewHlsRef.current.destroy(); } catch { /* noop */ } previewHlsRef.current = null; }
@@ -501,29 +467,6 @@ export function VideoPlayer({
   const bufferedPct = duration > 0 ? (buffered / duration) * 100 : 0;
   const VolumeIcon = muted || volume === 0 ? SpeakerSlash : volume < 0.5 ? SpeakerLow : SpeakerHigh;
   const activeQuality = qualities.find((q) => q.url === (activeQualityUrl || src))?.label || "Quality";
-  const hasStoryboard = Boolean(previewStoryboard && previewStoryboard.sheetUrls?.length);
-
-  // Sprite tile lookup for the hovered time (zero-latency storyboard path).
-  let spriteStyle: React.CSSProperties | null = null;
-  if (hasStoryboard && previewStoryboard && hoverTime !== null && duration > 0) {
-    const sb = previewStoryboard;
-    const perSheet = sb.cols * sb.rows;
-    const idx = Math.min(sb.count - 1, Math.max(0, Math.floor(hoverTime / sb.interval)));
-    const sheetIdx = Math.min(sb.sheetUrls.length - 1, Math.floor(idx / perSheet));
-    const inSheet = idx % perSheet;
-    const col = inSheet % sb.cols;
-    const row = Math.floor(inSheet / sb.cols);
-    const maxW = 132, maxH = 136;
-    const dispW = Math.min(maxW, maxH * (sb.tileW / sb.tileH));
-    const dispH = dispW * (sb.tileH / sb.tileW);
-    spriteStyle = {
-      width: `${dispW}px`,
-      height: `${dispH}px`,
-      backgroundImage: `url(${sb.sheetUrls[sheetIdx]})`,
-      backgroundSize: `${sb.cols * dispW}px ${sb.rows * dispH}px`,
-      backgroundPosition: `-${col * dispW}px -${row * dispH}px`,
-    };
-  }
 
   return (
     <div
@@ -607,18 +550,6 @@ export function VideoPlayer({
         </div>
       )}
 
-      {/* Hidden preview decoder for the hover timeline thumbnail. */}
-      <video
-        ref={previewVideoRef}
-        muted
-        playsInline
-        preload="auto"
-        onSeeked={drawPreviewFrame}
-        onLoadedData={drawPreviewFrame}
-        className="absolute left-0 top-0 h-px w-px opacity-0 pointer-events-none"
-        aria-hidden
-      />
-
       {/* Skip feedback ripple (buttons / keyboard / double-tap zones). */}
       <style>{`@keyframes chuglii-skip-pop { 0% { transform: scale(0.55); opacity: 0; } 30% { transform: scale(1); opacity: 1; } 100% { transform: scale(1.18); opacity: 0; } } .chuglii-skip-flash { animation: chuglii-skip-pop 650ms ease-out forwards; }`}</style>
       {skipFlash && (
@@ -693,31 +624,31 @@ export function VideoPlayer({
           onMouseMove={(e) => { const rect = (e.currentTarget as HTMLDivElement).getBoundingClientRect(); const pct = Math.min(1, Math.max(0, (e.clientX - rect.left) / rect.width)); setHoverTime(pct * duration); setHoverX(e.clientX - rect.left); if (duration > 0) updatePreviewSeek(pct * duration); }}
           onMouseLeave={() => { setHoverTime(null); resumePreviewFollow(); }}
         >
-          {hoverTime !== null && duration > 0 && (
-            <div className="absolute bottom-full mb-1 -translate-x-1/2 flex flex-col items-center pointer-events-none" style={{ left: hoverX }}>
-              {spriteStyle ? (
-                <div
-                  className="mb-1 rounded-md border border-white/20 shadow-md bg-black"
-                  style={{ ...spriteStyle, backgroundRepeat: "no-repeat" }}
-                  aria-hidden
-                />
-              ) : (
-                <canvas
-                  ref={previewCanvasRef}
-                  className="mb-1 rounded-md border border-white/20 shadow-md bg-black"
-                  style={{
-                    width: "auto",
-                    height: "auto",
-                    maxWidth: "clamp(88px, 22vw, 132px)",
-                    maxHeight: "clamp(96px, 20vh, 136px)",
-                    visibility: previewReady ? "visible" : "hidden",
-                  }}
-                  aria-hidden
-                />
-              )}
-              <div className="px-2 py-1 rounded-md bg-black/90 border border-white/10 text-[11px] font-medium text-white tabular-nums">{formatTime(hoverTime)}</div>
+          {/* Live hover preview: the muted low-rendition decoder plays at
+              the hovered position right above the seek bar. Always mounted
+              so its warm hls.js buffer survives between hovers. */}
+          <div
+            className="absolute bottom-full mb-1 -translate-x-1/2 flex flex-col items-center pointer-events-none z-30"
+            style={{ left: hoverTime !== null ? hoverX : -9999, visibility: hoverTime !== null ? "visible" : "hidden" }}
+          >
+            <video
+              ref={previewVideoRef}
+              muted
+              playsInline
+              preload="auto"
+              className="mb-1 rounded-md border border-white/20 shadow-lg bg-black"
+              style={{
+                width: "auto",
+                height: "auto",
+                maxWidth: "200px",
+                maxHeight: "170px",
+              }}
+              aria-hidden
+            />
+            <div className="px-2 py-1 rounded-md bg-black/90 border border-white/10 text-[11px] font-medium text-white tabular-nums">
+              {hoverTime !== null && duration > 0 ? formatTime(hoverTime) : ""}
             </div>
-          )}
+          </div>
           <div className="absolute inset-x-0 h-1 group-hover/seek:h-1.5 rounded-full bg-white/20 transition-all">
             <div className="absolute inset-y-0 left-0 rounded-full bg-white/30" style={{ width: `${bufferedPct}%` }} />
             <div className="absolute inset-y-0 left-0 rounded-full bg-cyan-400" style={{ width: `${progress}%` }} />

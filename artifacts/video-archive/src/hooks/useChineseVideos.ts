@@ -1,6 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
 import { getSupabase } from "@/lib/supabase";
-import type { PreviewStoryboard } from "@/components/VideoPlayer";
 
 export interface ChineseVideo {
   id: string;
@@ -36,16 +35,6 @@ export interface ChineseVideo {
   status: string;
   published_at: string | null;
   scraped_at: string;
-  /** Sprite storyboard metadata (scraper/thumbnails.py); null until generated. */
-  preview_thumbs?: {
-    interval: number;
-    tileW: number;
-    tileH: number;
-    cols: number;
-    rows: number;
-    count: number;
-    sheets: number;
-  } | null;
   raw_payload?: Record<string, unknown>;
 }
 
@@ -54,27 +43,6 @@ export interface ChineseVideo {
 export function chineseDisplayTitle(video: Pick<ChineseVideo, "title" | "title_en">): string {
   const en = (video.title_en || "").trim();
   return en || video.title;
-}
-
-/** Build the player's sprite-storyboard prop from a row's preview_thumbs
- *  metadata. Sheets are served by the edge route with immutable caching. */
-export function chineseStoryboard(
-  video: Pick<ChineseVideo, "id" | "preview_thumbs">,
-): PreviewStoryboard | null {
-  const pt = video.preview_thumbs;
-  if (!pt || !pt.sheets || !pt.count || !pt.interval || !pt.tileW || !pt.tileH) return null;
-  return {
-    interval: pt.interval,
-    tileW: pt.tileW,
-    tileH: pt.tileH,
-    cols: pt.cols,
-    rows: pt.rows,
-    count: pt.count,
-    sheetUrls: Array.from(
-      { length: pt.sheets },
-      (_, i) => `/api/preview/chinese_videos/${video.id}/${i}`,
-    ),
-  };
 }
 
 /** Coarse website-browse groups inside the isolated chinese table.
