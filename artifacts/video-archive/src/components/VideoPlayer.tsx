@@ -293,8 +293,8 @@ export function VideoPlayer({
     const pv = previewVideoRef.current;
     const canvas = previewCanvasRef.current;
     if (!pv || !canvas || !pv.videoWidth) return;
-    const w = 336;
-    const h = Math.round(w * (pv.videoHeight / pv.videoWidth)) || 192;
+    const w = 256;
+    const h = Math.round(w * (pv.videoHeight / pv.videoWidth)) || 144;
     if (canvas.width !== w || canvas.height !== h) { canvas.width = w; canvas.height = h; }
     const ctx = canvas.getContext("2d");
     if (!ctx) return;
@@ -556,8 +556,14 @@ export function VideoPlayer({
             <div className="absolute bottom-full mb-1 -translate-x-1/2 flex flex-col items-center pointer-events-none" style={{ left: hoverX }}>
               <canvas
                 ref={previewCanvasRef}
-                className="mb-1 rounded-md border border-white/25 shadow-xl bg-black"
-                style={{ width: 168, height: "auto", visibility: previewReady ? "visible" : "hidden" }}
+                className="mb-1 rounded-md border border-white/20 shadow-md bg-black"
+                style={{
+                  width: "auto",
+                  height: "auto",
+                  maxWidth: "clamp(88px, 22vw, 132px)",
+                  maxHeight: "clamp(96px, 20vh, 136px)",
+                  visibility: previewReady ? "visible" : "hidden",
+                }}
                 aria-hidden
               />
               <div className="px-2 py-1 rounded-md bg-black/90 border border-white/10 text-[11px] font-medium text-white tabular-nums">{formatTime(hoverTime)}</div>
