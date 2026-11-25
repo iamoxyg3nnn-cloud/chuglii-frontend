@@ -1783,9 +1783,13 @@ async function resolveHotScopesEmbed(targetUrl, searchParams) {
         if (upstreamRes.headers.get("Content-Length")) {
           resHeaders.set("Content-Length", upstreamRes.headers.get("Content-Length"));
         }
+          // Segments/keys/MP4s are immutable content-addressed media: a long
+          // browser-cache lifetime lets the timeline prefetcher warm regions
+          // once and keeps every later hover/seek on them instant (even
+          // across reloads).
           resHeaders.set(
             "Cache-Control",
-            upstreamRes.status === 206 ? "no-store" : "public, max-age=86400"
+            upstreamRes.status === 206 ? "no-store" : "public, max-age=604800, immutable"
           );
 
         return new Response(upstreamRes.body, {

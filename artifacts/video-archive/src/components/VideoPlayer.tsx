@@ -324,10 +324,13 @@ export function VideoPlayer({
         const hls = new Hls({
           enableWorker: false,
           autoStartLoad: true,
-          // Keep a large warm buffer around the playhead so hover-seeks inside
-          // it are instant local MSE seeks instead of network fragment fetches.
-          maxBufferLength: 30,
-          maxMaxBufferLength: 60,
+          // Prefetch horizon: keep ~3 min of low-rendition stream buffered
+          // ahead of the preview playhead so timeline hovers land in the warm
+          // buffer and paint instantly. Segments are served with long-lived
+          // immutable cache headers, so everything fetched here also sticks
+          // in the browser HTTP cache across reloads.
+          maxBufferLength: 180,
+          maxMaxBufferLength: 400,
           backBufferLength: Infinity,
         });
         previewHlsRef.current = hls;
@@ -342,8 +345,47 @@ export function VideoPlayer({
       }).catch(() => { /* preview unavailable */ });
     } else if (src) {
       pv.src = src;
+      maybePrefetchDirectFile();
     }
   }, [previewCandidates, src]);
+
+  // Whole-file prefetch for short direct files (MP4 leaks): a single
+  // background fetch populates the browser HTTP cache (the proxy serves these
+  // with long-lived immutable headers), after which every timeline position
+  // - hover preview or main seek - is served from disk cache instantly.
+  const prefetchStartedRef = useRef(false);
+  const prefetchAbortRef = useRef<AbortController | null>(null);
+  const maybePrefetchDirectFile = useCallback(() => {
+    if (prefetchStartedRef.current || !src) return;
+    prefetchStartedRef.current = true;
+    const kickoff = async () => {
+      try {
+        // Wait until the main video is actually playing so startup isn't
+        // competing for bandwidth.
+        const v = videoRef.current;
+        if (v && v.paused) {
+          await new Promise<void>((resolve) => {
+            const onPlay = () => { v.removeEventListener("playing", onPlay); resolve(); };
+            v.addEventListener("playing", onPlay);
+            window.setTimeout(resolve, 20000); // give up waiting eventually
+          });
+        }
+        const probe = await fetch(src, { method: "GET", headers: { Range: "bytes=0-0" } });
+        const cr = probe.headers.get("Content-Range");
+        probe.body?.cancel().catch(() => {});
+        const total = cr ? parseInt(cr.split("/")[1] || "0", 10) : 0;
+        if (!total || total > 40 * 1024 * 1024) return; // only short files
+        const ac = new AbortController();
+        prefetchAbortRef.current = ac;
+        await fetch(src, { signal: ac.signal }); // warms the HTTP cache
+      } catch { /* prefetch is best-effort */ }
+    };
+    window.setTimeout(kickoff, 8000);
+  }, [src, videoRef]);
+
+  useEffect(() => () => {
+    prefetchAbortRef.current?.abort();
+  }, []);
 
   // Resume the follow-the-playhead loop after a hover ends: re-sync to the
   // main position and keep buffering so future hovers stay instant.
