@@ -153,7 +153,11 @@ export function iframeReferrerPolicy(
       hostname.includes("embedseek") ||
       hostname.includes("seeks.cloud") ||
       hostname.includes("upns") ||
-      hostname.includes("vidara")
+      hostname.includes("vidara") ||
+      // These CDNs require the origin Referer header to authorize playback
+      hostname.includes("internetchicks") ||
+      hostname.includes("sheeshfans") ||
+      hostname.includes("influencersgonewild")
     ) {
       // "origin" sends only "https://chuglii.in" — domain validated, path hidden
       return "origin";

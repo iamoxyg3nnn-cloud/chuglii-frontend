@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import Hls from "hls.js";
-import { VideoPlayer, type VideoQualityOption } from "./VideoPlayer";
+import { VideoPlayer, type VideoQualityOption, type PreviewStoryboard } from "./VideoPlayer";
 
 interface HlsVideoPlayerProps {
   /** Ordered proxied manifest URLs; fails over on fatal errors. */
@@ -8,9 +8,11 @@ interface HlsVideoPlayerProps {
   poster?: string;
   title?: string;
   autoPlay?: boolean;
+  /** Sprite storyboard for instant timeline hover previews (optional). */
+  previewStoryboard?: PreviewStoryboard | null;
   /** Fired when every candidate failed — parent should fall back. */
   onExhausted?: () => void;
-}
+  }
 
 const AUTO = "hls:auto";
 const levelTag = (idx: number) => `hls:level:${idx}`;
@@ -32,6 +34,7 @@ export function HlsVideoPlayer({
   poster,
   title,
   autoPlay = true,
+  previewStoryboard,
   onExhausted,
 }: HlsVideoPlayerProps) {
   const videoRef = useRef<HTMLVideoElement>(null);
@@ -231,6 +234,7 @@ export function HlsVideoPlayer({
       onError={handleError}
       videoRef={videoRef}
       previewCandidates={candidates}
+      previewStoryboard={previewStoryboard}
     />
   );
 }

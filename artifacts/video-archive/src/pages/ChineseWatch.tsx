@@ -11,6 +11,7 @@ import {
   useChineseVideos,
   CHINESE_GROUP_LABELS,
   chineseDisplayTitle,
+  chineseStoryboard,
   isChineseGroup,
 } from "@/hooks/useChineseVideos";
 import { ChineseCard } from "@/components/ChineseCard";
@@ -275,6 +276,7 @@ export default function ChineseWatch() {
                 poster={video.clean_thumbnail_url || video.thumbnail_url || undefined}
                 title={chineseDisplayTitle(video)}
                 autoPlay
+                previewStoryboard={chineseStoryboard(video)}
                 onExhausted={() => setUseIframeFallback(true)}
               />
             ) : playerFrameSrc ? (

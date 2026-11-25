@@ -26,6 +26,18 @@ export interface VideoProgressState {
   playing: boolean;
 }
 
+/** Pre-generated storyboard sprite metadata (scraper/thumbnails.py). */
+export interface PreviewStoryboard {
+  interval: number;
+  tileW: number;
+  tileH: number;
+  cols: number;
+  rows: number;
+  count: number;
+  /** Ordered sheet image URLs (edge-cached /api/preview/...). */
+  sheetUrls: string[];
+}
+
 interface VideoPlayerProps {
   /** Direct media URL. Omit when an external engine (e.g. hls.js/MSE)
    *  attaches to the video element itself. */
@@ -33,6 +45,9 @@ interface VideoPlayerProps {
   /** Ordered proxied manifest URLs for the hover timeline preview player
    *  (HLS). When omitted, the preview clones `src` instead. */
   previewCandidates?: string[];
+  /** Sprite storyboard: when present, hover previews render instantly from
+   *  pre-generated tiles and the streaming preview decoder is skipped. */
+  previewStoryboard?: PreviewStoryboard | null;
   poster?: string;
   title?: string;
   autoPlay?: boolean;
@@ -61,6 +76,7 @@ function formatTime(seconds: number): string {
 export function VideoPlayer({
   src,
   previewCandidates,
+  previewStoryboard,
   poster,
   title,
   autoPlay = false,
@@ -309,6 +325,7 @@ export function VideoPlayer({
 
   const ensurePreviewEngine = useCallback(() => {
     if (previewInitRef.current) return;
+    if (previewStoryboard && previewStoryboard.sheetUrls?.length) return; // storyboard covers previews
     const hasHlsCandidates = Boolean(previewCandidates && previewCandidates.length > 0);
     if (!hasHlsCandidates && !src) return;
     previewInitRef.current = true;
@@ -347,7 +364,7 @@ export function VideoPlayer({
       pv.src = src;
       maybePrefetchDirectFile();
     }
-  }, [previewCandidates, src]);
+  }, [previewCandidates, previewStoryboard, src]);
 
   // Whole-file prefetch for short direct files (MP4 leaks): a single
   // background fetch populates the browser HTTP cache (the proxy serves these
@@ -401,6 +418,7 @@ export function VideoPlayer({
   }, [videoRef]);
 
   const updatePreviewSeek = useCallback((time: number) => {
+    if (previewStoryboard && previewStoryboard.sheetUrls?.length) return; // storyboard path
     ensurePreviewEngine();
     const pv = previewVideoRef.current;
     if (!pv || !Number.isFinite(time) || time <= 0) return;
@@ -417,7 +435,7 @@ export function VideoPlayer({
       // fetches just the one fragment and stays buffered from then on.
       pv.currentTime = target;
     } catch { /* not seekable yet */ }
-  }, [drawPreviewFrame, ensurePreviewEngine]);
+  }, [drawPreviewFrame, ensurePreviewEngine, previewStoryboard]);
 
   // Follow loop: the preview decoder plays (muted, lowest rendition) mirrored
   // to the main playhead whenever the main video plays, so its buffer is
@@ -439,11 +457,12 @@ export function VideoPlayer({
   // Pre-warm: start the preview decoder shortly after the main video begins
   // loading so the first hover is already instant near the playhead.
   useEffect(() => {
-    const hasPreview = Boolean(previewCandidates && previewCandidates.length > 0) || Boolean(src);
+    const hasPreview = (Boolean(previewCandidates && previewCandidates.length > 0) || Boolean(src))
+      && !(previewStoryboard && previewStoryboard.sheetUrls?.length);
     if (!hasPreview) return;
     const t = window.setTimeout(() => ensurePreviewEngine(), 5000);
     return () => window.clearTimeout(t);
-  }, [ensurePreviewEngine, previewCandidates, src]);
+  }, [ensurePreviewEngine, previewCandidates, previewStoryboard, src]);
 
   useEffect(() => () => {
     if (previewHlsRef.current) { try { previewHlsRef.current.destroy(); } catch { /* noop */ } previewHlsRef.current = null; }
@@ -482,6 +501,29 @@ export function VideoPlayer({
   const bufferedPct = duration > 0 ? (buffered / duration) * 100 : 0;
   const VolumeIcon = muted || volume === 0 ? SpeakerSlash : volume < 0.5 ? SpeakerLow : SpeakerHigh;
   const activeQuality = qualities.find((q) => q.url === (activeQualityUrl || src))?.label || "Quality";
+  const hasStoryboard = Boolean(previewStoryboard && previewStoryboard.sheetUrls?.length);
+
+  // Sprite tile lookup for the hovered time (zero-latency storyboard path).
+  let spriteStyle: React.CSSProperties | null = null;
+  if (hasStoryboard && previewStoryboard && hoverTime !== null && duration > 0) {
+    const sb = previewStoryboard;
+    const perSheet = sb.cols * sb.rows;
+    const idx = Math.min(sb.count - 1, Math.max(0, Math.floor(hoverTime / sb.interval)));
+    const sheetIdx = Math.min(sb.sheetUrls.length - 1, Math.floor(idx / perSheet));
+    const inSheet = idx % perSheet;
+    const col = inSheet % sb.cols;
+    const row = Math.floor(inSheet / sb.cols);
+    const maxW = 132, maxH = 136;
+    const dispW = Math.min(maxW, maxH * (sb.tileW / sb.tileH));
+    const dispH = dispW * (sb.tileH / sb.tileW);
+    spriteStyle = {
+      width: `${dispW}px`,
+      height: `${dispH}px`,
+      backgroundImage: `url(${sb.sheetUrls[sheetIdx]})`,
+      backgroundSize: `${sb.cols * dispW}px ${sb.rows * dispH}px`,
+      backgroundPosition: `-${col * dispW}px -${row * dispH}px`,
+    };
+  }
 
   return (
     <div
@@ -653,18 +695,26 @@ export function VideoPlayer({
         >
           {hoverTime !== null && duration > 0 && (
             <div className="absolute bottom-full mb-1 -translate-x-1/2 flex flex-col items-center pointer-events-none" style={{ left: hoverX }}>
-              <canvas
-                ref={previewCanvasRef}
-                className="mb-1 rounded-md border border-white/20 shadow-md bg-black"
-                style={{
-                  width: "auto",
-                  height: "auto",
-                  maxWidth: "clamp(88px, 22vw, 132px)",
-                  maxHeight: "clamp(96px, 20vh, 136px)",
-                  visibility: previewReady ? "visible" : "hidden",
-                }}
-                aria-hidden
-              />
+              {spriteStyle ? (
+                <div
+                  className="mb-1 rounded-md border border-white/20 shadow-md bg-black"
+                  style={{ ...spriteStyle, backgroundRepeat: "no-repeat" }}
+                  aria-hidden
+                />
+              ) : (
+                <canvas
+                  ref={previewCanvasRef}
+                  className="mb-1 rounded-md border border-white/20 shadow-md bg-black"
+                  style={{
+                    width: "auto",
+                    height: "auto",
+                    maxWidth: "clamp(88px, 22vw, 132px)",
+                    maxHeight: "clamp(96px, 20vh, 136px)",
+                    visibility: previewReady ? "visible" : "hidden",
+                  }}
+                  aria-hidden
+                />
+              )}
               <div className="px-2 py-1 rounded-md bg-black/90 border border-white/10 text-[11px] font-medium text-white tabular-nums">{formatTime(hoverTime)}</div>
             </div>
           )}
