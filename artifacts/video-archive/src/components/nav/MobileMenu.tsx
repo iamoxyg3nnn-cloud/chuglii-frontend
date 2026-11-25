@@ -20,6 +20,7 @@ import {
   FilmStrip,
   Broadcast,
   Eye,
+  Magnet,
 } from "@phosphor-icons/react";
 import { NAV_LINKS } from "./DesktopNav";
 import { prefetchRoute } from "@/lib/route-chunks";
@@ -201,6 +202,26 @@ export function MobileMenu({
                   </span>
                   <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-400 uppercase">
                     5 SRC
+                  </span>
+                </span>
+              </Link>
+              <Link href="/chinese" aria-current={isActiveNavigationRoute("/chinese", location) ? "page" : undefined}>
+                <span
+                  className={`w-full px-3 py-2 text-sm rounded-lg transition-all duration-150 inline-flex items-center justify-between ${
+                    isActiveNavigationRoute("/chinese", location)
+                      ? "text-sky-400 font-medium bg-sky-500/15 border border-sky-500/30"
+                      : "text-sky-400/90 hover:text-sky-300 hover:bg-sky-500/10"
+                  }`}
+                  onClick={onClose}
+                  onMouseEnter={() => prefetchRoute("/chinese")}
+                  onFocus={() => prefetchRoute("/chinese")}
+                >
+                  <span className="inline-flex items-center gap-2.5">
+                    <Magnet size={16} weight="fill" className="text-sky-400" />
+                    Chinese
+                  </span>
+                  <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-sky-500/20 text-sky-400 uppercase">
+                    HD+MG
                   </span>
                 </span>
               </Link>

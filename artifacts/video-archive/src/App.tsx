@@ -72,6 +72,8 @@ const OnlyfansFeed = lazyWithSkeleton(() => import("@/pages/OnlyfansFeed"), <Ske
 const OnlyfansWatch = lazyWithSkeleton(() => import("@/pages/OnlyfansWatch"), <SkeletonDetailPage />, "OnlyfansWatch");
 const VoyeurhouseFeed = lazyWithSkeleton(() => import("@/pages/VoyeurhouseFeed"), <SkeletonGridPage count={12} />, "VoyeurhouseFeed");
 const VoyeurhouseWatch = lazyWithSkeleton(() => import("@/pages/VoyeurhouseWatch"), <SkeletonDetailPage />, "VoyeurhouseWatch");
+const ChineseFeed = lazyWithSkeleton(() => import("@/pages/ChineseFeed"), <SkeletonGridPage count={12} />, "ChineseFeed");
+const ChineseWatch = lazyWithSkeleton(() => import("@/pages/ChineseWatch"), <SkeletonDetailPage />, "ChineseWatch");
 
 const NotFound = lazyWithSkeleton(() => import("@/pages/not-found"), <SkeletonSimplePage rows={3} />, "NotFound");
 
@@ -250,6 +252,8 @@ function Router() {
         <Route path="/voyeurhouse/:site/video/:id" component={VoyeurhouseWatch} />
         <Route path="/voyeurhouse/:site" component={VoyeurhouseFeed} />
         <Route path="/voyeurhouse" component={VoyeurhouseFeed} />
+        <Route path="/chinese/video/:id" component={ChineseWatch} />
+        <Route path="/chinese" component={ChineseFeed} />
         <Route path="/premium" component={Premium} />
         <Route path="/login" component={Login} />
         <Route path="/signup" component={Signup} />

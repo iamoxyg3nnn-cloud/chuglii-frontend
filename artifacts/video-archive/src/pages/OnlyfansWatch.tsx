@@ -2,6 +2,9 @@ import { useRef, useState, useEffect, useMemo } from "react";
 import { useParams, Link } from "wouter";
 import { Layout } from "@/components/Layout";
 import { VideoPlayer } from "@/components/VideoPlayer";
+import { PlayerFrame } from "@/components/PlayerFrame";
+import { copyText } from "@/lib/clipboard";
+import { buildEdgePlayerUrl } from "@/lib/video-source";
 import { iframeReferrerPolicy, detectHostLabel } from "@/lib/video-hosts";
 import { proxyImageUrl } from "@/lib/proxy-url";
 import {
@@ -230,8 +233,12 @@ export default function OnlyfansWatch() {
   // Referer, bypasses frame-ancestors restrictions and can unwrap direct streams.
   const embedPlaybackUrl = useMemo(() => {
     if (!activeUrl) return "";
-    return `/api/player?url=${encodeURIComponent(activeUrl)}`;
-  }, [activeUrl]);
+    return buildEdgePlayerUrl(activeUrl, {
+      title: video?.title,
+      poster: video?.clean_thumbnail_url || video?.thumbnail_url || "",
+      detail: video?.detail_url || activeUrl,
+    });
+  }, [activeUrl, video?.title, video?.clean_thumbnail_url, video?.thumbnail_url, video?.detail_url]);
 
   const cleanPosterUrl = useMemo(() => {
     const raw = video?.clean_thumbnail_url || video?.thumbnail_url;
@@ -313,19 +320,17 @@ export default function OnlyfansWatch() {
     } catch {}
   };
 
-  const handleShare = () => {
-    if (navigator.clipboard) {
-      navigator.clipboard.writeText(window.location.href);
+  const handleShare = async () => {
+    if (await copyText(window.location.href)) {
       setCopied(true);
-      setTimeout(() => setCopied(false), 2000);
+      window.setTimeout(() => setCopied(false), 2000);
     }
   };
 
-  const handleCopyStream = () => {
-    if (activeUrl && navigator.clipboard) {
-      navigator.clipboard.writeText(activeUrl);
+  const handleCopyStream = async () => {
+    if (activeUrl && await copyText(activeUrl)) {
       setCopiedStream(true);
-      setTimeout(() => setCopiedStream(false), 2000);
+      window.setTimeout(() => setCopiedStream(false), 2000);
     }
   };
 
@@ -432,13 +437,13 @@ export default function OnlyfansWatch() {
                   }}
                 />
               ) : (
-                <iframe
-                  key={`${activeUrl}-${playerKey}`}
+                <PlayerFrame
                   src={embedPlaybackUrl}
+                  resetKey={`${activeUrl}-${playerKey}`}
                   title={video.title}
-                  className="w-full h-full border-0"
-                  allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share; fullscreen"
+                  poster={cleanPosterUrl || undefined}
                   referrerPolicy={refPolicy as any}
+                  onRetry={() => setPlayerKey((key) => key + 1)}
                 />
               )
             ) : (

@@ -19,15 +19,24 @@ export interface VideoQualityOption {
   label: string;
 }
 
+export interface VideoProgressState {
+  currentTime: number;
+  duration: number;
+  playing: boolean;
+}
+
 interface VideoPlayerProps {
   src: string;
   poster?: string;
   title?: string;
   autoPlay?: boolean;
+  /** Autoplay is muted by default so browsers do not block it. */
+  startMuted?: boolean;
   qualities?: VideoQualityOption[];
   activeQualityUrl?: string;
   onQualityChange?: (url: string) => void;
-  onError?: () => void;
+  onError?: (detail: { code?: number; message?: string; src: string }) => void;
+  onProgress?: (state: VideoProgressState) => void;
   onReload?: () => void;
   onAutoDowngrade?: (fromUrl: string) => void;
   videoRef?: React.RefObject<HTMLVideoElement | null>;
@@ -48,10 +57,12 @@ export function VideoPlayer({
   poster,
   title,
   autoPlay = false,
+  startMuted = autoPlay,
   qualities = [],
   activeQualityUrl,
   onQualityChange,
   onError,
+  onProgress,
   onReload,
   onAutoDowngrade,
   videoRef: externalRef,
@@ -61,17 +72,21 @@ export function VideoPlayer({
   const videoRef = externalRef || internalRef;
   const containerRef = useRef<HTMLDivElement>(null);
   const hideTimer = useRef<number | null>(null);
+  const noticeTimer = useRef<number | null>(null);
+  const onProgressRef = useRef(onProgress);
 
   const [playing, setPlaying] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
   const [duration, setDuration] = useState(0);
   const [buffered, setBuffered] = useState(0);
   const [volume, setVolume] = useState(1);
-  const [muted, setMuted] = useState(false);
+  const [muted, setMuted] = useState(startMuted);
+  const [needsTap, setNeedsTap] = useState(false);
   const [fullscreen, setFullscreen] = useState(false);
   const [showControls, setShowControls] = useState(true);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [showSettings, setShowSettings] = useState(false);
   const [playbackRate, setPlaybackRate] = useState(1);
   const [hoverTime, setHoverTime] = useState<number | null>(null);
@@ -87,6 +102,19 @@ export function VideoPlayer({
     if (hideTimer.current) { window.clearTimeout(hideTimer.current); hideTimer.current = null; }
   }, []);
 
+  const clearNoticeTimer = useCallback(() => {
+    if (noticeTimer.current) { window.clearTimeout(noticeTimer.current); noticeTimer.current = null; }
+  }, []);
+
+  const showNotice = useCallback((message: string, delay: number) => {
+    clearNoticeTimer();
+    setStallNotice(message);
+    noticeTimer.current = window.setTimeout(() => {
+      setStallNotice(null);
+      noticeTimer.current = null;
+    }, delay);
+  }, [clearNoticeTimer]);
+
   const scheduleHide = useCallback(() => {
     clearHideTimer();
     if (!videoRef.current?.paused) {
@@ -97,16 +125,23 @@ export function VideoPlayer({
   const revealControls = useCallback(() => { setShowControls(true); scheduleHide(); }, [scheduleHide]);
 
   useEffect(() => {
-    setError(false); setLoading(true); setPlaying(false); setCurrentTime(0); setDuration(0); setBuffered(0); setStallNotice(null);
+    onProgressRef.current = onProgress;
+  }, [onProgress]);
+
+  useEffect(() => {
+    setError(false); setLoading(true); setPlaying(false); setCurrentTime(0); setDuration(0); setBuffered(0);
+    setErrorMessage(null); setStallNotice(null); setNeedsTap(false); setMuted(startMuted);
     if (stallTimer.current) { window.clearTimeout(stallTimer.current); stallTimer.current = null; }
     if (startupStallTimer.current) { window.clearTimeout(startupStallTimer.current); startupStallTimer.current = null; }
+    clearNoticeTimer();
     playRequested.current = autoPlay;
     lastProgressValue.current = 0;
-  }, [src, autoPlay]);
+  }, [src, autoPlay, startMuted, clearNoticeTimer]);
 
   useEffect(() => () => {
     if (stallTimer.current) window.clearTimeout(stallTimer.current);
     if (startupStallTimer.current) window.clearTimeout(startupStallTimer.current);
+    if (noticeTimer.current) window.clearTimeout(noticeTimer.current);
   }, []);
 
   useEffect(() => {
@@ -126,15 +161,13 @@ export function VideoPlayer({
     if (now - lastDowngradeAt.current < 12000) return;
     lastDowngradeAt.current = now;
     if (qualities.length > 1 && onAutoDowngrade) {
-      setStallNotice("Slow/blocked stream - trying lower quality...");
+      showNotice("Slow/blocked stream - trying lower quality...", 4000);
       onAutoDowngrade(activeQualityUrl || src);
-      window.setTimeout(() => setStallNotice(null), 4000);
       return;
     }
-    setStallNotice(reason);
-    window.setTimeout(() => setStallNotice(null), 4000);
+    showNotice(reason, 4000);
     onReload?.();
-  }, [activeQualityUrl, onAutoDowngrade, onReload, qualities.length, src]);
+  }, [activeQualityUrl, onAutoDowngrade, onReload, qualities.length, showNotice, src]);
 
   const armStartupStallTimer = useCallback((delay = 9000) => {
     clearStartupStallTimer();
@@ -155,7 +188,14 @@ export function VideoPlayer({
     if (v.paused || v.ended) {
       playRequested.current = true;
       armStartupStallTimer(9000);
-      v.play().catch(() => {});
+      v.play()
+        .then(() => setNeedsTap(false))
+        .catch((err: unknown) => {
+          if ((err as DOMException)?.name === "NotAllowedError") {
+            setNeedsTap(true);
+            clearStartupStallTimer();
+          }
+        });
     } else {
       playRequested.current = false;
       clearStartupStallTimer();
@@ -178,6 +218,16 @@ export function VideoPlayer({
   const seek = useCallback((time: number) => {
     const v = videoRef.current; if (!v || !Number.isFinite(time)) return;
     v.currentTime = Math.min(Math.max(0, time), v.duration || time); setCurrentTime(v.currentTime);
+  }, [videoRef]);
+
+  const emitProgress = useCallback((playing: boolean) => {
+    const v = videoRef.current;
+    if (!v) return;
+    onProgressRef.current?.({
+      currentTime: v.currentTime || 0,
+      duration: Number.isFinite(v.duration) ? v.duration : 0,
+      playing,
+    });
   }, [videoRef]);
 
   const toggleFullscreen = useCallback(async () => {
@@ -205,17 +255,21 @@ export function VideoPlayer({
   const onTimeUpdate = () => {
     const v = videoRef.current; if (!v) return;
     setCurrentTime(v.currentTime);
+    emitProgress(!v.paused && !v.ended);
     if (v.buffered.length > 0) { try { setBuffered(v.buffered.end(v.buffered.length - 1)); } catch {} }
     if (v.currentTime > 0.25 || v.readyState >= 3) {
       clearStartupStallTimer();
       playRequested.current = false;
       lastProgressValue.current = v.currentTime;
+      setNeedsTap(false);
     }
   };
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
-    const tag = (e.target as HTMLElement)?.tagName?.toLowerCase();
-    if (tag === "input" || tag === "select" || tag === "textarea") return;
+    if (e.defaultPrevented) return;
+    const target = e.target as HTMLElement | null;
+    const tag = target?.tagName?.toLowerCase();
+    if (tag === "input" || tag === "select" || tag === "textarea" || tag === "button" || tag === "a" || target?.isContentEditable) return;
     switch (e.key.toLowerCase()) {
       case " ": case "k": e.preventDefault(); togglePlay(); break;
       case "arrowleft": case "j": e.preventDefault(); seek((videoRef.current?.currentTime || 0) - 5); revealControls(); break;
@@ -249,16 +303,18 @@ export function VideoPlayer({
         src={src}
         poster={poster}
         autoPlay={autoPlay}
+        muted={muted}
         playsInline
         preload="metadata"
         {...({ referrerPolicy: "no-referrer" } as any)}
         className="w-full h-full object-contain"
         onClick={togglePlay}
         onDoubleClick={toggleFullscreen}
-        onPlay={() => { setPlaying(true); scheduleHide(); if (playRequested.current) armStartupStallTimer(9000); }}
-        onPause={() => { setPlaying(false); setShowControls(true); clearHideTimer(); }}
-        onEnded={() => { setPlaying(false); setShowControls(true); playRequested.current = false; clearStartupStallTimer(); }}
+        onPlay={() => { setPlaying(true); emitProgress(true); scheduleHide(); if (playRequested.current) armStartupStallTimer(9000); }}
+        onPause={() => { setPlaying(false); emitProgress(false); setShowControls(true); clearHideTimer(); }}
+        onEnded={() => { setPlaying(false); emitProgress(false); setShowControls(true); playRequested.current = false; clearStartupStallTimer(); }}
         onTimeUpdate={onTimeUpdate}
+        onVolumeChange={() => { const v = videoRef.current; if (v) { setMuted(v.muted); setVolume(v.volume); } }}
         onDurationChange={() => setDuration(videoRef.current?.duration || 0)}
         onLoadedMetadata={() => { setDuration(videoRef.current?.duration || 0); setLoading(false); }}
         onLoadedData={() => { setLoading(false); if (playRequested.current) armStartupStallTimer(9000); }}
@@ -270,20 +326,26 @@ export function VideoPlayer({
             if (now - lastDowngradeAt.current < 8000) return;
             if (qualities.length > 1 && onAutoDowngrade) {
               lastDowngradeAt.current = now;
-              setStallNotice("Slow network - switching to lower quality...");
+              showNotice("Slow network - switching to lower quality...", 3500);
               onAutoDowngrade(activeQualityUrl || src);
-              window.setTimeout(() => setStallNotice(null), 3500);
             } else {
-              setStallNotice("Buffering... slow network detected");
-              window.setTimeout(() => setStallNotice(null), 3000);
+              showNotice("Buffering... slow network detected", 3000);
             }
           }, 2800);
           if (playRequested.current) armStartupStallTimer(9000);
         }}
         onCanPlay={() => { setLoading(false); setError(false); if (stallTimer.current) { window.clearTimeout(stallTimer.current); stallTimer.current = null; } }}
-        onPlaying={() => { setLoading(false); clearStartupStallTimer(); playRequested.current = false; if (stallTimer.current) { window.clearTimeout(stallTimer.current); stallTimer.current = null; } }}
+        onPlaying={() => { setLoading(false); emitProgress(true); clearStartupStallTimer(); playRequested.current = false; setNeedsTap(false); if (stallTimer.current) { window.clearTimeout(stallTimer.current); stallTimer.current = null; } }}
         onStalled={() => { setLoading(true); if (playRequested.current) armStartupStallTimer(7000); }}
-        onError={() => { setLoading(false); setError(true); clearStartupStallTimer(); playRequested.current = false; if (stallTimer.current) { window.clearTimeout(stallTimer.current); stallTimer.current = null; } onError?.(); }}
+        onError={() => {
+          const v = videoRef.current;
+          setLoading(false); setError(true);
+          setErrorMessage(v?.error?.message || null);
+          clearStartupStallTimer(); clearNoticeTimer();
+          playRequested.current = false;
+          if (stallTimer.current) { window.clearTimeout(stallTimer.current); stallTimer.current = null; }
+          onError?.({ code: v?.error?.code, message: v?.error?.message, src });
+        }}
       />
 
       <div className={`pointer-events-none absolute inset-x-0 top-0 h-28 bg-gradient-to-b from-black/70 via-black/20 to-transparent transition-opacity duration-300 ${showControls || !playing ? "opacity-100" : "opacity-0"}`} />
@@ -305,7 +367,7 @@ export function VideoPlayer({
           </div>
         )}
         {!loading && !error && !playing && (
-          <button type="button" onClick={togglePlay} className="pointer-events-auto flex items-center justify-center w-[72px] h-[72px] sm:w-20 sm:h-20 rounded-full bg-cyan-500/90 hover:bg-cyan-400 text-white shadow-2xl shadow-cyan-500/30 backdrop-blur-sm transition-all duration-200 hover:scale-105 active:scale-95" aria-label="Play video">
+          <button type="button" onClick={togglePlay} className="pointer-events-auto flex items-center justify-center w-[72px] h-[72px] sm:w-20 sm:h-20 rounded-full bg-cyan-500/90 hover:bg-cyan-400 text-white shadow-2xl shadow-cyan-500/30 backdrop-blur-sm transition-all duration-200 hover:scale-105 active:scale-95" aria-label={needsTap ? "Tap to play video" : "Play video"}>
             <Play size={34} weight="fill" className="ml-1" />
           </button>
         )}
@@ -314,7 +376,7 @@ export function VideoPlayer({
             <div className="w-12 h-12 rounded-full bg-amber-500/15 text-amber-400 flex items-center justify-center"><WarningCircle size={28} weight="bold" /></div>
             <div>
               <p className="text-sm font-semibold text-white">Playback failed</p>
-              <p className="text-xs text-white/60 mt-1">This stream may be unavailable or expired.</p>
+              <p className="text-xs text-white/60 mt-1">{errorMessage || "This stream may be unavailable or expired. Try another mirror if one is listed."}</p>
             </div>
             {onReload && (
               <button type="button" onClick={onReload} className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-cyan-500 hover:bg-cyan-400 text-white text-xs font-semibold transition-colors">
@@ -357,10 +419,9 @@ export function VideoPlayer({
       </div>
 
       <div className={`absolute inset-x-0 bottom-0 px-3 sm:px-4 pb-3 sm:pb-4 transition-opacity duration-300 ${showControls || !playing ? "opacity-100" : "opacity-0 pointer-events-none"}`}>
-        <div className="group/seek relative mb-3 h-5 flex items-center cursor-pointer"
+        <div className="group/seek relative mb-3 h-5 flex items-center"
           onMouseMove={(e) => { const rect = (e.currentTarget as HTMLDivElement).getBoundingClientRect(); const pct = Math.min(1, Math.max(0, (e.clientX - rect.left) / rect.width)); setHoverTime(pct * duration); setHoverX(e.clientX - rect.left); }}
           onMouseLeave={() => setHoverTime(null)}
-          onClick={(e) => { const rect = (e.currentTarget as HTMLDivElement).getBoundingClientRect(); const pct = Math.min(1, Math.max(0, (e.clientX - rect.left) / rect.width)); seek(pct * duration); }}
         >
           {hoverTime !== null && duration > 0 && (
             <div className="absolute -top-7 -translate-x-1/2 px-2 py-1 rounded-md bg-black/90 border border-white/10 text-[11px] font-medium text-white tabular-nums" style={{ left: hoverX }}>{formatTime(hoverTime)}</div>
@@ -381,14 +442,14 @@ export function VideoPlayer({
             <button type="button" onClick={toggleMute} className="p-2 rounded-lg text-white hover:bg-white/10 transition-colors" aria-label={muted ? "Unmute" : "Mute"}>
               <VolumeIcon size={20} weight="fill" />
             </button>
-            <input type="range" min={0} max={1} step={0.05} value={muted ? 0 : volume} onChange={(e) => changeVolume(Number(e.target.value))} className="w-0 sm:w-20 opacity-0 sm:opacity-100 sm:group-hover/vol:w-24 transition-all accent-cyan-400 h-1" aria-label="Volume" />
+            <input type="range" min={0} max={1} step={0.05} value={muted ? 0 : volume} onChange={(e) => changeVolume(Number(e.target.value))} className="w-12 sm:w-20 sm:group-hover/vol:w-24 transition-all accent-cyan-400 h-1" aria-label="Volume" />
           </div>
           <div className="text-xs sm:text-sm font-medium text-white/90 tabular-nums">
             <span>{formatTime(currentTime)}</span><span className="text-white/40 mx-1">/</span><span className="text-white/70">{formatTime(duration)}</span>
           </div>
           <div className="flex-1" />
           {typeof document !== "undefined" && document.pictureInPictureEnabled && (
-            <button type="button" onClick={togglePiP} className="hidden sm:inline-flex p-2 rounded-lg text-white/85 hover:text-white hover:bg-white/10 transition-colors" aria-label="Picture in picture"><PictureInPicture size={20} /></button>
+            <button type="button" onClick={togglePiP} className="inline-flex p-2 rounded-lg text-white/85 hover:text-white hover:bg-white/10 transition-colors" aria-label="Picture in picture"><PictureInPicture size={20} /></button>
           )}
           <button type="button" onClick={toggleFullscreen} className="p-2 rounded-lg text-white/85 hover:text-white hover:bg-white/10 transition-colors" aria-label={fullscreen ? "Exit fullscreen" : "Fullscreen"}>
             {fullscreen ? <CornersIn size={20} weight="bold" /> : <CornersOut size={20} weight="bold" />}

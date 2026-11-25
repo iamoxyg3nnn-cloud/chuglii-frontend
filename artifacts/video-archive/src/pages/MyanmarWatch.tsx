@@ -2,6 +2,9 @@ import { useRef, useState, useEffect, useCallback } from "react";
 import { useParams, Link, useLocation } from "wouter";
 import { Layout } from "@/components/Layout";
 import { VideoPlayer } from "@/components/VideoPlayer";
+import { PlayerFrame } from "@/components/PlayerFrame";
+import { copyText } from "@/lib/clipboard";
+import { buildEdgePlayerUrl } from "@/lib/video-source";
 import { useMyanmarVideoById, useMyanmarRelatedVideos, type MyanmarVideo } from "@/hooks/useMyanmarVideos";
 import { MyanmarCard } from "@/components/MyanmarCard";
 import { getSupabase } from "@/lib/supabase";
@@ -231,20 +234,18 @@ export default function MyanmarWatch() {
     } catch {}
   };
 
-  const handleShare = () => {
-    if (navigator.clipboard) {
-      navigator.clipboard.writeText(window.location.href);
+  const handleShare = async () => {
+    if (await copyText(window.location.href)) {
       setCopied(true);
-      setTimeout(() => setCopied(false), 2000);
+      window.setTimeout(() => setCopied(false), 2000);
     }
   };
 
-  const handleCopyStream = () => {
+  const handleCopyStream = async () => {
     const stream = streamUrl || video?.full_video_url || video?.detail_url;
-    if (stream && navigator.clipboard) {
-      navigator.clipboard.writeText(stream);
+    if (stream && await copyText(stream)) {
       setCopiedStream(true);
-      setTimeout(() => setCopiedStream(false), 2000);
+      window.setTimeout(() => setCopiedStream(false), 2000);
     }
   };
 
@@ -341,14 +342,19 @@ export default function MyanmarWatch() {
                 }}
               />
             ) : video.detail_url ? (
-              <iframe
-                key={`clean-iframe-${video.detail_url}-${playerKey}`}
-                src={`/api/player?url=${encodeURIComponent(video.detail_url)}`}
+              <PlayerFrame
+                src={buildEdgePlayerUrl(video.detail_url, {
+                  title: video.title,
+                  poster: video.clean_thumbnail_url || video.thumbnail_url || "",
+                  detail: video.detail_url,
+                })}
+                resetKey={`${video.id}-${playerKey}`}
                 title={video.title}
-                referrerPolicy="no-referrer"
-                allow="autoplay *; fullscreen *; picture-in-picture *; encrypted-media *; accelerometer *; gyroscope *"
-                allowFullScreen
-                className="w-full h-full border-none bg-black"
+                poster={video.clean_thumbnail_url || video.thumbnail_url || undefined}
+                onRetry={() => {
+                  setPlayerKey((key) => key + 1);
+                  resolveFreshStream(true);
+                }}
               />
             ) : (
               <div className="w-full h-full flex flex-col items-center justify-center p-6 text-center text-muted-foreground bg-black">

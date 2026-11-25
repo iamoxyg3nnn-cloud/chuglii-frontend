@@ -38,6 +38,8 @@ const ROUTE_IMPORTS: ReadonlyArray<[string, () => Promise<unknown>]> = [
   ["/myanmar/video", () => import("@/pages/MyanmarWatch")],
   ["/myanmar", () => import("@/pages/MyanmarFeed")],
   ["/voyeurhouse", () => import("@/pages/VoyeurhouseFeed")],
+  ["/chinese/video", () => import("@/pages/ChineseWatch")],
+  ["/chinese", () => import("@/pages/ChineseFeed")],
   ["/login", () => import("@/pages/Login")],
   ["/signup", () => import("@/pages/Signup")],
   ["/forgot-password", () => import("@/pages/ForgotPassword")],

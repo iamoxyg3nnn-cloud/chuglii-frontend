@@ -2,7 +2,10 @@ import { useRef, useState, useEffect } from "react";
 import { useParams, Link, useLocation } from "wouter";
 import { Layout } from "@/components/Layout";
 import { VideoPlayer } from "@/components/VideoPlayer";
+import { PlayerFrame } from "@/components/PlayerFrame";
 import { LeakCard } from "@/components/LeakCard";
+import { copyText } from "@/lib/clipboard";
+import { buildEdgePlayerUrl, isDirectVideoUrl } from "@/lib/video-source";
 import { useScrapedVideoById, useScrapedRelatedVideos, type ScrapedVideo } from "@/hooks/useScrapedVideos";
 import {
   Flame,
@@ -32,20 +35,52 @@ export default function LeakWatch() {
   const [copiedStream, setCopiedStream] = useState(false);
   const [isSaved, setIsSaved] = useState(false);
   const [selectedServerUrl, setSelectedServerUrl] = useState<string | null>(null);
+  const [playerKey, setPlayerKey] = useState(0);
+
+  // A stale mirror from the previous video must never stick across navigation.
+  useEffect(() => {
+    setSelectedServerUrl(null);
+    setPlayerKey(0);
+  }, [id]);
 
   const { data: video, isLoading, error } = useScrapedVideoById(id);
   const { data: relatedVideos, isLoading: relatedLoading } = useScrapedRelatedVideos(id, video, 12);
 
-  const isDirectMp4 = Boolean(
-    video?.full_video_url && video.full_video_url.endsWith(".mp4")
+  const poster = video?.clean_thumbnail_url || video?.thumbnail_url || "";
+  const primaryVideoUrl = video?.full_video_url || "";
+  // Preserve the historical rule for the primary source: only a bare file URL
+  // opens natively by default. Signed/query URLs stay on the embed path unless
+  // the user explicitly selects a direct mirror.
+  const primaryIsPlainDirect = Boolean(
+    primaryVideoUrl && !/[?#]/.test(primaryVideoUrl) && isDirectVideoUrl(primaryVideoUrl),
   );
 
   const rawPayload = video?.raw_payload as any;
   const servers: Array<{ name: string; embed_url: string }> = rawPayload?.servers || [];
-  const defaultEmbedUrl = rawPayload?.embed_url || (!isDirectMp4 ? (video?.full_video_url || video?.trailer_preview_url) : null);
+  const defaultEmbedUrl = rawPayload?.embed_url || (!primaryIsPlainDirect ? (primaryVideoUrl || video?.trailer_preview_url) : null);
   const activeEmbedUrl = selectedServerUrl || defaultEmbedUrl;
+  const activeDirectSrc = activeEmbedUrl && isDirectVideoUrl(activeEmbedUrl)
+    ? activeEmbedUrl
+    : primaryIsPlainDirect ? primaryVideoUrl : null;
 
-  const resolvedEmbedUrl = activeEmbedUrl || null;
+  const resolvedEmbedUrl = activeEmbedUrl && !isDirectVideoUrl(activeEmbedUrl)
+    ? buildEdgePlayerUrl(activeEmbedUrl, {
+        title: video?.title,
+        poster,
+        detail: video?.detail_url || activeEmbedUrl,
+      })
+    : null;
+
+  const mirrorUrls = servers.map((server) => server.embed_url).filter(Boolean);
+  const selectNextMirror = () => {
+    if (mirrorUrls.length < 2) {
+      setPlayerKey((key) => key + 1);
+      return;
+    }
+    const currentIndex = mirrorUrls.indexOf(activeEmbedUrl || "");
+    setSelectedServerUrl(mirrorUrls[(currentIndex + 1) % mirrorUrls.length]);
+    setPlayerKey((key) => key + 1);
+  };
 
   // Check saved state from localStorage
   useEffect(() => {
@@ -108,20 +143,18 @@ export default function LeakWatch() {
     } catch {}
   };
 
-  const handleShare = () => {
-    if (navigator.clipboard) {
-      navigator.clipboard.writeText(window.location.href);
+  const handleShare = async () => {
+    if (await copyText(window.location.href)) {
       setCopied(true);
-      setTimeout(() => setCopied(false), 2000);
+      window.setTimeout(() => setCopied(false), 2000);
     }
   };
 
-  const handleCopyStream = () => {
+  const handleCopyStream = async () => {
     const stream = video?.full_video_url || video?.trailer_preview_url;
-    if (stream && navigator.clipboard) {
-      navigator.clipboard.writeText(stream);
+    if (stream && await copyText(stream)) {
       setCopiedStream(true);
-      setTimeout(() => setCopiedStream(false), 2000);
+      window.setTimeout(() => setCopiedStream(false), 2000);
     }
   };
 
@@ -208,22 +241,23 @@ export default function LeakWatch() {
 
           {/* Video Player Cinema Frame */}
           <div className="relative aspect-video w-full max-h-[70vh] mx-auto bg-black rounded-2xl overflow-hidden shadow-2xl border border-border/30">
-            {isDirectMp4 ? (
+            {activeDirectSrc ? (
               <VideoPlayer
-                src={video.full_video_url!}
-                poster={video.clean_thumbnail_url || video.thumbnail_url || undefined}
+                key={`leak-${id}-${playerKey}-${activeDirectSrc}`}
+                src={activeDirectSrc}
+                poster={poster || undefined}
                 title={video.title}
                 autoPlay
                 videoRef={videoRef}
               />
             ) : resolvedEmbedUrl ? (
-              <iframe
+              <PlayerFrame
                 src={resolvedEmbedUrl}
+                resetKey={`${id}-${playerKey}`}
                 title={video.title}
-                referrerPolicy="no-referrer"
-                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share; fullscreen"
-                allowFullScreen
-                className="w-full h-full border-none bg-black"
+                poster={poster || undefined}
+                onRetry={() => setPlayerKey((key) => key + 1)}
+                onNextSource={mirrorUrls.length > 1 ? selectNextMirror : undefined}
               />
             ) : (
               <div className="w-full h-full flex flex-col items-center justify-center p-6 text-center text-muted-foreground">
@@ -254,7 +288,10 @@ export default function LeakWatch() {
                 return (
                   <button
                     key={srv.name + idx}
-                    onClick={() => setSelectedServerUrl(srv.embed_url)}
+                    onClick={() => {
+                      setSelectedServerUrl(srv.embed_url);
+                      setPlayerKey((key) => key + 1);
+                    }}
                     className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors cursor-pointer ${
                       isSelected
                         ? "bg-rose-500 text-white shadow-sm"
@@ -277,11 +314,11 @@ export default function LeakWatch() {
                   href={primaryStream}
                   target="_blank"
                   rel="noopener noreferrer"
-                  download={isDirectMp4 ? "" : undefined}
+                  download={activeDirectSrc ? "" : undefined}
                   className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs sm:text-sm font-semibold bg-rose-500 hover:bg-rose-600 text-white shadow-sm transition-all"
                 >
                   <DownloadSimple size={16} weight="bold" />
-                  <span>{isDirectMp4 ? "Download MP4" : "Open Stream Mirror"}</span>
+                  <span>{activeDirectSrc ? "Download MP4" : "Open Stream Mirror"}</span>
                 </a>
               )}
 

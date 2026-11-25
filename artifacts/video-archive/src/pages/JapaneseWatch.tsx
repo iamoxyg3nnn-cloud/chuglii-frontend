@@ -1,6 +1,9 @@
 import { useRef, useState, useEffect, useMemo } from "react";
 import { useParams, Link, useLocation } from "wouter";
 import { Layout } from "@/components/Layout";
+import { PlayerFrame } from "@/components/PlayerFrame";
+import { copyText } from "@/lib/clipboard";
+import { buildEdgePlayerUrl, isDirectVideoUrl } from "@/lib/video-source";
 import { iframeReferrerPolicy } from "@/lib/video-hosts";
 import { useJapaneseVideoById, useJapaneseRelatedVideos, type JapaneseVideo } from "@/hooks/useJapaneseVideos";
 import { JapaneseCard } from "@/components/JapaneseCard";
@@ -42,6 +45,7 @@ export default function JapaneseWatch() {
   const { data: video, isLoading, error } = useJapaneseVideoById(id);
   const { data: relatedVideos, isLoading: relatedLoading } = useJapaneseRelatedVideos(id, video, 8);
 
+  const poster = video?.clean_thumbnail_url || video?.thumbnail_url || "";
   const rawPayload = video?.raw_payload as any;
   const allServers: Array<{ name: string; embed_url: string }> = rawPayload?.servers || [];
   
@@ -115,8 +119,8 @@ export default function JapaneseWatch() {
     // LuluStream (luminscdn / lulustream / luluvdo) strictly binds HLS tokens to client TCP socket IP.
     // Must embed directly with referrerpolicy="no-referrer" so client's browser generates and plays token directly without 403 / infinite stalls
     if (u.includes("luminscdn") || u.includes("lulustream") || u.includes("luluvdo")) return false;
-    // Direct raw MP4 files (not streamtape) can play directly
-    if (u.endsWith(".mp4") && !u.includes("streamtape")) return false;
+    // Direct raw MP4/WebM files (not streamtape) can play directly, even with signed query tokens.
+    if (isDirectVideoUrl(urlStr) && !u.includes("streamtape")) return false;
     // All other hosts (FC2Stream, EarnVids, VidSpeed, Streamtape) MUST go through /api/player
     // to bypass domain restrictions (Referer spoofing), CSP frame-ancestors, and rogue download triggers
     return true;
@@ -124,9 +128,24 @@ export default function JapaneseWatch() {
 
   const resolvedEmbedUrl = currentEmbedUrl
     ? (needsEdgeProxy(currentEmbedUrl)
-        ? `/api/player?url=${encodeURIComponent(currentEmbedUrl)}`
+        ? buildEdgePlayerUrl(currentEmbedUrl, {
+            title: video?.title,
+            poster,
+            detail: video?.detail_url || currentEmbedUrl,
+          })
         : currentEmbedUrl)
     : null;
+
+  const serverUrls = servers.map((server) => server.embed_url).filter(Boolean);
+  const selectNextMirror = () => {
+    if (serverUrls.length < 2) {
+      setPlayerKey((key) => key + 1);
+      return;
+    }
+    const currentIndex = serverUrls.indexOf(activeEmbedUrl || "");
+    setSelectedServerUrl(serverUrls[(currentIndex + 1) % serverUrls.length]);
+    setPlayerKey((key) => key + 1);
+  };
 
   useEffect(() => {
     if (!id) return;
@@ -165,20 +184,18 @@ export default function JapaneseWatch() {
     } catch {}
   };
 
-  const handleShare = () => {
-    if (navigator.clipboard) {
-      navigator.clipboard.writeText(window.location.href);
+  const handleShare = async () => {
+    if (await copyText(window.location.href)) {
       setCopied(true);
-      setTimeout(() => setCopied(false), 2000);
+      window.setTimeout(() => setCopied(false), 2000);
     }
   };
 
-  const handleCopyStream = () => {
+  const handleCopyStream = async () => {
     const stream = activeEmbedUrl || video?.full_video_url || video?.trailer_preview_url;
-    if (stream && navigator.clipboard) {
-      navigator.clipboard.writeText(stream);
+    if (stream && await copyText(stream)) {
       setCopiedStream(true);
-      setTimeout(() => setCopiedStream(false), 2000);
+      window.setTimeout(() => setCopiedStream(false), 2000);
     }
   };
 
@@ -266,14 +283,14 @@ export default function JapaneseWatch() {
           {/* Video Cinema Player Frame */}
           <div className="relative aspect-video w-full max-h-[70vh] mx-auto bg-black rounded-2xl overflow-hidden shadow-2xl border border-border/30">
             {resolvedEmbedUrl ? (
-              <iframe
-                key={`${resolvedEmbedUrl}-${playerKey}`}
+              <PlayerFrame
                 src={resolvedEmbedUrl}
+                resetKey={`${id}-${playerKey}`}
                 title={video.title}
+                poster={poster || undefined}
                 referrerPolicy={iframeReferrerPolicy(resolvedEmbedUrl)}
-                allow="autoplay *; fullscreen *; picture-in-picture *; encrypted-media *; accelerometer *; gyroscope *; display-capture *; screen-wake-lock *; clipboard-write *"
-                allowFullScreen
-                className="w-full h-full border-none bg-black"
+                onRetry={() => setPlayerKey((key) => key + 1)}
+                onNextSource={serverUrls.length > 1 ? selectNextMirror : undefined}
               />
             ) : (
               <div className="w-full h-full flex flex-col items-center justify-center p-6 text-center text-muted-foreground">

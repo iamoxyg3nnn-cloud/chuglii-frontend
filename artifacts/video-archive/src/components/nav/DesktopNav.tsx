@@ -1,6 +1,6 @@
 import { Link } from "wouter";
 import { useCallback, memo, useState, useRef } from "react";
-import { PaperPlaneTilt, Flame, GlobeHemisphereWest, FilmStrip, CaretDown, Broadcast, Eye } from "@phosphor-icons/react";
+import { PaperPlaneTilt, Flame, GlobeHemisphereWest, FilmStrip, CaretDown, Broadcast, Eye, Magnet } from "@phosphor-icons/react";
 import { prefetchRoute } from "@/lib/route-chunks";
 import { isActiveNavigationRoute } from "@/lib/navigation";
 
@@ -47,6 +47,13 @@ export const SCRAPER_CATEGORIES = [
     href: "/voyeurhouse",
     count: "5 SRC",
     icon: Eye,
+  },
+  {
+    id: "chinese",
+    name: "Chinese",
+    href: "/chinese",
+    count: "HD+MG",
+    icon: Magnet,
   },
 ] as const;
 
@@ -141,6 +148,7 @@ export const DesktopNav = memo(function DesktopNav({ location, onRequestOpen }: 
                 (cat.id === "japanese" && isActiveNavigationRoute("/japanese", location)) ||
                 (cat.id === "myanmar" && (isActiveNavigationRoute("/myanmar", location) || location.includes("category=myanmar"))) ||
                 (cat.id === "voyeurhouse" && isActiveNavigationRoute("/voyeurhouse", location)) ||
+                (cat.id === "chinese" && isActiveNavigationRoute("/chinese", location)) ||
                 (cat.id === "viral-mms" && (isActiveNavigationRoute("/leak", location) || location.includes("category=viral-mms")));
               return (
                 <Link key={cat.id} href={cat.href}>

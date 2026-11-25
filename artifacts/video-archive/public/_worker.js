@@ -747,7 +747,7 @@ function renderCleanMp4Player(streams, title = '', poster = '') {
   const safeTitle = (title || 'Chuglii Player').replace(/</g, '&lt;').replace(/>/g, '&gt;');
   const safePoster = poster ? String(poster).replace(/"/g, '&quot;') : '';
   const list = Array.isArray(streams) ? streams.filter(s => s && s.url) : [];
-  return `<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1.0,user-scalable=no"><meta name="referrer" content="no-referrer"><title>${safeTitle}</title><style>*{margin:0;padding:0;box-sizing:border-box}html,body{width:100%;height:100%;background:#000;overflow:hidden;display:flex;align-items:center;justify-content:center;position:relative}video{width:100%;height:100%;max-height:100vh;object-fit:contain;background:#000}.control-overlay{position:absolute;top:12px;right:12px;z-index:50}.quality-select{background:rgba(15,23,42,.88);color:#f8fafc;border:1px solid rgba(255,255,255,.25);border-radius:6px;padding:5px 10px;font-size:13px;font-family:system-ui,-apple-system,sans-serif;cursor:pointer}.quality-select option{background:#0f172a;color:#fff}</style></head><body><div id="quality-wrap" class="control-overlay" style="display:none"><select id="quality-selector" class="quality-select" title="Select Video Quality"></select></div><video id="player" controls autoplay muted playsinline referrerpolicy="no-referrer" ${safePoster ? `poster="${safePoster}"` : ''}></video><script>(function(){var v=document.getElementById('player'),s=${JSON.stringify(list)},sel=document.getElementById('quality-selector'),w=document.getElementById('quality-wrap');if(!s.length)return;function label(x){var l=x.label||(x.quality?(x.quality+'p'):'Original');if(x.quality>=1080&&!/full\s*hd/i.test(l))l+=' Full HD';else if(x.quality>=720&&x.quality<1080&&!/\bhd\b/i.test(l))l+=' HD';return l}if(s.length>1){w.style.display='block';s.forEach(function(x,i){var o=document.createElement('option');o.value=String(i);o.textContent=label(x);sel.appendChild(o)})}function set(i,keep){i=Math.max(0,Math.min(s.length-1,i));var t=keep?(v.currentTime||0):0,p=v.paused;sel.value=String(i);var usedFallback=false;var onError=function(){v.removeEventListener('error',onError);var fb=s[i].fallbackUrl;if(fb&&!usedFallback){usedFallback=true;v.src=fb;v.addEventListener('error',onError);v.load()}else if(i<s.length-1){set(i+1,keep)}};v.addEventListener('error',onError);v.src=s[i].url;v.addEventListener('loadedmetadata',function m(){v.removeEventListener('loadedmetadata',m);try{if(t>0)v.currentTime=Math.min(t,Math.max(0,(v.duration||t)-.25))}catch(e){}if(!p){v.muted=true;v.play().catch(function(){})}});v.load()}sel.addEventListener('change',function(){set(parseInt(sel.value,10)||0,true)});set(0,false);v.play().catch(function(){v.muted=true;v.play().catch(function(){})})})();</script></body></html>`;
+  return `<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1.0,user-scalable=no"><meta name="referrer" content="no-referrer"><title>${safeTitle}</title><style>*{margin:0;padding:0;box-sizing:border-box}html,body{width:100%;height:100%;background:#000;overflow:hidden;display:flex;align-items:center;justify-content:center;position:relative}video{width:100%;height:100%;max-height:100vh;object-fit:contain;background:#000}.control-overlay{position:absolute;top:12px;right:12px;z-index:50}.quality-select{background:rgba(15,23,42,.88);color:#f8fafc;border:1px solid rgba(255,255,255,.25);border-radius:6px;padding:5px 10px;font-size:13px;font-family:system-ui,-apple-system,sans-serif;cursor:pointer}.quality-select option{background:#0f172a;color:#fff}</style></head><body><div id="quality-wrap" class="control-overlay" style="display:none"><select id="quality-selector" class="quality-select" title="Select Video Quality"></select></div><video id="player" controls autoplay muted playsinline referrerpolicy="no-referrer" ${safePoster ? `poster="${safePoster}"` : ''}></video><script>(function(){var v=document.getElementById('player'),s=${JSON.stringify(list)},sel=document.getElementById('quality-selector'),w=document.getElementById('quality-wrap');if(!s.length)return;function label(x){var l=x.label||(x.quality?(x.quality+'p'):'Original');if(x.quality>=1080&&!/full\s*hd/i.test(l))l+=' Full HD';else if(x.quality>=720&&x.quality<1080&&!/\bhd\b/i.test(l))l+=' HD';return l}if(s.length>1){w.style.display='block';s.forEach(function(x,i){var o=document.createElement('option');o.value=String(i);o.textContent=label(x);sel.appendChild(o)})}function set(i,keep){i=Math.max(0,Math.min(s.length-1,i));var t=keep?(v.currentTime||0):0,p=v.paused;sel.value=String(i);var usedFallback=false;var onError=function(){v.removeEventListener('error',onError);var fb=s[i].fallbackUrl;if(fb&&!usedFallback){usedFallback=true;v.src=fb;v.addEventListener('error',onError);v.load()}else if(i<s.length-1){set(i+1,keep)}};v.addEventListener('error',onError);v.src=s[i].url;v.addEventListener('loadedmetadata',function m(){v.removeEventListener('loadedmetadata',m);try{if(t>0)v.currentTime=Math.min(t,Math.max(0,(v.duration||t)-.25))}catch(e){}if(!p){v.muted=true;v.play().catch(function(){})}});v.load()}sel.addEventListener('change',function(){set(parseInt(sel.value,10)||0,true)});set(0,false);v.play().catch(function(){v.muted=true;v.play().catch(function(){})})})();</script><script>(function(){function n(t,d){try{parent.postMessage({source:'chuglii-player',type:t,detail:d||{}},'*')}catch(e){}}var v=document.getElementById('player');v.addEventListener('playing',function(){n('player:playing')});v.addEventListener('ended',function(){n('player:ended')});v.addEventListener('error',function(){n('player:error',{code:'media_error',message:(v.error&&v.error.message)||'This stream failed to play.'})})})();</script></body></html>`;
 }
 
 function renderCleanHlsPlayer(streamingUrl, title = "", poster = "") {
@@ -779,7 +779,16 @@ function renderCleanHlsPlayer(streamingUrl, title = "", poster = "") {
   <video id="player" controls autoplay playsinline ${poster ? `poster="${poster}"` : ""}></video>
   <script>
     (function() {
+      function notify(type, detail) {
+        try { parent.postMessage({ source: 'chuglii-player', type: type, detail: detail || {} }, '*'); } catch (err) {}
+      }
+      var hlsRetries = 0;
       var video = document.getElementById('player');
+      video.addEventListener('playing', function() { notify('player:playing'); });
+      video.addEventListener('ended', function() { notify('player:ended'); });
+      video.addEventListener('error', function() {
+        notify('player:error', { code: 'media_error', message: (video.error && video.error.message) || 'This stream failed to play.' });
+      });
       var streamUrl = ${JSON.stringify(streamingUrl)};
       ${isHls ? `
       if (typeof Hls !== 'undefined' && Hls.isSupported()) {
@@ -791,7 +800,13 @@ function renderCleanHlsPlayer(streamingUrl, title = "", poster = "") {
         });
         hls.loadSource(streamUrl);
         hls.attachMedia(video);
+        // A successful load starts a fresh retry budget; only consecutive
+        // network failures should escalate to a hard error.
+        if (Hls.Events.FRAG_LOADED) {
+          hls.on(Hls.Events.FRAG_LOADED, function() { hlsRetries = 0; });
+        }
         hls.on(Hls.Events.MANIFEST_PARSED, function(event, data) {
+          hlsRetries = 0;
           try {
             var levels = hls.levels;
             var selector = document.getElementById('quality-selector');
@@ -803,10 +818,10 @@ function renderCleanHlsPlayer(streamingUrl, title = "", poster = "") {
                 return b.height !== a.height ? b.height - a.height : b.bitrate - a.bitrate;
               });
 
-              // Start at the highest advertised rendition. Users can switch to
-              // Auto (Best) or a lower level from the selector when needed.
+              // Start in adaptive/auto mode so the player can step down on a
+              // slow connection instead of stalling on the highest rendition.
               var highestLevel = sorted[0].idx;
-              hls.currentLevel = highestLevel;
+              hls.currentLevel = -1;
 
               if (levels.length > 1) {
                 wrap.style.display = 'flex';
@@ -820,7 +835,7 @@ function renderCleanHlsPlayer(streamingUrl, title = "", poster = "") {
                   opt.textContent = label;
                   selector.appendChild(opt);
                 });
-                selector.value = String(highestLevel);
+                selector.value = "-1";
                 selector.addEventListener('change', function() {
                   var val = parseInt(selector.value, 10);
                   hls.currentLevel = val;
@@ -839,8 +854,14 @@ function renderCleanHlsPlayer(streamingUrl, title = "", poster = "") {
           if (data && data.fatal) {
             switch (data.type) {
               case Hls.ErrorTypes.NETWORK_ERROR:
-                console.warn("HLS Network error, reloading stream...", data);
-                hls.startLoad();
+                if (hlsRetries < 2) {
+                  hlsRetries += 1;
+                  console.warn("HLS Network error, retrying stream...", data);
+                  hls.startLoad();
+                } else {
+                  notify('player:error', { code: 'hls_network_error', message: 'The stream could not be loaded after retries.' });
+                  hls.destroy();
+                }
                 break;
               case Hls.ErrorTypes.MEDIA_ERROR:
                 console.warn("HLS Media error, recovering...", data);
@@ -848,6 +869,7 @@ function renderCleanHlsPlayer(streamingUrl, title = "", poster = "") {
                 break;
               default:
                 console.error("HLS fatal error:", data);
+                notify('player:error', { code: 'hls_error', message: 'The stream stopped unexpectedly.' });
                 hls.destroy();
                 break;
             }
@@ -868,6 +890,179 @@ function renderCleanHlsPlayer(streamingUrl, title = "", poster = "") {
       video.src = streamUrl;
       video.play().catch(function() {});
       `}
+    })();
+  </script>
+</body>
+</html>`;
+}
+
+// ─── api.php → play.m3u8 Resolver (Chinese CDN endpoints) ───────────
+// The 95da network's api.php endpoints (zone=1&md5=<hash>) deterministically
+// resolve to play.m3u8?zone=1&dir=<hash> on the same host — a pure string
+// transform, no upstream fetch needed.
+function apiPhpToM3u8(u) {
+  try {
+    const o = new URL(u);
+    if (!o.pathname.endsWith("/api.php")) return null;
+    const md5 = o.searchParams.get("md5");
+    if (!md5) return null;
+    const zone = o.searchParams.get("zone") || "1";
+    return `${o.origin}/play.m3u8?zone=${encodeURIComponent(zone)}&dir=${encodeURIComponent(md5)}`;
+  } catch (e) {
+    return null;
+  }
+}
+
+// ─── Multi-Candidate HLS Player (endpoint failover) ────────────────
+// Same UI/behavior as renderCleanHlsPlayer, but takes an ordered list of
+// proxied manifest URLs. On fatal errors it fails over to the next candidate
+// (preserving playback position), so dead or geo-blocked CDN endpoints never
+// kill playback as long as any endpoint serves the manifest.
+function renderCleanHlsPlayerMulti(candidates, title = "", poster = "") {
+  const safeTitle = (title || "Chuglii Player").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+  return `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+  <title>${safeTitle}</title>
+  <script src="https://cdn.jsdelivr.net/npm/hls.js@1.5.8/dist/hls.min.js"></script>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    html, body { width: 100%; height: 100%; background: #000; overflow: hidden; display: flex; align-items: center; justify-content: center; position: relative; }
+    video { width: 100%; height: 100%; max-height: 100vh; object-fit: contain; background: #000; outline: none; }
+    .control-overlay { position: absolute; top: 12px; right: 12px; z-index: 50; display: flex; align-items: center; gap: 8px; opacity: 0.85; transition: opacity 0.2s ease; }
+    .control-overlay:hover { opacity: 1; }
+    .quality-select { background: rgba(0,0,0,0.7); color: #fff; border: 1px solid rgba(255,255,255,0.25); border-radius: 6px; padding: 4px 8px; font-size: 12px; cursor: pointer; outline: none; }
+    .quality-select option { background: #111; color: #fff; }
+    .failover-badge { position: absolute; top: 12px; left: 12px; z-index: 50; background: rgba(0,0,0,0.65); color: #fbbf24; border: 1px solid rgba(251,191,36,0.4); border-radius: 6px; padding: 4px 10px; font-size: 11px; font-family: system-ui, sans-serif; display: none; }
+  </style>
+</head>
+<body>
+  <div id="quality-wrap" class="control-overlay" style="display: none;">
+    <select id="quality-selector" class="quality-select" title="Select Video Quality">
+      <option value="-1">Auto (Best)</option>
+    </select>
+  </div>
+  <div id="failover-badge" class="failover-badge"></div>
+  <video id="player" controls autoplay playsinline ${poster ? `poster="${poster}"` : ""}></video>
+  <script>
+    (function() {
+      function notify(type, detail) {
+        try { parent.postMessage({ source: 'chuglii-player', type: type, detail: detail || {} }, '*'); } catch (err) {}
+      }
+      var video = document.getElementById('player');
+      var badge = document.getElementById('failover-badge');
+      var candidates = ${JSON.stringify(candidates)};
+      var ci = 0;
+      var hls = null;
+      var hlsRetries = 0;
+
+      function destroyHls() {
+        if (hls) { try { hls.destroy(); } catch (err) {} hls = null; }
+      }
+
+      function buildQualitySelector(hlsInstance) {
+        try {
+          var levels = hlsInstance.levels;
+          var selector = document.getElementById('quality-selector');
+          var wrap = document.getElementById('quality-wrap');
+          if (levels && levels.length > 0) {
+            var sorted = levels.map(function(lvl, idx) {
+              return { idx: idx, height: lvl.height || 0, bitrate: lvl.bitrate || 0 };
+            }).sort(function(a, b) {
+              return b.height !== a.height ? b.height - a.height : b.bitrate - a.bitrate;
+            });
+            hlsInstance.currentLevel = -1;
+            if (levels.length > 1) {
+              wrap.style.display = 'flex';
+              selector.innerHTML = '<option value="-1">Auto (Best)</option>';
+              sorted.forEach(function(item) {
+                var label = item.height ? (item.height + 'p') : ('Level ' + (item.idx + 1));
+                if (item.height >= 1080) label += ' Full HD';
+                else if (item.height >= 720) label += ' HD';
+                var opt = document.createElement('option');
+                opt.value = item.idx;
+                opt.textContent = label;
+                selector.appendChild(opt);
+              });
+              selector.value = "-1";
+              selector.onchange = function() {
+                hlsInstance.currentLevel = parseInt(selector.value, 10);
+              };
+            }
+          }
+        } catch (err) { console.warn('Quality selector init error:', err); }
+      }
+
+      function startPlayback(keepTime) {
+        var t = keepTime ? (video.currentTime || 0) : 0;
+        if (typeof Hls !== 'undefined' && Hls.isSupported()) {
+          hls = new Hls({ enableWorker: true, lowLatencyMode: false, backBufferLength: 90, maxBufferLength: 30 });
+          hls.on(Hls.Events.FRAG_LOADED, function() { hlsRetries = 0; });
+          hls.on(Hls.Events.MANIFEST_PARSED, function() {
+            hlsRetries = 0;
+            buildQualitySelector(hls);
+            if (t > 0) { try { video.currentTime = t; } catch (err) {} }
+            video.play().catch(function() { video.muted = true; video.play().catch(function() {}); });
+          });
+          hls.on(Hls.Events.ERROR, function(event, data) {
+            if (data && data.fatal) {
+              if (data.type === Hls.ErrorTypes.NETWORK_ERROR && hlsRetries < 2) {
+                hlsRetries += 1;
+                console.warn('HLS network error, retrying...', data);
+                try { hls.startLoad(); } catch (err) { nextCandidate(); }
+              } else if (data.type === Hls.ErrorTypes.MEDIA_ERROR) {
+                console.warn('HLS media error, recovering...', data);
+                try { hls.recoverMediaError(); } catch (err) { nextCandidate(); }
+              } else {
+                console.error('HLS fatal error:', data);
+                nextCandidate();
+              }
+            }
+          });
+          hls.loadSource(candidates[ci]);
+          hls.attachMedia(video);
+        } else if (video.canPlayType('application/vnd.apple.mpegurl')) {
+          // Native HLS (Safari / iOS)
+          video.src = candidates[ci];
+          video.addEventListener('loadedmetadata', function onMeta() {
+            video.removeEventListener('loadedmetadata', onMeta);
+            if (t > 0) { try { video.currentTime = t; } catch (err) {} }
+            video.play().catch(function() { video.muted = true; video.play().catch(function() {}); });
+          });
+        } else {
+          video.src = candidates[ci];
+        }
+      }
+
+      function nextCandidate() {
+        destroyHls();
+        hlsRetries = 0;
+        if (ci < candidates.length - 1) {
+          ci += 1;
+          if (badge) {
+            badge.style.display = 'block';
+            badge.textContent = 'Switching stream source ' + (ci + 1) + '/' + candidates.length + '...';
+          }
+          console.log('Failing over to candidate ' + (ci + 1) + ' of ' + candidates.length);
+          startPlayback(true);
+        } else {
+          notify('player:error', { code: 'media_error', message: 'This stream failed to play. Please try again later.' });
+        }
+      }
+
+      video.addEventListener('playing', function() {
+        if (badge) badge.style.display = 'none';
+        notify('player:playing');
+      });
+      video.addEventListener('ended', function() { notify('player:ended'); });
+      video.addEventListener('error', function() {
+        // Native-HLS path errors only (hls.js path handles its own errors)
+        if (!hls) nextCandidate();
+      });
+
+      startPlayback(false);
     })();
   </script>
 </body>
@@ -1120,7 +1315,8 @@ function renderUnavailablePlayer(title, poster, detailUrl) {
   </style></head><body><div class="wrap">
   ${safePoster ? `<img class="poster" src="${safePoster}" alt="">` : ""}
   <main class="card"><h1>${safeTitle}</h1><p>This upstream source is currently unavailable. No ad-gated or broken player scripts were loaded.</p>${safeDetail ? `<a href="${safeDetail}" target="_blank" rel="noopener noreferrer">Open source page</a>` : ""}</main>
-  </div></body></html>`;
+  </div>
+  <script>try{parent.postMessage({source:'chuglii-player',type:'player:error',detail:{code:'upstream_unavailable',message:'This upstream source is currently unavailable.'}},'*')}catch(err){}</script></body></html>`;
 }
 
 async function resolveGounlimitedStream(nestedUrl, referer) {
@@ -1288,9 +1484,7 @@ async function resolveAvsStreamChain(startUrl, referer = "https://hotscopes.net/
   return streams;
 }
 
-async function resolveAvsForPlayer(targetUrl, searchParams) {
-  const title = searchParams.get("title") || "HotScopes Video";
-  const poster = searchParams.get("poster") || "";
+async function resolveAvsStreams(targetUrl, searchParams) {
   // Prefer the live embed/detail page over a stored direct URL: AVS file
   // names rotate, so the stored URL is usually expired by playback time.
   const starts = [];
@@ -1301,9 +1495,16 @@ async function resolveAvsForPlayer(targetUrl, searchParams) {
   if (!starts.includes(targetUrl)) starts.push(targetUrl);
   for (const start of starts) {
     const streams = await resolveAvsStreamChain(start, "https://hotscopes.net/", 6);
-    if (streams.length) return renderCleanMp4Player(streams, title, poster);
+    if (streams.length) return streams;
   }
-  return null;
+  return [];
+}
+
+async function resolveAvsForPlayer(targetUrl, searchParams) {
+  const title = searchParams.get("title") || "HotScopes Video";
+  const poster = searchParams.get("poster") || "";
+  const streams = await resolveAvsStreams(targetUrl, searchParams);
+  return streams.length ? renderCleanMp4Player(streams, title, poster) : null;
 }
 
 async function resolveHotScopesEmbed(targetUrl, searchParams) {
@@ -1538,6 +1739,37 @@ async function resolveHotScopesEmbed(targetUrl, searchParams) {
     }
   }
 
+  // ─── Stream Resolver for the native React player (/api/player/resolve) ─
+  // Returns the same freshly resolved MP4 candidates the iframe player uses,
+  // so the parent page can feed them into VideoPlayer instead of an iframe.
+  if (path === "/api/player/resolve") {
+    const raw = url.searchParams.get("url");
+    if (!raw || !/^https?:\/\//i.test(raw)) {
+      return errorResponse("Missing or invalid url parameter", 400);
+    }
+    try {
+      const parsed = new URL(raw);
+      const isAvsFamily =
+        AVS_CHAIN_HOST_RE.test(parsed.hostname) ||
+        /(^|\.)reallifecams\.net$/i.test(parsed.hostname);
+      if (!isAvsFamily) return jsonResponse({ streams: [] });
+
+      const streams = await resolveAvsStreams(raw, url.searchParams);
+      return jsonResponse({
+        streams: streams.map((s) => ({
+          url: s.url,
+          fallbackUrl: s.fallbackUrl || "",
+          rawUrl: s.rawUrl || s.url,
+          type: s.type || "",
+          quality: Number(s.quality) || 0,
+          label: s.label || "",
+        })),
+      });
+    } catch (err) {
+      return errorResponse("Resolver error: " + (err.message || err), 502);
+    }
+  }
+
   // ─── Edge Video Player Proxy (/api/player) ─────────────────────────
   if (path === "/api/player") {
     let targetUrl = url.searchParams.get("url");
@@ -1568,6 +1800,44 @@ async function resolveHotScopesEmbed(targetUrl, searchParams) {
       }
 
       const destObj = new URL(targetUrl);
+
+      // Direct HLS manifests (e.g. Chinese CDN play.m3u8 links): never return
+      // the raw playlist as the iframe document — render our custom HLS player
+      // with the manifest proxied through /api/player/stream so relative
+      // segment URLs, referer handling and CORS are all resolved at the edge.
+      if (/\.m3u8(?:[?#]|$)/i.test(targetUrl)) {
+        // Ordered candidate list: primary manifest first, then any fallback
+        // endpoints passed by the caller (api.php forms are resolved to their
+        // play.m3u8 equivalents). The client fails over on fatal errors, so a
+        // dead or geo-blocked CDN endpoint never kills playback.
+        const candidates = [targetUrl];
+        const fbRaw = url.searchParams.get("fallbacks") || "";
+        if (fbRaw) {
+          try {
+            const arr = JSON.parse(fbRaw);
+            if (Array.isArray(arr)) {
+              for (const fb of arr) {
+                if (typeof fb !== "string" || !fb.startsWith("http")) continue;
+                const m3u8 = apiPhpToM3u8(fb);
+                if (m3u8 && !candidates.includes(m3u8)) candidates.push(m3u8);
+              }
+            }
+          } catch (e) { /* malformed fallbacks ignored */ }
+        }
+        const proxied = candidates.map((c) => `/api/player/stream?url=${encodeURIComponent(c)}`);
+        return new Response(renderCleanHlsPlayerMulti(
+          proxied,
+          url.searchParams.get("title") || "Video",
+          url.searchParams.get("poster") || "",
+        ), {
+          status: 200,
+          headers: {
+            "Content-Type": "text/html; charset=utf-8",
+            "Access-Control-Allow-Origin": "*",
+            "Cache-Control": "no-store",
+          },
+        });
+      }
 
       // Voyeur House's own reallifecams.net CDN serves byte ranges correctly
       // to the browser but stalls when streamed through the Worker. Play it

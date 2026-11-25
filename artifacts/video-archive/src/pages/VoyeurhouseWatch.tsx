@@ -2,6 +2,9 @@ import { useRef, useState, useEffect, useCallback, useMemo } from "react";
 import { useParams, Link } from "wouter";
 import { Layout } from "@/components/Layout";
 import { VideoPlayer } from "@/components/VideoPlayer";
+import { PlayerFrame } from "@/components/PlayerFrame";
+import { copyText } from "@/lib/clipboard";
+import { buildEdgePlayerUrl, resolveEdgeStreams, type ResolvedStream } from "@/lib/video-source";
 import { rankRelatedVideos } from "@/lib/recommendations";
 import {
   useVoyeurhouseVideoById,
@@ -28,6 +31,7 @@ import {
   LinkSimple,
   ArrowClockwise,
   MonitorPlay,
+  SpinnerGap,
 } from "@phosphor-icons/react";
 
 export default function VoyeurhouseWatch() {
@@ -41,6 +45,9 @@ export default function VoyeurhouseWatch() {
   const [useIframe, setUseIframe] = useState(false);
   const [retryNonce, setRetryNonce] = useState(0);
   const [streamError, setStreamError] = useState(false);
+  const [resolvedStreams, setResolvedStreams] = useState<ResolvedStream[]>([]);
+  const [activeStreamIndex, setActiveStreamIndex] = useState(0);
+  const [resolving, setResolving] = useState(false);
 
   const { data: video, isLoading, error } = useVoyeurhouseVideoById(site, id);
 
@@ -61,15 +68,85 @@ export default function VoyeurhouseWatch() {
     setUseIframe(false);
     setStreamError(false);
     setRetryNonce(0);
+    setResolvedStreams([]);
+    setActiveStreamIndex(0);
+    setResolving(false);
   }, [id]);
 
-  // AVS/ClicknPlay MP4 filenames rotate per embed request, so the stored URL
-  // is expired by the time the page is opened. Start in the worker player,
-  // which resolves a fresh stream from the embed instead of failing natively.
+  // AVS/ClicknPlay MP4 filenames rotate per embed request. The stored URL is
+  // usually expired by playback time, so ask the edge resolver for a fresh
+  // direct MP4 and feed that into our native VideoPlayer by default.
   useEffect(() => {
     if (!video?.id) return;
-    setUseIframe(isAvsDirectSource(video));
-  }, [video?.id]);
+
+    // DoodStream-family embeds are geo/VPN gated; keep them on the iframe path.
+    if (isDoodstreamSource(video)) {
+      setUseIframe(true);
+      setResolving(false);
+      return;
+    }
+
+    if (!isAvsDirectSource(video)) {
+      setResolvedStreams(
+        video.full_video_url
+          ? [{ url: video.full_video_url, label: "Original", type: "direct_mp4" }]
+          : [],
+      );
+      setActiveStreamIndex(0);
+      setUseIframe(false);
+      setResolving(false);
+      return;
+    }
+
+    const target =
+      video.full_video_url ||
+      video.raw_payload?.embed_url ||
+      video.detail_url ||
+      "";
+    if (!/^https?:\/\//i.test(target)) {
+      setUseIframe(true);
+      setResolving(false);
+      return;
+    }
+
+    let cancelled = false;
+    const controller = new AbortController();
+    setUseIframe(false);
+    setResolving(true);
+    resolveEdgeStreams(
+      target,
+      {
+        title: video.title,
+        poster: video.clean_thumbnail_url || video.thumbnail_url || "",
+        embed: video.raw_payload?.embed_url || "",
+        detail: video.detail_url || "",
+      },
+      controller.signal,
+    )
+      .then((streams) => {
+        if (cancelled) return;
+        setResolvedStreams(
+          streams.length > 0
+            ? streams
+            : video.full_video_url
+              ? [{ url: video.full_video_url, label: "Original", type: "direct_mp4" }]
+              : [],
+        );
+        setActiveStreamIndex(0);
+        setResolving(false);
+      })
+      .catch(() => {
+        if (cancelled) return;
+        setResolvedStreams([]);
+        setResolving(false);
+        setUseIframe(true);
+      });
+
+    return () => {
+      cancelled = true;
+      controller.abort();
+    };
+  }, [video?.id, retryNonce]);
 
   useEffect(() => {
     if (!id) return;
@@ -131,26 +208,32 @@ export default function VoyeurhouseWatch() {
     }
   };
 
-  const handleShare = () => {
-    if (navigator.clipboard) {
-      navigator.clipboard.writeText(window.location.href);
+  const handleShare = async () => {
+    if (await copyText(window.location.href)) {
       setCopied(true);
-      setTimeout(() => setCopied(false), 2000);
+      window.setTimeout(() => setCopied(false), 2000);
     }
   };
 
-  const handleCopyStream = () => {
+  const handleCopyStream = async () => {
     const stream = video?.full_video_url || embedUrl(video);
-    if (stream && navigator.clipboard) {
-      navigator.clipboard.writeText(stream);
+    if (stream && await copyText(stream)) {
       setCopiedStream(true);
-      setTimeout(() => setCopiedStream(false), 2000);
+      window.setTimeout(() => setCopiedStream(false), 2000);
     }
   };
 
   const handleVideoError = useCallback(() => {
     setUseIframe(true);
     setStreamError(false);
+  }, []);
+
+  const reloadStream = useCallback(() => {
+    setUseIframe(false);
+    setStreamError(false);
+    setResolvedStreams([]);
+    setActiveStreamIndex(0);
+    setRetryNonce((n) => n + 1);
   }, []);
 
   if (isLoading) {
@@ -191,9 +274,20 @@ export default function VoyeurhouseWatch() {
   const playerFrameSrc = iframeSrc?.startsWith("/api/player?")
     ? iframeSrc
     : iframeSrc
-      ? `/api/player?url=${encodeURIComponent(iframeSrc)}&title=${encodeURIComponent(video.title)}&poster=${encodeURIComponent(video.clean_thumbnail_url || video.thumbnail_url || "")}`
+      ? buildEdgePlayerUrl(iframeSrc, {
+          title: video.title,
+          poster: video.clean_thumbnail_url || video.thumbnail_url || "",
+          detail: video.detail_url || iframeSrc,
+        })
       : null;
   const isDirect = video.video_mime_type === "video/mp4" && Boolean(video.full_video_url);
+  const nativeStreams = resolvedStreams.filter((stream) => /^https?:\/\//i.test(stream.url));
+  const activeStream = nativeStreams[Math.min(activeStreamIndex, Math.max(0, nativeStreams.length - 1))];
+  const nativeSrc = activeStream?.url || null;
+  const nativeQualities = nativeStreams.map((stream, index) => ({
+    url: stream.url,
+    label: stream.label || `Source ${index + 1}`,
+  }));
 
   return (
     <Layout>
@@ -234,38 +328,42 @@ export default function VoyeurhouseWatch() {
                 <FilmStrip size={48} className="mb-2 text-muted-foreground/60" />
                 <p className="text-sm font-medium text-foreground">Video stream is temporarily unavailable.</p>
                 <button
-                  onClick={() => {
-                    setStreamError(false);
-                    setUseIframe(isAvsDirectSource(video));
-                    setRetryNonce((n) => n + 1);
-                  }}
+                  onClick={reloadStream}
                   className="mt-4 px-4 py-2 rounded-xl text-xs font-semibold bg-amber-500 text-white hover:bg-amber-600 transition-colors inline-flex items-center gap-1.5 cursor-pointer"
                 >
                   <ArrowClockwise size={14} /> Retry Stream
                 </button>
               </div>
-            ) : isDirect && !useIframe && video.full_video_url ? (
+            ) : resolving && !nativeSrc ? (
+              <div className="w-full h-full flex flex-col items-center justify-center gap-3 p-6 text-center text-muted-foreground bg-black">
+                <SpinnerGap size={34} className="animate-spin text-cyan-400" />
+                <p className="text-sm font-medium text-foreground">Resolving fresh stream...</p>
+              </div>
+            ) : nativeSrc && !useIframe ? (
               <VideoPlayer
-                key={`vh-${site}-${video.full_video_url}-${retryNonce}`}
-                src={video.full_video_url}
+                key={`vh-${site}-${nativeSrc}-${retryNonce}`}
+                src={nativeSrc}
                 poster={video.clean_thumbnail_url || video.thumbnail_url || undefined}
                 title={video.title}
                 autoPlay
                 videoRef={videoRef}
-                onError={handleVideoError}
-                onReload={() => {
-                  setUseIframe(false);
-                  setRetryNonce((n) => n + 1);
+                qualities={nativeQualities}
+                activeQualityUrl={nativeSrc}
+                onAutoDowngrade={(fromUrl) => {
+                  if (nativeStreams.length < 2) return;
+                  const current = nativeStreams.findIndex((stream) => stream.url === fromUrl);
+                  setActiveStreamIndex(((current < 0 ? 0 : current) + 1) % nativeStreams.length);
                 }}
+                onError={handleVideoError}
+                onReload={reloadStream}
               />
             ) : playerFrameSrc ? (
-              <iframe
-                key={`vh-iframe-${site}-${playerFrameSrc}-${retryNonce}`}
+              <PlayerFrame
                 src={playerFrameSrc}
+                resetKey={`${site}-${video.id}-${retryNonce}`}
                 title={video.title}
-                referrerPolicy="no-referrer"
-                allow="autoplay *; fullscreen *; picture-in-picture *; encrypted-media *; accelerometer *; gyroscope *"
-                className="w-full h-full border-none bg-black"
+                poster={video.clean_thumbnail_url || video.thumbnail_url || undefined}
+                onRetry={() => setRetryNonce((value) => value + 1)}
               />
             ) : (
               <div className="w-full h-full flex flex-col items-center justify-center p-6 text-center text-muted-foreground bg-black">
@@ -279,11 +377,7 @@ export default function VoyeurhouseWatch() {
             <div className="flex flex-wrap items-center gap-2">
               <button
                 type="button"
-                onClick={() => {
-                  setUseIframe(false);
-                  setStreamError(false);
-                  setRetryNonce((n) => n + 1);
-                }}
+                onClick={reloadStream}
                 className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-semibold bg-amber-500/20 text-amber-300 hover:bg-amber-500/30 border border-amber-500/40 transition-colors cursor-pointer"
                 title="Reload Video Stream"
               >
@@ -405,6 +499,18 @@ function isAvsDirectSource(video: VoyeurhouseVideo | null | undefined): boolean 
   } catch {
     return false;
   }
+}
+
+function isDoodstreamSource(video: VoyeurhouseVideo | null | undefined): boolean {
+  const candidates = [video?.full_video_url, video?.raw_payload?.embed_url].filter(Boolean) as string[];
+  return candidates.some((value) => {
+    try {
+      const host = new URL(value).hostname.toLowerCase();
+      return /(^|\.)(doodstream\.com|dood\.(la|wf|so|pm|ws|to|sh|cx|yt|re|li)|myvidplay\.com|ds2play\.com)$/.test(host);
+    } catch {
+      return false;
+    }
+  });
 }
 
 function avsDirectPlayerUrl(video: VoyeurhouseVideo | null | undefined): string | null {
