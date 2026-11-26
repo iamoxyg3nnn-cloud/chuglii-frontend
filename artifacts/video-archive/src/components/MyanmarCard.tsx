@@ -1,22 +1,53 @@
-import { useState } from "react";
+import { useState, useRef, useEffect } from "react";
 import { Link } from "wouter";
-import { Play, Eye, ThumbsUp, Clock, BookmarkSimple, Check } from "@phosphor-icons/react";
-import type { MyanmarVideo } from "@/hooks/useMyanmarVideos";
+import { Play, Eye, Clock, BookmarkSimple, Check } from "@phosphor-icons/react";
+import type { MyanmarVideo, MyanmarSite } from "@/hooks/useMyanmarVideos";
+
+function toMediaProxyUrl(raw: string): string {
+  return raw.startsWith("http") ? `/api/media?url=${encodeURIComponent(raw)}` : raw;
+}
 
 interface MyanmarCardProps {
   video: MyanmarVideo;
+  site?: MyanmarSite;
   isSaved?: boolean;
   onToggleSave?: (id: string) => void;
 }
 
-export function MyanmarCard({ video, isSaved = false, onToggleSave }: MyanmarCardProps) {
+export function MyanmarCard({ video, site = "buumal", isSaved = false, onToggleSave }: MyanmarCardProps) {
   const [imageError, setImageError] = useState(false);
   const [justSaved, setJustSaved] = useState(false);
+  const [isHovered, setIsHovered] = useState(false);
+  const [frameIndex, setFrameIndex] = useState(0);
+  const hoverTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
+  const rawFrames = video.raw_payload?.media?.preview_frames ?? [];
+  const previewFrames = Array.isArray(rawFrames)
+    ? rawFrames.filter((u): u is string => typeof u === "string" && u.length > 0).map(toMediaProxyUrl)
+    : [];
+
+  useEffect(() => {
+    if (!isHovered || previewFrames.length <= 1) {
+      setFrameIndex(0);
+      return;
+    }
+    const timer = setInterval(() => {
+      setFrameIndex((prev) => (prev + 1) % previewFrames.length);
+    }, 550);
+    return () => clearInterval(timer);
+  }, [isHovered, previewFrames.length]);
 
   const rawThumb = video.clean_thumbnail_url || video.thumbnail_url || "";
-  const thumbSrc = imageError
+  const resolvedBaseThumb = imageError || !rawThumb
     ? "/placeholder-thumb.jpg"
-    : (rawThumb || "/placeholder-thumb.jpg");
+    : (site === "samusar" || rawThumb.includes("samusar.com") ? toMediaProxyUrl(rawThumb) : rawThumb);
+  const thumbSrc = isHovered && previewFrames.length > 1
+    ? previewFrames[frameIndex] || resolvedBaseThumb
+    : resolvedBaseThumb;
+
+  const targetHref = site && site !== "buumal"
+    ? `/myanmar/${site}/video/${video.id}`
+    : `/myanmar/video/${video.id}`;
 
   const handleSaveClick = (e: React.MouseEvent) => {
     e.preventDefault();
@@ -32,8 +63,19 @@ export function MyanmarCard({ video, isSaved = false, onToggleSave }: MyanmarCar
   const relativeTime = video.raw_payload?.relative_time || "";
 
   return (
-    <div className="group relative flex flex-col rounded-2xl bg-card/60 border border-border/40 overflow-hidden hover:border-rose-500/50 hover:shadow-xl hover:shadow-rose-500/5 transition-all duration-300">
-      <Link href={`/myanmar/video/${video.id}`}>
+    <div
+      className="group relative flex flex-col rounded-2xl bg-card/60 border border-border/40 overflow-hidden hover:border-rose-500/50 hover:shadow-xl hover:shadow-rose-500/5 transition-all duration-300"
+      onMouseEnter={() => {
+        if (hoverTimeoutRef.current) clearTimeout(hoverTimeoutRef.current);
+        hoverTimeoutRef.current = setTimeout(() => setIsHovered(true), 200);
+      }}
+      onMouseLeave={() => {
+        if (hoverTimeoutRef.current) clearTimeout(hoverTimeoutRef.current);
+        setIsHovered(false);
+        setFrameIndex(0);
+      }}
+    >
+      <Link href={targetHref}>
         <div className="relative aspect-[16/10] w-full overflow-hidden bg-muted/40 cursor-pointer">
           <img
             src={thumbSrc}
@@ -70,7 +112,7 @@ export function MyanmarCard({ video, isSaved = false, onToggleSave }: MyanmarCar
           </button>
 
           {/* Duration Badge */}
-          {video.duration_formatted && (
+          {video.duration_formatted && video.duration_formatted !== "00:00" && (
             <div className="absolute bottom-2.5 right-2.5 px-2 py-0.5 rounded-md text-[11px] font-medium bg-black/75 text-white/90 backdrop-blur-sm flex items-center gap-1">
               <Clock size={11} />
               <span>{video.duration_formatted}</span>
@@ -88,7 +130,7 @@ export function MyanmarCard({ video, isSaved = false, onToggleSave }: MyanmarCar
 
       {/* Video Info Section */}
       <div className="p-3.5 flex flex-col flex-1 justify-between gap-2.5">
-        <Link href={`/myanmar/video/${video.id}`}>
+        <Link href={targetHref}>
           <h3
             title={video.title}
             className="text-sm font-semibold text-foreground/90 group-hover:text-rose-400 line-clamp-2 transition-colors cursor-pointer leading-snug"
@@ -101,7 +143,13 @@ export function MyanmarCard({ video, isSaved = false, onToggleSave }: MyanmarCar
         <div className="flex items-center justify-between text-xs text-muted-foreground pt-1 border-t border-border/30">
           <span className="flex items-center gap-1">
             <Eye size={13} />
-            <span className="tabular-nums">{video.views_raw || `${video.views_count || 120} views`}</span>
+            <span className="tabular-nums">
+              {video.views_raw && video.views_raw !== "0"
+                ? video.views_raw
+                : video.views_count > 0
+                  ? `${video.views_count} views`
+                  : "HD"}
+            </span>
           </span>
 
           <span className="text-[11px] text-muted-foreground/75 truncate max-w-[130px]">

@@ -39,6 +39,7 @@ const ROUTE_IMPORTS: ReadonlyArray<[string, () => Promise<unknown>]> = [
   ["/leak", () => import("@/pages/LeakFeed")],
   ["/japanese/video", () => import("@/pages/JapaneseWatch")],
   ["/japanese", () => import("@/pages/JapaneseFeed")],
+  ["/myanmar/samusar/video", () => import("@/pages/MyanmarWatch")],
   ["/myanmar/video", () => import("@/pages/MyanmarWatch")],
   ["/myanmar", () => import("@/pages/MyanmarFeed")],
   ["/voyeurhouse", () => import("@/pages/VoyeurhouseFeed")],

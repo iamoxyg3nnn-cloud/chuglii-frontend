@@ -1,7 +1,14 @@
 import { useState, useEffect, useCallback } from "react";
-import { Link, useSearch, useLocation } from "wouter";
+import { useParams, useSearch, useLocation } from "wouter";
 import { Layout } from "@/components/Layout";
-import { useMyanmarVideos, type MyanmarVideo, type MyanmarSortOption } from "@/hooks/useMyanmarVideos";
+import {
+  useMyanmarVideos,
+  MYANMAR_SITES,
+  MYANMAR_SITE_LABELS,
+  isMyanmarSite,
+  type MyanmarSite,
+  type MyanmarSortOption,
+} from "@/hooks/useMyanmarVideos";
 import { MyanmarCard } from "@/components/MyanmarCard";
 import { AppPagination } from "@/components/ui/app-pagination";
 import {
@@ -41,6 +48,9 @@ const SORT_OPTIONS: { id: MyanmarSortOption; label: string }[] = [
 const ITEMS_PER_PAGE = 24;
 
 export default function MyanmarFeed() {
+  const { site: routeSite } = useParams<{ site?: string }>();
+  const activeSite: MyanmarSite = isMyanmarSite(routeSite) ? routeSite : "buumal";
+  const basePath = activeSite === "buumal" ? "/myanmar" : `/myanmar/${activeSite}`;
   const [, setLocation] = useLocation();
   const searchString = useSearch();
 
@@ -94,10 +104,19 @@ export default function MyanmarFeed() {
       if (sort !== "newest") params.set("sort", sort);
       if (q.trim()) params.set("q", q.trim());
       const newQuery = params.toString();
-      setLocation(`/myanmar${newQuery ? `?${newQuery}` : ""}`, { replace: true });
+      setLocation(`${basePath}${newQuery ? `?${newQuery}` : ""}`, { replace: true });
     },
-    [setLocation]
+    [setLocation, basePath]
   );
+
+  const handleSiteSwitch = (siteKey: MyanmarSite) => {
+    setActiveCategory("All");
+    setActiveTag("All");
+    setCurrentPage(1);
+    setSearchQuery("");
+    setDebouncedSearch("");
+    setLocation(siteKey === "buumal" ? "/myanmar" : `/myanmar/${siteKey}`);
+  };
 
   const handleTabClick = (tabId: string) => {
     setActiveCategory(tabId);
@@ -122,8 +141,9 @@ export default function MyanmarFeed() {
   const isSavedMode = activeTag === "Saved";
 
   const { data, isLoading, isError, refetch } = useMyanmarVideos({
-    tag: isSavedMode ? undefined : activeTag,
-    category: isSavedMode ? undefined : (activeCategory === "All" ? undefined : activeCategory),
+    site: activeSite,
+    tag: isSavedMode || activeSite !== "buumal" ? undefined : activeTag,
+    category: isSavedMode || activeSite !== "buumal" ? undefined : (activeCategory === "All" ? undefined : activeCategory),
     search: debouncedSearch,
     sort: activeSort,
     page: currentPage,
@@ -171,6 +191,27 @@ export default function MyanmarFeed() {
                 </div>
               </div>
             </div>
+          </div>
+
+          {/* Source Site Switcher */}
+          <div className="flex flex-wrap items-center gap-2 mb-5">
+            {MYANMAR_SITES.map((s) => {
+              const selected = activeSite === s;
+              return (
+                <button
+                  key={s}
+                  type="button"
+                  onClick={() => handleSiteSwitch(s)}
+                  className={`px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                    selected
+                      ? "bg-rose-500 text-white shadow-md shadow-rose-500/25"
+                      : "bg-card/80 border border-border/50 text-muted-foreground hover:text-foreground hover:bg-secondary/60"
+                  }`}
+                >
+                  {MYANMAR_SITE_LABELS[s]}
+                </button>
+              );
+            })}
           </div>
 
           {/* Search & Filter Controls */}
@@ -232,7 +273,10 @@ export default function MyanmarFeed() {
 
           {/* Tag Category Horizontal Scroll */}
           <div className="flex items-center gap-2 overflow-x-auto pb-4 scrollbar-none mb-6">
-            {MYANMAR_TABS.map((tab) => {
+            {(activeSite === "buumal"
+              ? MYANMAR_TABS
+              : MYANMAR_TABS.filter((t) => t.id === "All" || t.id === "Saved")
+            ).map((tab) => {
               const active = activeTag === tab.id;
               return (
                 <button
@@ -293,6 +337,7 @@ export default function MyanmarFeed() {
                   <MyanmarCard
                     key={video.id}
                     video={video}
+                    site={activeSite}
                     isSaved={savedIds.includes(video.id)}
                     onToggleSave={handleToggleSave}
                   />

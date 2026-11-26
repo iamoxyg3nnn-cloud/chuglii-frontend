@@ -5,7 +5,12 @@ import { VideoPlayer } from "@/components/VideoPlayer";
 import { PlayerFrame } from "@/components/PlayerFrame";
 import { copyText } from "@/lib/clipboard";
 import { buildEdgePlayerUrl } from "@/lib/video-source";
-import { useMyanmarVideoById, useMyanmarRelatedVideos, type MyanmarVideo } from "@/hooks/useMyanmarVideos";
+import {
+  useMyanmarVideoById,
+  useMyanmarRelatedVideos,
+  isMyanmarSite,
+  type MyanmarSite,
+} from "@/hooks/useMyanmarVideos";
 import { MyanmarCard } from "@/components/MyanmarCard";
 import { getSupabase } from "@/lib/supabase";
 import {
@@ -59,8 +64,17 @@ function isUrlExpired(url: string | null | undefined): boolean {
   return Date.now() > expiresAt - 120_000;
 }
 
+function toMyanmarPlaybackUrl(rawUrl: string): string {
+  if (rawUrl.toLowerCase().includes("samusar.com")) {
+    return `/api/player/stream?url=${encodeURIComponent(rawUrl)}`;
+  }
+  return rawUrl;
+}
+
 export default function MyanmarWatch() {
-  const { id } = useParams<{ id: string }>();
+  const { site: routeSite, id } = useParams<{ site?: string; id: string }>();
+  const activeSite: MyanmarSite = isMyanmarSite(routeSite) ? routeSite : "buumal";
+  const feedBasePath = activeSite === "buumal" ? "/myanmar" : `/myanmar/${activeSite}`;
   const [, setLocation] = useLocation();
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const failedStreamsRef = useRef<Set<string>>(new Set());
@@ -77,8 +91,8 @@ export default function MyanmarWatch() {
   const [playerKey, setPlayerKey] = useState(0);
   const [retryNonce, setRetryNonce] = useState(0);
 
-  const { data: video, isLoading, error } = useMyanmarVideoById(id);
-  const { data: relatedVideos, isLoading: relatedLoading } = useMyanmarRelatedVideos(id, video, 8);
+  const { data: video, isLoading, error } = useMyanmarVideoById(id, activeSite);
+  const { data: relatedVideos, isLoading: relatedLoading } = useMyanmarRelatedVideos(id, video, 8, activeSite);
 
   // Fetch or re-resolve a fresh MP4 stream.
   // BuuMal's Cloudflare bot challenge blocks Cloudflare Worker egress, so we first
@@ -91,7 +105,7 @@ export default function MyanmarWatch() {
 
     // If candidate URL is already fresh and not forced, use it directly
     if (!force && candidateUrl && !isUrlExpired(candidateUrl)) {
-      setStreamUrl(candidateUrl);
+      setStreamUrl(toMyanmarPlaybackUrl(candidateUrl));
       setStreamError(false);
       setIsResolving(false);
       return;
@@ -100,15 +114,15 @@ export default function MyanmarWatch() {
     setIsResolving(true);
     setStreamError(false);
 
-    // 1) Database-side resolver (bypasses the Cloudflare bot challenge)
-    if (video.source_post_id) {
+    // 1) Database-side resolver for BuuMal (bypasses Cloudflare bot challenge)
+    if (activeSite === "buumal" && video.source_post_id) {
       try {
         const sb = await getSupabase();
         const { data, error: rpcError } = await sb.rpc("scraper_resolve_myanmar_stream_by_id", {
           p_post_id: video.source_post_id,
         });
         if (!rpcError && typeof data === "string" && data.startsWith("http")) {
-          setStreamUrl(data);
+          setStreamUrl(toMyanmarPlaybackUrl(data));
           setIsResolving(false);
           return;
         }
@@ -120,14 +134,14 @@ export default function MyanmarWatch() {
       }
     }
 
-    // 2) Edge worker resolver (covers legacy records / other hosts)
+    // 2) Edge worker resolver (Samusar token refresh / legacy BuuMal records)
     if (video.detail_url) {
       try {
         const res = await fetch(`/api/player?url=${encodeURIComponent(video.detail_url)}&format=json`);
         if (!res.ok) throw new Error(`Resolver status ${res.status}`);
         const data = await res.json();
         if (data && data.streamUrl) {
-          setStreamUrl(data.streamUrl);
+          setStreamUrl(toMyanmarPlaybackUrl(data.streamUrl));
           setStreamError(false);
           setIsResolving(false);
           return;
@@ -139,7 +153,7 @@ export default function MyanmarWatch() {
 
     // 3) Fall back to a still-valid stored URL, otherwise the clean embed.
     if (candidateUrl && !isUrlExpired(candidateUrl)) {
-      setStreamUrl(candidateUrl);
+      setStreamUrl(toMyanmarPlaybackUrl(candidateUrl));
       setIsResolving(false);
     } else if (video.detail_url) {
       setUseIframePlayer(true);
@@ -271,7 +285,7 @@ export default function MyanmarWatch() {
           <p className="text-sm text-muted-foreground mb-6">
             This Myanmar video may have been removed or the ID is invalid.
           </p>
-          <Link href="/myanmar">
+          <Link href={feedBasePath}>
             <span className="px-4 py-2 rounded-xl text-sm font-medium bg-rose-500 text-white cursor-pointer hover:bg-rose-600 transition-colors inline-flex items-center gap-2">
               <ArrowLeft size={16} /> Return to Myanmar Feed
             </span>
@@ -281,7 +295,7 @@ export default function MyanmarWatch() {
     );
   }
 
-  const primaryDownloadUrl = streamUrl || (video.full_video_url && !isUrlExpired(video.full_video_url) ? video.full_video_url : null);
+  const primaryDownloadUrl = streamUrl || (video.full_video_url && !isUrlExpired(video.full_video_url) ? toMyanmarPlaybackUrl(video.full_video_url) : null);
 
   return (
     <Layout>
@@ -289,7 +303,7 @@ export default function MyanmarWatch() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-6">
           {/* Breadcrumb Header */}
           <div className="flex items-center justify-between gap-4 mb-4">
-            <Link href="/myanmar">
+            <Link href={feedBasePath}>
               <span className="inline-flex items-center gap-1.5 text-xs sm:text-sm font-medium text-muted-foreground hover:text-rose-400 transition-colors cursor-pointer">
                 <ArrowLeft size={15} /> Back to Myanmar Feed
               </span>
@@ -445,7 +459,13 @@ export default function MyanmarWatch() {
             <div className="flex items-center gap-4 text-xs text-muted-foreground">
               <span className="flex items-center gap-1">
                 <Eye size={14} />
-                <span className="tabular-nums">{video.views_raw || `${video.views_count || 120} views`}</span>
+                <span className="tabular-nums">
+                  {video.views_raw && video.views_raw !== "0"
+                    ? video.views_raw
+                    : video.views_count > 0
+                      ? `${video.views_count} views`
+                      : "HD"}
+                </span>
               </span>
               {video.raw_payload?.relative_time && (
                 <span className="flex items-center gap-1">
@@ -471,7 +491,7 @@ export default function MyanmarWatch() {
                 {video.tags
                   .filter((t) => !["🍑", "⭐️", "👇🏻"].includes(t))
                   .map((tag) => (
-                    <Link key={tag} href={`/myanmar?tag=${encodeURIComponent(tag)}`}>
+                    <Link key={tag} href={`${feedBasePath}?tag=${encodeURIComponent(tag)}`}>
                       <span className="px-2.5 py-1 rounded-lg text-xs font-medium bg-secondary/80 hover:bg-rose-500/20 hover:text-rose-400 text-muted-foreground border border-border/30 transition-colors cursor-pointer">
                         #{tag}
                       </span>
@@ -503,7 +523,7 @@ export default function MyanmarWatch() {
             ) : relatedVideos && relatedVideos.length > 0 ? (
               <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
                 {relatedVideos.map((rv) => (
-                  <MyanmarCard key={rv.id} video={rv} />
+                  <MyanmarCard key={rv.id} video={rv} site={activeSite} />
                 ))}
               </div>
             ) : (

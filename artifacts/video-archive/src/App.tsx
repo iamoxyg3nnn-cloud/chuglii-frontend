@@ -35,7 +35,6 @@ import { RouteSeoMeta } from "@/components/RouteSeoMeta";
 // loads (see components/skeletons/PageSkeletons.tsx), so navigation feels
 // instant instead of flashing a generic spinner.
 import Home from "@/pages/Home";
-import RandomRedirect from "@/pages/RandomRedirect";
 
 const Browse = lazyWithSkeleton(() => import("@/pages/Browse"), <SkeletonGridPage count={12} />, "Browse");
 const VideoDetail = lazyWithSkeleton(() => import("@/pages/VideoDetail"), <SkeletonDetailPage />, "VideoDetail");
@@ -229,14 +228,13 @@ function Router() {
           <ProtectedRoute><WatchLater /></ProtectedRoute>
         </Route>
 
-        <Route path="/random" component={RandomRedirect} />
         <Route path="/playlists" component={Playlists} />
         <Route path="/collections">
           <ProtectedRoute><Collections /></ProtectedRoute>
         </Route>
-        <Route path="/collections/:id">
-          <ProtectedRoute><CollectionDetail /></ProtectedRoute>
-        </Route>
+        {/* Public playlist detail: collection data is public; owner-only edits
+            are already gated inside CollectionDetail via `isOwner`. */}
+        <Route path="/collections/:id" component={CollectionDetail} />
         <Route path="/admin">
           <ProtectedRoute requiredRole="admin"><AdminPage /></ProtectedRoute>
         </Route>
@@ -249,6 +247,8 @@ function Router() {
         <Route path="/leak" component={LeakFeed} />
         <Route path="/japanese/video/:id" component={JapaneseWatch} />
         <Route path="/japanese" component={JapaneseFeed} />
+        <Route path="/myanmar/:site/video/:id" component={MyanmarWatch} />
+        <Route path="/myanmar/:site" component={MyanmarFeed} />
         <Route path="/myanmar/video/:id" component={MyanmarWatch} />
         <Route path="/myanmar" component={MyanmarFeed} />
         <Route path="/onlyfans/:site/video/:id" component={OnlyfansWatch} />

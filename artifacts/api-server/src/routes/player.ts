@@ -168,6 +168,8 @@ router.get("/player/stream", async (req, res) => {
       referer = "https://www.indianbfclips.com/";
     } else if (destObj.hostname.includes("mydesi")) {
       referer = "https://mydesi.sbs/";
+    } else if (destObj.hostname.includes("samusar")) {
+      referer = "https://www.samusar.com/";
     }
 
     const upstreamHeaders: Record<string, string> = {

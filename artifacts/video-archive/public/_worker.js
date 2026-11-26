@@ -83,6 +83,992 @@ function withResolvedSite(item, siteMap) {
   return { ...item, site: resolveSite(item, siteMap) };
 }
 
+// ─── Public playlists (user collections) helpers ─────────────────────────────
+// user_collections / user_collection_items are RLS-protected, so these routes
+// use the service-role key already preferred by handleApi. The response shape
+// mirrors the Express API so the SPA can consume either backend unchanged.
+const PLAYLIST_COLUMNS = "id,user_id,name,description,created_at,updated_at";
+const PLAYLIST_MEDIA_COLUMNS = "id,thumbnail_url,thumbnail_mirrors,preview_url,preview_mirrors";
+
+function postgrestCount(res, fallback) {
+  const range = res.headers.get("Content-Range") || "";
+  const total = range.split("/")[1];
+  const count = total && total !== "*" ? parseInt(total, 10) : NaN;
+  return Number.isFinite(count) ? count : fallback;
+}
+
+function parsePlaylistMetadata(raw) {
+  if (typeof raw === "string") {
+    try { return JSON.parse(raw) || {}; } catch { return {}; }
+  }
+  return raw && typeof raw === "object" ? { ...raw } : {};
+}
+
+function playlistAuthor(profileMap, userId) {
+  const p = profileMap.get(userId);
+  if (!p) return null;
+  return {
+    display_name: p.display_name ?? null,
+    avatar_url: p.avatar_url ?? null,
+    username: p.username ?? null,
+  };
+}
+
+async function fetchPlaylistProfiles(supabaseUrl, headers, userIds) {
+  const ids = [...new Set(userIds.filter(Boolean))];
+  if (!ids.length) return new Map();
+  const res = await fetch(
+    `${supabaseUrl}/rest/v1/user_profiles?select=user_id,display_name,avatar_url,username&user_id=in.(${ids.map(encodeURIComponent).join(",")})`,
+    { headers },
+  );
+  if (!res.ok) return new Map();
+  const rows = await res.json();
+  return new Map((rows || []).map(p => [p.user_id, p]));
+}
+
+async function fetchPlaylistRecMap(supabaseUrl, headers, recordingIds) {
+  const ids = [...new Set(recordingIds.filter(Boolean))];
+  if (!ids.length) return new Map();
+  const inList = ids.map(encodeURIComponent).join(",");
+  const [recRes, prevRes] = await Promise.all([
+    fetch(`${supabaseUrl}/rest/v1/recordings?select=${PLAYLIST_MEDIA_COLUMNS}&id=in.(${inList})`, { headers }),
+    fetch(`${supabaseUrl}/rest/v1/preview_images?select=recording_id,thumbnail_mirrors,preview_mirrors&recording_id=in.(${inList})`, { headers }),
+  ]);
+
+  const recMap = new Map();
+  if (recRes.ok) {
+    for (const rec of await recRes.json()) recMap.set(rec.id, { ...rec });
+  }
+  if (prevRes.ok) {
+    for (const prev of await prevRes.json()) {
+      if (!prev?.recording_id) continue;
+      const current = recMap.get(prev.recording_id) || { id: prev.recording_id };
+      if (prev.thumbnail_mirrors) {
+        current.thumbnail_mirrors = { ...(current.thumbnail_mirrors || {}), ...prev.thumbnail_mirrors };
+      }
+      if (prev.preview_mirrors) {
+        current.preview_mirrors = { ...(current.preview_mirrors || {}), ...prev.preview_mirrors };
+      }
+      recMap.set(prev.recording_id, current);
+    }
+  }
+  return recMap;
+}
+
+function enrichPlaylistItems(items, recMap) {
+  return (items || []).map(item => {
+    const rec = recMap.get(item.recording_id);
+    if (!rec) return item;
+    const metadata = parsePlaylistMetadata(item.metadata);
+    if (rec.thumbnail_url) metadata.thumbnail_url = rec.thumbnail_url;
+    if (rec.thumbnail_mirrors) metadata.thumbnail_mirrors = rec.thumbnail_mirrors;
+    if (rec.preview_url) metadata.preview_url = rec.preview_url;
+    if (rec.preview_mirrors) metadata.preview_mirrors = rec.preview_mirrors;
+    return { ...item, metadata: JSON.stringify(metadata) };
+  });
+}
+
+// ─── Authenticated user API helpers ──────────────────────────────────────────
+// Every /api/user/* write is scoped to the JWT subject. The service-role key
+// is used for PostgREST only after Supabase Auth has verified the bearer token.
+const AUTH_WINDOW_MS = 15 * 60 * 1000;
+const AUTH_MAX_ATTEMPTS = 10;
+const _authAttempts = new Map();
+
+function rateLimitHit(key, limit = AUTH_MAX_ATTEMPTS, windowMs = AUTH_WINDOW_MS) {
+  const now = Date.now();
+  let bucket = _authAttempts.get(key);
+  if (!bucket || now - bucket.start >= windowMs) {
+    bucket = { start: now, count: 0 };
+    _authAttempts.set(key, bucket);
+  }
+  bucket.count += 1;
+  if (_authAttempts.size > 1000) {
+    for (const [k, v] of _authAttempts) {
+      if (now - v.start >= windowMs) _authAttempts.delete(k);
+    }
+  }
+  return bucket.count > limit;
+}
+
+function clientKey(request) {
+  return request.headers.get("CF-Connecting-IP") ||
+    request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ||
+    "unknown";
+}
+
+function bearerToken(request) {
+  const header = request.headers.get("Authorization") || "";
+  return header.startsWith("Bearer ") ? header.slice(7).trim() : null;
+}
+
+async function verifyBearerUser(request, supabaseUrl, anonKey) {
+  const token = bearerToken(request);
+  if (!token) return null;
+  try {
+    const res = await fetch(`${supabaseUrl}/auth/v1/user`, {
+      headers: { "apikey": anonKey, "Authorization": `Bearer ${token}` },
+    });
+    if (!res.ok) return null;
+    const user = await res.json();
+    if (!user || typeof user.id !== "string" || !user.id) return null;
+    return { user, token };
+  } catch (_) {
+    return null;
+  }
+}
+
+const USER_ROLES = new Set(["user", "moderator", "admin"]);
+
+async function resolveUserRole(supabaseUrl, headers, user) {
+  try {
+    const res = await fetch(
+      `${supabaseUrl}/rest/v1/user_roles?select=role&user_id=eq.${encodeURIComponent(user.id)}&limit=1`,
+      { headers },
+    );
+    if (res.ok) {
+      const rows = await res.json();
+      if (USER_ROLES.has(rows?.[0]?.role)) return rows[0].role;
+    }
+  } catch (_) {
+    // Fall back to trusted JWT metadata below.
+  }
+  const metaRole = user?.app_metadata?.role || user?.user_metadata?.role;
+  return USER_ROLES.has(metaRole) ? metaRole : "user";
+}
+
+async function readJsonBody(request) {
+  try {
+    const body = await request.json();
+    return body && typeof body === "object" ? body : {};
+  } catch (_) {
+    return {};
+  }
+}
+
+function decodeSegment(value) {
+  try { return decodeURIComponent(value); } catch (_) { return value; }
+}
+
+async function ownsCollection(supabaseUrl, headers, userId, collectionId) {
+  if (!collectionId || !userId) return false;
+  try {
+    const res = await fetch(
+      `${supabaseUrl}/rest/v1/user_collections?select=id&id=eq.${encodeURIComponent(collectionId)}` +
+        `&user_id=eq.${encodeURIComponent(userId)}&limit=1`,
+      { headers },
+    );
+    if (!res.ok) return false;
+    const rows = await res.json();
+    return Array.isArray(rows) && rows.length > 0;
+  } catch (_) {
+    return false;
+  }
+}
+
+const NOTIFICATION_TYPES = ["request_submitted", "request_status", "recording_available"];
+
+// Preferences live in auth user metadata: the deployed database predates the
+// checked-in notification/sound preference columns, so writing to those tables
+// would fail with PGRST204. Metadata is scoped to the verified user and works
+// with the live schema.
+async function updateAuthUserMetadata(supabaseUrl, serviceKey, userId, patch) {
+  if (!serviceKey) return null;
+  const headers = {
+    "apikey": serviceKey,
+    "Authorization": `Bearer ${serviceKey}`,
+    "Content-Type": "application/json",
+  };
+  const endpoint = `${supabaseUrl}/auth/v1/admin/users/${encodeURIComponent(userId)}`;
+  try {
+    const currentRes = await fetch(endpoint, { headers });
+    const current = currentRes.ok ? await currentRes.json() : null;
+    const res = await fetch(endpoint, {
+      method: "PUT",
+      headers,
+      body: JSON.stringify({
+        user_metadata: { ...(current?.user_metadata || {}), ...patch },
+      }),
+    });
+    return res.ok ? await res.json() : null;
+  } catch (_) {
+    return null;
+  }
+}
+
+const DEFAULT_PREMIUM_SETTINGS = {
+  ads_enabled: true,
+  ads_target: 5,
+  reward_cooldown_s: 60,
+  grace_minutes: 10,
+  price_usd: 4.99,
+};
+
+async function readPremiumSettings(supabaseUrl, headers) {
+  try {
+    const res = await fetch(`${supabaseUrl}/rest/v1/site_settings?select=key,value`, { headers });
+    if (!res.ok) return DEFAULT_PREMIUM_SETTINGS;
+    const rows = await res.json();
+    const map = new Map((rows || []).map((row) => [row.key, row.value]));
+    const toNumber = (value, fallback) => {
+      const n = typeof value === "string" ? Number(value) : value;
+      return typeof n === "number" && Number.isFinite(n) ? n : fallback;
+    };
+    return {
+      ads_enabled: typeof map.get("ads_enabled") === "boolean"
+        ? map.get("ads_enabled") : DEFAULT_PREMIUM_SETTINGS.ads_enabled,
+      ads_target: Math.max(0, Math.round(toNumber(map.get("ads_target"), DEFAULT_PREMIUM_SETTINGS.ads_target))),
+      reward_cooldown_s: Math.max(0, Math.round(toNumber(map.get("reward_cooldown_s"), DEFAULT_PREMIUM_SETTINGS.reward_cooldown_s))),
+      grace_minutes: Math.max(0, Math.round(toNumber(map.get("grace_minutes"), DEFAULT_PREMIUM_SETTINGS.grace_minutes))),
+      price_usd: toNumber(map.get("price_usd"), DEFAULT_PREMIUM_SETTINGS.price_usd) > 0
+        ? toNumber(map.get("price_usd"), DEFAULT_PREMIUM_SETTINGS.price_usd)
+        : DEFAULT_PREMIUM_SETTINGS.price_usd,
+    };
+  } catch (_) {
+    return DEFAULT_PREMIUM_SETTINGS;
+  }
+}
+
+function normalizeLoginUsername(value) {
+  if (typeof value !== "string") return null;
+  const username = value.trim().toLowerCase();
+  return /^[a-z0-9_-]{3,30}$/.test(username) ? username : null;
+}
+
+// ─── Authenticated /api/user/* API ────────────────────────────────────────────
+// Mirrors the Express API contract. Authentication is verified with Supabase
+// Auth on every request; the service-role key only touches PostgREST after
+// that, and every query is scoped to the verified JWT subject.
+async function handleUserApi(request, opts) {
+  const { path, url, supabaseUrl, anonKey, serviceKey, postgrestHeaders } = opts;
+  const method = request.method.toUpperCase();
+  const noStore = { "Cache-Control": "private, no-store" };
+  const ok = (status = 200) => jsonResponse({ ok: true }, status, noStore);
+  const fail = (message = "Internal server error", status = 500) =>
+    jsonResponse({ error: message }, status, noStore);
+  const pg = (suffix, init = {}) =>
+    fetch(`${supabaseUrl}/rest/v1/${suffix}`, { headers: postgrestHeaders, ...init });
+  const returning = { ...postgrestHeaders, "Prefer": "return=representation" };
+
+  // Public username sign-in. Never reveal whether a username exists.
+  if (path === "/api/user/username-login" && method === "POST") {
+    if (rateLimitHit(`username-login:${clientKey(request)}`)) {
+      return fail("Too many attempts — please wait a moment and try again.", 429);
+    }
+    const body = await readJsonBody(request);
+    const username = normalizeLoginUsername(body.username);
+    const password = typeof body.password === "string" ? body.password : "";
+    const invalid = () => fail("Invalid username or password", 401);
+    if (!username || password.length < 1 || password.length > 1024) return invalid();
+
+    try {
+      const profileRes = await pg(
+        `user_profiles?select=user_id,email&username=eq.${encodeURIComponent(username)}&limit=1`,
+      );
+      if (!profileRes.ok) return fail("Sign-in service temporarily unavailable", 503);
+      const profiles = await profileRes.json();
+      const profile = profiles?.[0];
+      if (!profile?.user_id || !profile?.email) return invalid();
+
+      const authRes = await fetch(`${supabaseUrl}/auth/v1/token?grant_type=password`, {
+        method: "POST",
+        headers: { "apikey": anonKey, "Content-Type": "application/json" },
+        body: JSON.stringify({ email: profile.email, password }),
+      });
+      if (!authRes.ok) {
+        if (authRes.status >= 500) return fail("Sign-in service temporarily unavailable", 503);
+        return invalid();
+      }
+      const auth = await authRes.json();
+      if (!auth?.access_token || !auth?.refresh_token || auth.user?.id !== profile.user_id) {
+        return invalid();
+      }
+      return jsonResponse({
+        session: { access_token: auth.access_token, refresh_token: auth.refresh_token },
+      }, 200, noStore);
+    } catch (_) {
+      return fail("Sign-in service temporarily unavailable", 503);
+    }
+  }
+
+  const auth = await verifyBearerUser(request, supabaseUrl, anonKey);
+  if (!auth) return fail("Unauthorized", 401);
+  const user = auth.user;
+  const uid = encodeURIComponent(user.id);
+
+  // ─── Premium ──────────────────────────────────────────────────────────────
+  if (path.startsWith("/api/user/premium/")) {
+    const settings = await readPremiumSettings(supabaseUrl, postgrestHeaders);
+    if (path === "/api/user/premium/status" && method === "GET") {
+      const res = await pg(
+        `user_premium?select=premium_expires_at,ads_seen_date,ads_seen_count,last_granted_date` +
+          `&user_id=eq.${uid}&limit=1`,
+      );
+      if (!res.ok) return fail();
+      const row = (await res.json())?.[0] ?? {};
+      const premiumUntil = row.premium_expires_at ?? null;
+      const isPremium = typeof premiumUntil === "string" && new Date(premiumUntil).getTime() > Date.now();
+      const today = new Date().toISOString().slice(0, 10);
+      return jsonResponse({
+        is_premium: isPremium,
+        premium_until: premiumUntil,
+        ads_viewed_today: row.ads_seen_date === today ? Number(row.ads_seen_count ?? 0) || 0 : 0,
+        reward_granted_today: row.last_granted_date === today,
+        ads_target: settings.ads_target,
+        can_earn: !isPremium,
+        cooldown_s: settings.reward_cooldown_s,
+        ads_enabled: settings.ads_enabled,
+        grace_minutes: settings.grace_minutes,
+      }, 200, noStore);
+    }
+    if (path === "/api/user/premium/reward" && method === "POST") {
+      if (rateLimitHit(`premium-reward:${user.id}`, 8, 60_000)) {
+        return jsonResponse({ error: "Too many requests" }, 429, noStore);
+      }
+      if (!settings.ads_enabled) {
+        return jsonResponse({ error: "Ads are currently disabled", cooldown_ms: 0 }, 403, noStore);
+      }
+      try {
+        const res = await fetch(`${supabaseUrl}/rest/v1/rpc/claim_premium_reward`, {
+          method: "POST",
+          headers: postgrestHeaders,
+          body: JSON.stringify({
+            p_user_id: user.id,
+            p_cooldown_s: settings.reward_cooldown_s,
+            p_target: settings.ads_target,
+          }),
+        });
+        if (!res.ok) return fail("Premium service unavailable", 500);
+        const payload = await res.json();
+        const raw = Array.isArray(payload) ? payload[0] : payload;
+        const num = (value, fallback = 0) => {
+          const n = Number(value);
+          return Number.isFinite(n) ? n : fallback;
+        };
+        const result = {
+          granted: raw?.granted === true,
+          cooldown_ms: Math.max(0, Math.round(num(raw?.cooldown_ms))),
+          already_granted_today: raw?.already_granted_today === true,
+          ads_viewed_today: Math.max(0, Math.round(num(raw?.ads_viewed_today))),
+          ads_target: Math.max(0, Math.round(num(raw?.ads_target, settings.ads_target))),
+          premium_until: typeof raw?.premium_until === "string" ? raw.premium_until : null,
+          is_premium: raw?.is_premium === true,
+        };
+        return jsonResponse(result, result.cooldown_ms > 0 ? 429 : 200, noStore);
+      } catch (_) {
+        return fail("Premium service unavailable", 500);
+      }
+    }
+    if (path === "/api/user/premium/checkout" && method === "POST") {
+      return jsonResponse({ error: "not_configured", provider: "stripe" }, 501, noStore);
+    }
+    return fail("API endpoint not found: " + path, 404);
+  }
+
+  // ─── Role ─────────────────────────────────────────────────────────────────
+  if (path === "/api/user/role" && method === "GET") {
+    return jsonResponse({ role: await resolveUserRole(supabaseUrl, postgrestHeaders, user) }, 200, noStore);
+  }
+
+  // ─── Profile ──────────────────────────────────────────────────────────────
+  const PROFILE_COLUMNS = "user_id,display_name,avatar_url,bio,created_at,updated_at,username,email";
+  if (path === "/api/user/profile" && method === "GET") {
+    try {
+      const res = await pg(`user_profiles?select=${PROFILE_COLUMNS}&user_id=eq.${uid}&limit=1`);
+      if (!res.ok) return fail();
+      const rows = await res.json();
+      if (rows?.length) return jsonResponse(rows[0], 200, noStore);
+
+      const name = user.user_metadata?.username || user.email?.split("@")[0] || "User";
+      const created = await pg("user_profiles", {
+        method: "POST",
+        headers: returning,
+        body: JSON.stringify({
+          user_id: user.id,
+          display_name: name,
+          username: user.user_metadata?.username ?? null,
+          email: user.email ?? null,
+        }),
+      });
+      if (!created.ok) return fail();
+      const createdRows = await created.json();
+      return jsonResponse(createdRows?.[0] ?? { user_id: user.id, display_name: name }, 200, noStore);
+    } catch (_) {
+      return fail();
+    }
+  }
+
+  if (path === "/api/user/profile" && method === "PUT") {
+    const body = await readJsonBody(request);
+    if (
+      body.avatar_url !== undefined && body.avatar_url !== null && body.avatar_url !== "" &&
+      (typeof body.avatar_url !== "string" || body.avatar_url.length > 2048 ||
+        !/^https?:\/\//i.test(body.avatar_url.trim()))
+    ) {
+      return fail("avatar_url must be a valid http(s) URL", 400);
+    }
+    if (
+      body.username !== undefined && body.username !== null && String(body.username).trim() !== "" &&
+      !/^[a-zA-Z0-9_-]{3,30}$/.test(String(body.username).trim())
+    ) {
+      return fail("username must be 3-30 characters (letters, numbers, underscores, or hyphens)", 400);
+    }
+
+    const updates = { updated_at: new Date().toISOString() };
+    if (typeof body.display_name === "string") updates.display_name = body.display_name.trim().slice(0, 100);
+    if (typeof body.avatar_url === "string") updates.avatar_url = body.avatar_url.trim() || null;
+    if (typeof body.bio === "string") updates.bio = body.bio.trim().slice(0, 1000);
+    if (typeof body.username === "string" && body.username.trim()) {
+      updates.username = body.username.trim().toLowerCase();
+    }
+    if (user.email) updates.email = user.email;
+
+    try {
+      const res = await pg(`user_profiles?on_conflict=user_id`, {
+        method: "POST",
+        headers: { ...postgrestHeaders, "Prefer": "resolution=merge-duplicates,return=representation" },
+        body: JSON.stringify({ user_id: user.id, ...updates }),
+      });
+      if (res.status === 409) return fail("Username already taken", 409);
+      if (!res.ok) return fail();
+      const rows = await res.json();
+      return jsonResponse(rows?.[0] ?? { user_id: user.id, ...updates }, 200, noStore);
+    } catch (_) {
+      return fail();
+    }
+  }
+
+  // ─── Saved videos ─────────────────────────────────────────────────────────
+  if (path === "/api/user/saved") {
+    if (method === "GET") {
+      const res = await pg(`saved_videos?select=recording_id,metadata,saved_at&user_id=eq.${uid}&order=saved_at.desc`);
+      return res.ok ? jsonResponse(await res.json(), 200, noStore) : fail();
+    }
+    if (method === "POST") {
+      const body = await readJsonBody(request);
+      if (typeof body.recording_id !== "string" || !body.recording_id) return fail("recording_id required", 400);
+      const res = await pg("saved_videos?on_conflict=user_id,recording_id", {
+        method: "POST",
+        headers: { ...postgrestHeaders, "Prefer": "resolution=merge-duplicates" },
+        body: JSON.stringify({
+          user_id: user.id,
+          recording_id: body.recording_id,
+          metadata: typeof body.metadata === "string" ? body.metadata : null,
+        }),
+      });
+      return res.ok ? ok(201) : fail();
+    }
+    if (method === "DELETE") {
+      const res = await pg(`saved_videos?user_id=eq.${uid}`, { method: "DELETE" });
+      return res.ok ? ok() : fail();
+    }
+  }
+  const savedItemMatch = path.match(/^\/api\/user\/saved\/([^/]+)$/);
+  if (savedItemMatch && method === "DELETE") {
+    const recordingId = decodeSegment(savedItemMatch[1]);
+    const res = await pg(`saved_videos?user_id=eq.${uid}&recording_id=eq.${encodeURIComponent(recordingId)}`, {
+      method: "DELETE",
+    });
+    return res.ok ? ok() : fail();
+  }
+
+  // ─── Watch history ────────────────────────────────────────────────────────
+  if (path === "/api/user/history/continue" && method === "GET") {
+    const raw = parseInt(url.searchParams.get("limit") || "12", 10);
+    const limit = Math.min(20, Math.max(1, Number.isFinite(raw) ? raw : 12));
+    const res = await pg(
+      `watch_history?select=recording_id,metadata,watched_at,progress,last_position_ms,total_watch_ms` +
+        `&user_id=eq.${uid}&progress=gt.0&progress=lt.100&order=watched_at.desc&limit=${limit}`,
+    );
+    return res.ok ? jsonResponse(await res.json(), 200, noStore) : fail();
+  }
+
+  if (path === "/api/user/history/stats" && method === "GET") {
+    const toNum = (v) => Number(v ?? 0) || 0;
+    try {
+      const rpcRes = await fetch(`${supabaseUrl}/rest/v1/rpc/get_user_history_stats`, {
+        method: "POST",
+        headers: postgrestHeaders,
+        body: JSON.stringify({ p_user_id: user.id }),
+      });
+      if (rpcRes.ok) {
+        const payload = await rpcRes.json();
+        const row = Array.isArray(payload) ? payload[0] : payload;
+        if (row) {
+          return jsonResponse({
+            totalWatchMs: toNum(row.total_watch_ms),
+            totalVideos: toNum(row.total_videos),
+            completedVideos: toNum(row.completed_videos),
+            avgProgress: toNum(row.avg_progress),
+            topPerformers: row.top_performers ?? [],
+            dayBuckets: row.day_buckets ?? [0, 0, 0, 0, 0, 0, 0],
+            hourBuckets: row.hour_buckets ?? Array(24).fill(0),
+          }, 200, noStore);
+        }
+      }
+    } catch (_) {
+      // Fall through to the JS compatibility fallback below.
+    }
+
+    const res = await pg(
+      `watch_history?select=recording_id,progress,total_watch_ms,metadata,watched_at&user_id=eq.${uid}`,
+    );
+    if (!res.ok) return fail();
+    const items = await res.json();
+    const totalWatchMs = items.reduce((sum, i) => sum + toNum(i.total_watch_ms), 0);
+    const totalVideos = items.length;
+    const completedVideos = items.filter((i) => toNum(i.progress) >= 100).length;
+    const avgProgress = totalVideos
+      ? Math.round(items.reduce((sum, i) => sum + toNum(i.progress), 0) / totalVideos)
+      : 0;
+    const performerMap = new Map();
+    for (const item of items) {
+      try {
+        const meta = typeof item.metadata === "string" ? JSON.parse(item.metadata) : item.metadata;
+        const username = meta?.username ?? "unknown";
+        const entry = performerMap.get(username) ?? { username, count: 0, watchMs: 0 };
+        entry.count += 1;
+        entry.watchMs += toNum(item.total_watch_ms);
+        performerMap.set(username, entry);
+      } catch (_) { /* skip malformed metadata */ }
+    }
+    const topPerformers = [...performerMap.values()].sort((a, b) => b.count - a.count).slice(0, 10);
+    const thirtyDaysAgo = Date.now() - 30 * 24 * 60 * 60 * 1000;
+    const dayBuckets = [0, 0, 0, 0, 0, 0, 0];
+    const hourBuckets = Array(24).fill(0);
+    for (const item of items) {
+      const time = new Date(item.watched_at).getTime();
+      if (!Number.isFinite(time) || time < thirtyDaysAgo) continue;
+      dayBuckets[new Date(time).getDay()] += toNum(item.total_watch_ms);
+      hourBuckets[new Date(time).getHours()] += toNum(item.total_watch_ms);
+    }
+    return jsonResponse({
+      totalWatchMs, totalVideos, completedVideos, avgProgress, topPerformers, dayBuckets, hourBuckets,
+    }, 200, noStore);
+  }
+
+  if (path === "/api/user/history") {
+    if (method === "GET") {
+      const res = await pg(
+        `watch_history?select=recording_id,metadata,watched_at&user_id=eq.${uid}&order=watched_at.desc&limit=200`,
+      );
+      return res.ok ? jsonResponse(await res.json(), 200, noStore) : fail();
+    }
+    if (method === "POST") {
+      const body = await readJsonBody(request);
+      if (typeof body.recording_id !== "string" || !body.recording_id) return fail("recording_id required", 400);
+      const update = {
+        user_id: user.id,
+        recording_id: body.recording_id,
+        metadata: typeof body.metadata === "string" ? body.metadata : null,
+        watched_at: new Date().toISOString(),
+      };
+      const clamp = (v, min, max) => Math.min(max, Math.max(min, Math.round(toNumber(v))));
+      const toNumber = (v) => (Number.isFinite(Number(v)) ? Number(v) : 0);
+      if (body.progress !== undefined) update.progress = clamp(body.progress, 0, 100);
+      if (body.last_position_ms !== undefined) update.last_position_ms = clamp(body.last_position_ms, 0, Number.MAX_SAFE_INTEGER);
+      if (body.total_watch_ms !== undefined) update.total_watch_ms = clamp(body.total_watch_ms, 0, Number.MAX_SAFE_INTEGER);
+      const res = await pg("watch_history?on_conflict=user_id,recording_id", {
+        method: "POST",
+        headers: { ...postgrestHeaders, "Prefer": "resolution=merge-duplicates" },
+        body: JSON.stringify(update),
+      });
+      return res.ok ? ok(201) : fail();
+    }
+    if (method === "DELETE") {
+      const res = await pg(`watch_history?user_id=eq.${uid}`, { method: "DELETE" });
+      return res.ok ? ok() : fail();
+    }
+  }
+
+  // ─── Watch later ──────────────────────────────────────────────────────────
+  if (path === "/api/user/watch-later") {
+    if (method === "GET") {
+      const res = await pg(`watch_later_items?select=recording_id,metadata,added_at&user_id=eq.${uid}&order=added_at.asc`);
+      return res.ok ? jsonResponse(await res.json(), 200, noStore) : fail();
+    }
+    if (method === "POST") {
+      const body = await readJsonBody(request);
+      if (typeof body.recording_id !== "string" || !body.recording_id) return fail("recording_id required", 400);
+      const res = await pg("watch_later_items?on_conflict=user_id,recording_id", {
+        method: "POST",
+        headers: { ...postgrestHeaders, "Prefer": "resolution=ignore-duplicates" },
+        body: JSON.stringify({
+          user_id: user.id,
+          recording_id: body.recording_id,
+          metadata: typeof body.metadata === "string" ? body.metadata : null,
+          added_at: new Date().toISOString(),
+        }),
+      });
+      return res.ok ? ok(201) : fail();
+    }
+    if (method === "DELETE") {
+      const res = await pg(`watch_later_items?user_id=eq.${uid}`, { method: "DELETE" });
+      return res.ok ? ok() : fail();
+    }
+  }
+  const watchLaterMatch = path.match(/^\/api\/user\/watch-later\/([^/]+)$/);
+  if (watchLaterMatch && method === "DELETE") {
+    const recordingId = decodeSegment(watchLaterMatch[1]);
+    const res = await pg(`watch_later_items?user_id=eq.${uid}&recording_id=eq.${encodeURIComponent(recordingId)}`, {
+      method: "DELETE",
+    });
+    return res.ok ? ok() : fail();
+  }
+
+  // ─── Collections (private playlists) ──────────────────────────────────────
+  if (path === "/api/user/collections") {
+    if (method === "GET") {
+      const res = await pg(
+        `user_collections?select=id,name,description,created_at,updated_at&user_id=eq.${uid}&order=created_at.desc`,
+      );
+      if (!res.ok) return fail();
+      const cols = await res.json();
+      const enriched = await Promise.all((cols || []).map(async (col) => {
+        const itemsRes = await pg(
+          `user_collection_items?select=metadata&collection_id=eq.${encodeURIComponent(col.id)}` +
+            `&order=added_at.asc&limit=4`,
+          { headers: { ...postgrestHeaders, "Prefer": "count=exact" } },
+        );
+        const items = itemsRes.ok ? await itemsRes.json() : [];
+        return {
+          ...col,
+          item_count: postgrestCount(itemsRes, items.length),
+          first_item_metadata: items[0]?.metadata ?? null,
+        };
+      }));
+      return jsonResponse(enriched, 200, noStore);
+    }
+    if (method === "POST") {
+      const body = await readJsonBody(request);
+      const name = typeof body.name === "string" ? body.name.trim() : "";
+      if (!name) return fail("name required", 400);
+      const id = crypto.randomUUID();
+      const res = await pg("user_collections", {
+        method: "POST",
+        headers: returning,
+        body: JSON.stringify({
+          id,
+          user_id: user.id,
+          name,
+          description: typeof body.description === "string" ? body.description : null,
+        }),
+      });
+      if (!res.ok) return fail();
+      const rows = await res.json();
+      return jsonResponse(rows?.[0] ?? { id, name }, 201, noStore);
+    }
+  }
+
+  const collectionItemReorderMatch = path.match(/^\/api\/user\/collections\/([^/]+)\/items\/reorder$/);
+  if (collectionItemReorderMatch && method === "PUT") {
+    const collectionId = decodeSegment(collectionItemReorderMatch[1]);
+    const body = await readJsonBody(request);
+    const ids = body.recording_ids;
+    if (!Array.isArray(ids) || ids.length === 0 || ids.length > 1000 ||
+        ids.some((id) => typeof id !== "string" || !id)) {
+      return fail("recording_ids (non-empty array) required", 400);
+    }
+    if (new Set(ids).size !== ids.length) return fail("duplicate recording ids in payload", 400);
+    if (!await ownsCollection(supabaseUrl, postgrestHeaders, user.id, collectionId)) return fail("Forbidden", 403);
+    // The SQL RPC calls auth.uid(), which is null for service-role requests.
+    // Ownership was just verified above, so apply the same ordering directly.
+    for (let i = 0; i < ids.length; i += 1) {
+      const res = await pg(
+        `user_collection_items?collection_id=eq.${encodeURIComponent(collectionId)}` +
+          `&recording_id=eq.${encodeURIComponent(ids[i])}`,
+        { method: "PATCH", body: JSON.stringify({ position: i }) },
+      );
+      if (!res.ok) return fail();
+    }
+    await pg(`user_collections?id=eq.${encodeURIComponent(collectionId)}`, {
+      method: "PATCH",
+      body: JSON.stringify({ updated_at: new Date().toISOString() }),
+    });
+    return jsonResponse({ ok: true, updated: ids.length }, 200, noStore);
+  }
+
+  const collectionItemsMatch = path.match(/^\/api\/user\/collections\/([^/]+)\/items$/);
+  if (collectionItemsMatch) {
+    const collectionId = decodeSegment(collectionItemsMatch[1]);
+    if (!await ownsCollection(supabaseUrl, postgrestHeaders, user.id, collectionId)) return fail("Not found", 404);
+    if (method === "GET") {
+      const res = await pg(
+        `user_collection_items?select=recording_id,metadata,added_at,position` +
+          `&collection_id=eq.${encodeURIComponent(collectionId)}` +
+          `&order=position.asc.nullslast,added_at.desc`,
+      );
+      return res.ok ? jsonResponse(await res.json(), 200, noStore) : fail();
+    }
+    if (method === "POST") {
+      const body = await readJsonBody(request);
+      if (typeof body.recording_id !== "string" || !body.recording_id) return fail("recording_id required", 400);
+      const existingRes = await pg(
+        `user_collection_items?select=id&collection_id=eq.${encodeURIComponent(collectionId)}` +
+          `&recording_id=eq.${encodeURIComponent(body.recording_id)}&limit=1`,
+      );
+      if (!existingRes.ok) return fail();
+      if ((await existingRes.json()).length) return jsonResponse({ ok: true, alreadyExists: true }, 200, noStore);
+      const res = await pg("user_collection_items", {
+        method: "POST",
+        headers: returning,
+        body: JSON.stringify({
+          collection_id: collectionId,
+          recording_id: body.recording_id,
+          metadata: typeof body.metadata === "string" ? body.metadata : null,
+        }),
+      });
+      if (!res.ok) {
+        if (res.status === 409) return jsonResponse({ ok: true, alreadyExists: true }, 200, noStore);
+        return fail();
+      }
+      await pg(`user_collections?id=eq.${encodeURIComponent(collectionId)}`, {
+        method: "PATCH",
+        headers: postgrestHeaders,
+        body: JSON.stringify({ updated_at: new Date().toISOString() }),
+      });
+      return ok(201);
+    }
+  }
+
+  const collectionItemMatch = path.match(/^\/api\/user\/collections\/([^/]+)\/items\/([^/]+)$/);
+  if (collectionItemMatch && method === "DELETE") {
+    const collectionId = decodeSegment(collectionItemMatch[1]);
+    const recordingId = decodeSegment(collectionItemMatch[2]);
+    if (!await ownsCollection(supabaseUrl, postgrestHeaders, user.id, collectionId)) return fail("Forbidden", 403);
+    const res = await pg(
+      `user_collection_items?collection_id=eq.${encodeURIComponent(collectionId)}` +
+        `&recording_id=eq.${encodeURIComponent(recordingId)}`,
+      { method: "DELETE" },
+    );
+    return res.ok ? ok() : fail();
+  }
+
+  const collectionMatch = path.match(/^\/api\/user\/collections\/([^/]+)$/);
+  if (collectionMatch) {
+    const collectionId = decodeSegment(collectionMatch[1]);
+    if (!await ownsCollection(supabaseUrl, postgrestHeaders, user.id, collectionId)) return fail("Not found", 404);
+    if (method === "PUT") {
+      const body = await readJsonBody(request);
+      const updates = { updated_at: new Date().toISOString() };
+      if (typeof body.name === "string") updates.name = body.name;
+      if (body.description !== undefined) updates.description = body.description;
+      const res = await pg(`user_collections?id=eq.${encodeURIComponent(collectionId)}&user_id=eq.${uid}`, {
+        method: "PATCH",
+        headers: returning,
+        body: JSON.stringify(updates),
+      });
+      if (!res.ok) return fail();
+      const rows = await res.json();
+      return jsonResponse(rows?.[0] ?? {}, 200, noStore);
+    }
+    if (method === "DELETE") {
+      await pg(`user_collection_items?collection_id=eq.${encodeURIComponent(collectionId)}`, { method: "DELETE" });
+      const res = await pg(`user_collections?id=eq.${encodeURIComponent(collectionId)}&user_id=eq.${uid}`, {
+        method: "DELETE",
+      });
+      return res.ok ? ok() : fail();
+    }
+  }
+
+  // ─── Performer follows ────────────────────────────────────────────────────
+  if (path === "/api/user/follows") {
+    if (method === "GET") {
+      const res = await pg(
+        `performer_follows?select=performer_username,followed_at&user_id=eq.${uid}&order=followed_at.desc`,
+      );
+      return res.ok ? jsonResponse(await res.json(), 200, noStore) : fail();
+    }
+    if (method === "POST") {
+      const body = await readJsonBody(request);
+      if (typeof body.performer_username !== "string" || !body.performer_username) {
+        return fail("performer_username required", 400);
+      }
+      const res = await pg("performer_follows?on_conflict=user_id,performer_username", {
+        method: "POST",
+        headers: { ...postgrestHeaders, "Prefer": "resolution=ignore-duplicates" },
+        body: JSON.stringify({
+          user_id: user.id,
+          performer_username: body.performer_username,
+          followed_at: new Date().toISOString(),
+        }),
+      });
+      return res.ok ? ok(201) : fail();
+    }
+  }
+  const followMatch = path.match(/^\/api\/user\/follows\/([^/]+)$/);
+  if (followMatch && method === "DELETE") {
+    const username = decodeSegment(followMatch[1]);
+    const res = await pg(
+      `performer_follows?user_id=eq.${uid}&performer_username=eq.${encodeURIComponent(username)}`,
+      { method: "DELETE" },
+    );
+    return res.ok ? ok() : fail();
+  }
+
+  // ─── Notifications ────────────────────────────────────────────────────────
+  if (path === "/api/user/notifications") {
+    if (method === "GET") {
+      const rawLimit = parseInt(url.searchParams.get("limit") || "50", 10);
+      const rawOffset = parseInt(url.searchParams.get("offset") || "0", 10);
+      const limit = Math.min(100, Math.max(1, Number.isFinite(rawLimit) ? rawLimit : 50));
+      const offset = Math.max(0, Number.isFinite(rawOffset) ? rawOffset : 0);
+      const res = await pg(
+        `user_notifications?select=id,type,message,related_id,is_read,created_at` +
+          `&user_id=eq.${uid}&order=created_at.desc&limit=${limit}&offset=${offset}`,
+      );
+      return res.ok ? jsonResponse(await res.json(), 200, noStore) : fail();
+    }
+    if (method === "DELETE") {
+      const res = await pg(`user_notifications?user_id=eq.${uid}`, { method: "DELETE" });
+      return res.ok ? ok() : fail();
+    }
+  }
+  if (path === "/api/user/notifications/read-all" && method === "PUT") {
+    const res = await pg(`user_notifications?user_id=eq.${uid}&is_read=eq.false`, {
+      method: "PATCH",
+      headers: postgrestHeaders,
+      body: JSON.stringify({ is_read: true }),
+    });
+    return res.ok ? ok() : fail();
+  }
+  if (path === "/api/user/notifications/read-batch" && method === "PUT") {
+    const body = await readJsonBody(request);
+    const ids = body.ids;
+    if (!Array.isArray(ids) || ids.length === 0) return fail("ids array required", 400);
+    const res = await pg(
+      `user_notifications?user_id=eq.${uid}&id=in.(${ids.map((id) => encodeURIComponent(String(id))).join(",")})`,
+      { method: "PATCH", headers: postgrestHeaders, body: JSON.stringify({ is_read: true }) },
+    );
+    return res.ok ? ok() : fail();
+  }
+  const notificationReadMatch = path.match(/^\/api\/user\/notifications\/([^/]+)\/read$/);
+  if (notificationReadMatch && method === "PUT") {
+    const id = encodeURIComponent(decodeSegment(notificationReadMatch[1]));
+    const res = await pg(`user_notifications?id=eq.${id}&user_id=eq.${uid}`, {
+      method: "PATCH", headers: postgrestHeaders, body: JSON.stringify({ is_read: true }),
+    });
+    return res.ok ? ok() : fail();
+  }
+  const notificationMatch = path.match(/^\/api\/user\/notifications\/([^/]+)$/);
+  if (notificationMatch && method === "DELETE") {
+    const id = encodeURIComponent(decodeSegment(notificationMatch[1]));
+    const res = await pg(`user_notifications?id=eq.${id}&user_id=eq.${uid}`, { method: "DELETE" });
+    return res.ok ? ok() : fail();
+  }
+
+  // ─── Notification preferences ─────────────────────────────────────────────
+  if (path === "/api/user/notification-preferences") {
+    const saved = user.user_metadata?.notification_preferences || {};
+    if (method === "GET") {
+      return jsonResponse(NOTIFICATION_TYPES.map((type) => ({
+        type,
+        enabled: saved[type]?.enabled !== false,
+        email_enabled: saved[type]?.email_enabled === true,
+      })), 200, noStore);
+    }
+    if (method === "PUT") {
+      const body = await readJsonBody(request);
+      const prefs = body.preferences;
+      if (!Array.isArray(prefs) || prefs.length === 0) return fail("preferences array required", 400);
+      if (prefs.some((p) => !p || !NOTIFICATION_TYPES.includes(p.type))) {
+        return fail("Invalid notification type: " + (prefs.find((p) => !p || !NOTIFICATION_TYPES.includes(p.type))?.type ?? "unknown"), 400);
+      }
+      const updated = { ...saved };
+      for (const pref of prefs) {
+        updated[pref.type] = {
+          enabled: pref.enabled !== false,
+          email_enabled: pref.email_enabled === true,
+        };
+      }
+      const result = await updateAuthUserMetadata(supabaseUrl, serviceKey, user.id, {
+        notification_preferences: updated,
+      });
+      return result ? ok() : fail();
+    }
+  }
+
+  // ─── Sound / vibration preferences ────────────────────────────────────────
+  if (path === "/api/user/sound-preferences") {
+    if (method === "GET") {
+      return jsonResponse({
+        sound_enabled: user.user_metadata?.sound_enabled !== false,
+        vibration_enabled: user.user_metadata?.vibration_enabled !== false,
+      }, 200, noStore);
+    }
+    if (method === "PUT") {
+      const body = await readJsonBody(request);
+      const patch = {};
+      if (typeof body.sound_enabled === "boolean") patch.sound_enabled = body.sound_enabled;
+      if (typeof body.vibration_enabled === "boolean") patch.vibration_enabled = body.vibration_enabled;
+      if (!Object.keys(patch).length) return ok();
+      const result = await updateAuthUserMetadata(supabaseUrl, serviceKey, user.id, patch);
+      return result ? ok() : fail();
+    }
+  }
+
+  return fail("API endpoint not found: " + path, 404);
+}
+
+// ─── Performer directory stats ───────────────────────────────────────────────
+// The SPA reads `performers[]` (recording_count / latest_thumbnail / gender)
+// from /api/performers. The raw `channels` table has none of those fields,
+// so use the same get_performer_stats RPC the Express API uses.
+let _performerStatsCache = null;
+let _performerStatsExpires = 0;
+const PERFORMER_STATS_TTL_MS = 5 * 60 * 1000;
+const GENDER_BUCKETS = {
+  female: ["female", "f", "females"],
+  male: ["male", "m"],
+  couple: ["couple", "malefemale"],
+  group: ["group"],
+  trans: ["trans", "transgender", "t"],
+};
+
+function genderMatches(raw, filter) {
+  if (!raw) return false;
+  const value = String(raw).trim().toLowerCase();
+  const lower = filter.trim().toLowerCase();
+  const matches = GENDER_BUCKETS[lower] || [lower];
+  return matches.includes(value);
+}
+
+async function getPerformerStats(supabaseUrl, postgrestHeaders) {
+  const now = Date.now();
+  if (_performerStatsCache && now < _performerStatsExpires) return _performerStatsCache;
+
+  try {
+    const res = await fetch(`${supabaseUrl}/rest/v1/rpc/get_performer_stats`, {
+      method: "POST",
+      headers: {
+        ...postgrestHeaders,
+        "Content-Type": "application/json",
+      },
+      body: "{}",
+    });
+    if (res.ok) {
+      const rows = await res.json();
+      const list = (rows || [])
+        .map(row => ({
+          username: String(row?.username || ""),
+          recording_count: Number(row?.recording_count || 0),
+          gender: row?.gender ?? null,
+          latest_timestamp: row?.latest_timestamp ?? null,
+          latest_thumbnail: row?.latest_thumbnail ?? null,
+          sprite_url: row?.sprite_url ?? null,
+        }))
+        .filter(row => row.username);
+      _performerStatsCache = list;
+      _performerStatsExpires = now + PERFORMER_STATS_TTL_MS;
+      return list;
+    }
+  } catch (_) {
+    // Fall through to the stale cache (if any) below.
+  }
+
+  return _performerStatsCache || [];
+}
+
 function escapeXml(unsafe) {
   if (!unsafe) return "";
   return String(unsafe)
@@ -747,7 +1733,7 @@ async function handleApi(request, env, url, ctx) {
     const videoId = parts[3] || "";
     const sheet = Math.max(0, parseInt(parts[4] || "0", 10) || 0);
     const allowedTables = new Set([
-      "chinese_videos", "videos", "japanese_videos", "myanmar_videos",
+      "chinese_videos", "videos", "japanese_videos", "myanmar_videos", "samusar_videos",
       "onlyfans_videos", "voyeurhouse_videos", "hotscopesvoyeurhouse_videos",
       "reallifecamto_videos", "hotscopesspygasm_videos", "hotscopesreallifecam_videos",
     ]);
@@ -798,7 +1784,8 @@ async function handleApi(request, env, url, ctx) {
         targetObj.hostname.includes("pixhost.to") ||
         targetObj.hostname.includes("catbox.moe") ||
         targetObj.hostname.includes("imgpile.com") ||
-        targetObj.hostname.includes("buumal.com")
+        targetObj.hostname.includes("buumal.com") ||
+        targetObj.hostname.includes("samusar.com")
       ) {
         referer = `${targetObj.origin}/`;
       }
@@ -1941,7 +2928,7 @@ async function resolveHotScopesEmbed(targetUrl, searchParams) {
       "taobao-cdn.com", "supjav.com", "supremejav.com", "clicknplay.to",
       "sheeshfans.com", "influencersgonewild.com",
       "influencersgonewild.net", "mmsvibex.fit", "voyeur-house.org",
-      "spicymms.com", "indianbfclips.com", "desibp.cam", "mydesi.sbs", "mydesi.rest", "mastiraja.tv", "viralmms.net",
+      "spicymms.com", "indianbfclips.com", "desibp.cam", "mydesi.sbs", "mydesi.rest", "mastiraja.tv", "viralmms.net", "samusar.com",
       "reallifecam.to", "reallifecams.net", "hotscopes.net",
       "lulustream.com", "vidara.so", "vidara.to", "whitetrafsa.com",
       "tiktokcdn.com", "838238.xyz", "xianshipian.com", "aomcyou.site",
@@ -2052,6 +3039,8 @@ async function resolveHotScopesEmbed(targetUrl, searchParams) {
         referer = "https://www.indianbfclips.com/";
       } else if (targetObj.hostname.includes("mydesi")) {
         referer = "https://mydesi.sbs/";
+      } else if (targetObj.hostname.includes("samusar")) {
+        referer = "https://www.samusar.com/";
       } else if (targetObj.hostname.includes("xianshipian") || targetObj.hostname.includes("aomcyou") || targetObj.hostname.includes("apianmeng") || targetObj.hostname.includes("atukjhesk") || targetObj.hostname.includes("cdn2020") || targetObj.hostname.includes("97img") || targetObj.hostname.includes("thm3u8") || targetObj.hostname.includes("sxtmo") || targetObj.hostname.includes("micgqv") || targetObj.hostname.includes("mkimfs") || targetObj.hostname.includes("ucjosl") || targetObj.hostname.includes("cloudfront")) {
         // fangsung CDNs: bbcdn 403s any FOREIGN referer but allows none at all
         // (it also 403s Cloudflare-worker egress even with the site referer,
@@ -2550,6 +3539,64 @@ async function resolveHotScopesEmbed(targetUrl, searchParams) {
         }
       }
 
+      // Samusar (Myanmar) Resolver (samusar.com) - extracts highest-quality KVS stream
+      if (destObj.hostname.includes("samusar.com")) {
+        try {
+          const samRes = await fetch(targetUrl, {
+            headers: {
+              "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
+              "Referer": "https://www.samusar.com/",
+            },
+          });
+          if (samRes.ok) {
+            const samHtml = await samRes.text();
+            const pickBest = (htmlStr) => {
+              const keys = ["video_alt_url3", "video_alt_url2", "video_alt_url", "video_url"];
+              const found = [];
+              for (const k of keys) {
+                const re = new RegExp(`${k}\\s*:\\s*'([^']*)'`);
+                const m = htmlStr.match(re);
+                if (m && m[1] && m[1].includes("/get_file/")) found.push(m[1]);
+              }
+              return found[0] || null;
+            };
+            const freshStreamUrl = pickBest(samHtml);
+            const titleMatch = samHtml.match(/<title>([^<]+)<\/title>/i);
+            const posterMatch = samHtml.match(/preview_url\s*:\s*'([^']+)'/i);
+            if (freshStreamUrl) {
+              const wantJson = url.searchParams.get("format") === "json" || request.headers.get("accept")?.includes("application/json");
+              if (wantJson) {
+                return new Response(JSON.stringify({
+                  streamUrl: freshStreamUrl,
+                  title: titleMatch ? titleMatch[1].trim() : "Myanmar Video",
+                  poster: posterMatch ? posterMatch[1] : "",
+                }), {
+                  status: 200,
+                  headers: {
+                    "Content-Type": "application/json",
+                    "Access-Control-Allow-Origin": "*",
+                    "Cache-Control": "no-store",
+                  },
+                });
+              }
+              return new Response(
+                renderCleanHlsPlayer(`/api/player/stream?url=${encodeURIComponent(freshStreamUrl)}`, titleMatch ? titleMatch[1].trim() : "Samusar Video", posterMatch ? posterMatch[1] : ""),
+                {
+                  status: 200,
+                  headers: {
+                    "Content-Type": "text/html; charset=utf-8",
+                    "Access-Control-Allow-Origin": "*",
+                    "Cache-Control": "no-store",
+                  },
+                },
+              );
+            }
+          }
+        } catch (e) {
+          console.error("Samusar resolve error:", e);
+        }
+      }
+
       // Buu Mal (Myanmar) Resolver (buumal.com)
       // Extracts clean direct Cloudflare R2 MP4 stream from Buu Mal video page
       // Serves pure ad-free responsive video player or JSON stream
@@ -2884,32 +3931,105 @@ async function resolveHotScopesEmbed(targetUrl, searchParams) {
 
   // GET /api/premium/config
   if (path === "/api/premium/config") {
-    return jsonResponse({
-      ads_enabled: true,
-      ads_target: 5,
-      reward_cooldown_s: 60,
-      grace_minutes: 10,
-      price_usd: 4.99,
+    const settings = await readPremiumSettings(supabaseUrl, postgrestHeaders);
+    return jsonResponse({ ...settings, checkout_configured: false });
+  }
+
+  // ─── Account / user-data API ────────────────────────────────────────────
+  // Public username login plus bearer-authenticated profile, role, saved,
+  // history, watch-later, collections, follows, notifications and preferences.
+  if (path === "/api/user" || path.startsWith("/api/user/")) {
+    return handleUserApi(request, {
+      path,
+      url,
+      supabaseUrl,
+      anonKey: env.SUPABASE_ANON_KEY || supabaseKey,
+      serviceKey: env.SUPABASE_SERVICE_ROLE_KEY || supabaseKey,
+      postgrestHeaders,
     });
   }
 
-  // GET /api/user/premium/status
-  if (path === "/api/user/premium/status") {
+  const PLAYLIST_CACHE = {
+    "Cache-Control": "public, s-maxage=60, stale-while-revalidate=180",
+  };
+
+  // GET /api/playlists — public, community-created playlists with card media.
+  if (path === "/api/playlists") {
+    const res = await fetch(
+      `${supabaseUrl}/rest/v1/user_collections?select=${PLAYLIST_COLUMNS}&order=created_at.desc&limit=100`,
+      { headers: postgrestHeaders },
+    );
+    if (!res.ok) return errorResponse("Failed to fetch playlists", res.status);
+    const cols = await res.json();
+    if (!cols || cols.length === 0) return jsonResponse([], 200, PLAYLIST_CACHE);
+
+    const profileMap = await fetchPlaylistProfiles(
+      supabaseUrl, postgrestHeaders, cols.map(col => col.user_id),
+    );
+    const colsWithItems = await Promise.all(cols.map(async col => {
+      const itemRes = await fetch(
+        `${supabaseUrl}/rest/v1/user_collection_items?select=recording_id,metadata,added_at,position&collection_id=eq.${encodeURIComponent(col.id)}&order=position.asc.nullslast,added_at.desc&limit=4`,
+        { headers: { ...postgrestHeaders, "Prefer": "count=exact" } },
+      );
+      const items = itemRes.ok ? await itemRes.json() : [];
+      return { col, items, count: postgrestCount(itemRes, items.length) };
+    }));
+    const recMap = await fetchPlaylistRecMap(
+      supabaseUrl,
+      postgrestHeaders,
+      colsWithItems.flatMap(entry => entry.items.map(item => item.recording_id)),
+    );
+
+    const enriched = colsWithItems.map(({ col, items, count }) => ({
+      ...col,
+      item_count: count,
+      items: enrichPlaylistItems(items, recMap),
+      author: playlistAuthor(profileMap, col.user_id),
+    }));
+    return jsonResponse(enriched, 200, PLAYLIST_CACHE);
+  }
+
+  // GET /api/playlists/:id/items — full item list for a playlist detail page.
+  const playlistItemsMatch = path.match(/^\/api\/playlists\/([^/]+)\/items$/);
+  if (playlistItemsMatch) {
+    const id = encodeURIComponent(playlistItemsMatch[1]);
+    const res = await fetch(
+      `${supabaseUrl}/rest/v1/user_collection_items?select=recording_id,metadata,added_at,position&collection_id=eq.${id}&order=position.asc.nullslast,added_at.desc`,
+      { headers: postgrestHeaders },
+    );
+    if (!res.ok) return errorResponse("Failed to fetch playlist items", res.status);
+    const items = await res.json();
+    const recMap = await fetchPlaylistRecMap(
+      supabaseUrl, postgrestHeaders, items.map(item => item.recording_id),
+    );
+    return jsonResponse(enrichPlaylistItems(items, recMap), 200, PLAYLIST_CACHE);
+  }
+
+  // GET /api/playlists/:id — single public playlist and its author/count.
+  const playlistMatch = path.match(/^\/api\/playlists\/([^/]+)$/);
+  if (playlistMatch) {
+    const id = encodeURIComponent(playlistMatch[1]);
+    const res = await fetch(
+      `${supabaseUrl}/rest/v1/user_collections?select=${PLAYLIST_COLUMNS}&id=eq.${id}&limit=1`,
+      { headers: postgrestHeaders },
+    );
+    if (!res.ok) return errorResponse("Failed to fetch playlist", res.status);
+    const cols = await res.json();
+    const col = cols && cols[0];
+    if (!col) return errorResponse("Playlist not found", 404);
+
+    const [profileMap, countRes] = await Promise.all([
+      fetchPlaylistProfiles(supabaseUrl, postgrestHeaders, [col.user_id]),
+      fetch(`${supabaseUrl}/rest/v1/user_collection_items?select=recording_id&collection_id=eq.${id}`, {
+        method: "HEAD",
+        headers: { ...postgrestHeaders, "Prefer": "count=exact" },
+      }),
+    ]);
     return jsonResponse({
-      is_premium: false,
-      premium_until: null,
-      ads_watched: 0,
-    });
-  }
-
-  // GET /api/user/role
-  if (path === "/api/user/role") {
-    return jsonResponse({ role: "user" });
-  }
-
-  // GET /api/user/profile
-  if (path === "/api/user/profile") {
-    return jsonResponse({ user: null });
+      ...col,
+      item_count: postgrestCount(countRes, 0),
+      author: playlistAuthor(profileMap, col.user_id),
+    }, 200, PLAYLIST_CACHE);
   }
 
   // GET /api/stats
@@ -3051,15 +4171,6 @@ async function resolveHotScopesEmbed(targetUrl, searchParams) {
     });
   }
 
-  // GET /api/recordings/random
-  if (path === "/api/recordings/random") {
-    const res = await fetch(`${supabaseUrl}/rest/v1/linked_recordings?select=id,username&limit=1&order=id.desc`, {
-      headers: postgrestHeaders,
-    });
-    const items = await res.json();
-    return jsonResponse(items[0] || {});
-  }
-
   // GET /api/recordings/related
   if (path === "/api/recordings/related") {
     const limit = Math.min(24, Math.max(1, parseInt(url.searchParams.get("limit") || "8", 10)));
@@ -3098,27 +4209,40 @@ async function resolveHotScopesEmbed(targetUrl, searchParams) {
   // GET /api/performers
   if (path === "/api/performers") {
     const page = Math.max(1, parseInt(url.searchParams.get("page") || "1", 10));
-    const limit = Math.min(50, Math.max(1, parseInt(url.searchParams.get("limit") || "24", 10)));
+    const limit = Math.min(100, Math.max(1, parseInt(url.searchParams.get("limit") || "24", 10)));
     const offset = (page - 1) * limit;
+    const search = (url.searchParams.get("search") || "").trim().toLowerCase();
+    const gender = (url.searchParams.get("gender") || "").trim();
+    const sort = url.searchParams.get("sort") || "count";
 
-    const [res, siteMap] = await Promise.all([
-      fetch(`${supabaseUrl}/rest/v1/channels?select=*&limit=${limit}&offset=${offset}&order=updated_at.desc`, {
-        headers: {
-          ...postgrestHeaders,
-          "Prefer": "count=exact",
-        },
-      }),
+    const [stats, siteMap] = await Promise.all([
+      getPerformerStats(supabaseUrl, postgrestHeaders),
       getSiteMap(supabaseUrl, postgrestHeaders),
     ]);
-    const data = await res.json();
-    const contentRange = res.headers.get("Content-Range") || "";
-    let total = data.length;
-    if (contentRange.includes("/")) {
-      const totalStr = contentRange.split("/")[1];
-      if (totalStr && totalStr !== "*") total = parseInt(totalStr, 10);
-    }
+
+    let performers = stats.slice();
+    if (gender) performers = performers.filter(row => genderMatches(row.gender, gender));
+    if (search) performers = performers.filter(row => row.username.toLowerCase().includes(search));
+
+    performers.sort(sort === "name"
+      ? (a, b) => a.username.localeCompare(b.username)
+      : (a, b) => b.recording_count - a.recording_count || a.username.localeCompare(b.username));
+
+    const total = performers.length;
+    const pageRows = performers.slice(offset, offset + limit).map(row => ({
+      username: row.username,
+      recording_count: row.recording_count,
+      gender: row.gender,
+      latest_timestamp: row.latest_timestamp,
+      latest_thumbnail: row.latest_thumbnail || row.sprite_url || null,
+      sprite_url: row.sprite_url,
+      site: resolveSite(row, siteMap),
+    }));
+
     return jsonResponse({
-      data: (data || []).map(item => withResolvedSite(item, siteMap)),
+      // `performers` is the SPA contract; `data` is kept for older consumers.
+      performers: pageRows,
+      data: pageRows,
       total,
       page,
       limit,

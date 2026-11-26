@@ -38,7 +38,7 @@ export const SCRAPER_CATEGORIES = [
     id: "myanmar",
     name: "Myanmar",
     href: "/myanmar",
-    count: "New",
+    count: "2 SRC",
     icon: FilmStrip,
   },
   {
