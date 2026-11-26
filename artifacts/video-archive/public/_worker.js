@@ -2180,7 +2180,7 @@ function renderCleanMp4Player(streams, title = '', poster = '') {
   const safeTitle = (title || 'Chuglii Player').replace(/</g, '&lt;').replace(/>/g, '&gt;');
   const safePoster = poster ? String(poster).replace(/"/g, '&quot;') : '';
   const list = Array.isArray(streams) ? streams.filter(s => s && s.url) : [];
-  return `<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1.0,user-scalable=no"><meta name="referrer" content="no-referrer"><title>${safeTitle}</title><style>*{margin:0;padding:0;box-sizing:border-box}html,body{width:100%;height:100%;background:#000;overflow:hidden;display:flex;align-items:center;justify-content:center;position:relative}video{width:100%;height:100%;max-height:100vh;object-fit:contain;background:#000}.control-overlay{position:absolute;top:12px;right:12px;z-index:50}.quality-select{background:rgba(15,23,42,.88);color:#f8fafc;border:1px solid rgba(255,255,255,.25);border-radius:6px;padding:5px 10px;font-size:13px;font-family:system-ui,-apple-system,sans-serif;cursor:pointer}.quality-select option{background:#0f172a;color:#fff}</style></head><body><div id="quality-wrap" class="control-overlay" style="display:none"><select id="quality-selector" class="quality-select" title="Select Video Quality"></select></div><video id="player" controls autoplay muted playsinline referrerpolicy="no-referrer" ${safePoster ? `poster="${safePoster}"` : ''}></video><script>(function(){var v=document.getElementById('player'),s=${JSON.stringify(list)},sel=document.getElementById('quality-selector'),w=document.getElementById('quality-wrap');if(!s.length)return;function label(x){var l=x.label||(x.quality?(x.quality+'p'):'Original');if(x.quality>=1080&&!/full\s*hd/i.test(l))l+=' Full HD';else if(x.quality>=720&&x.quality<1080&&!/\bhd\b/i.test(l))l+=' HD';return l}if(s.length>1){w.style.display='block';s.forEach(function(x,i){var o=document.createElement('option');o.value=String(i);o.textContent=label(x);sel.appendChild(o)})}function set(i,keep){i=Math.max(0,Math.min(s.length-1,i));var t=keep?(v.currentTime||0):0,p=v.paused;sel.value=String(i);var usedFallback=false;var onError=function(){v.removeEventListener('error',onError);var fb=s[i].fallbackUrl;if(fb&&!usedFallback){usedFallback=true;v.src=fb;v.addEventListener('error',onError);v.load()}else if(i<s.length-1){set(i+1,keep)}};v.addEventListener('error',onError);v.src=s[i].url;v.addEventListener('loadedmetadata',function m(){v.removeEventListener('loadedmetadata',m);try{if(t>0)v.currentTime=Math.min(t,Math.max(0,(v.duration||t)-.25))}catch(e){}if(!p){v.muted=true;v.play().catch(function(){})}});v.load()}sel.addEventListener('change',function(){set(parseInt(sel.value,10)||0,true)});set(0,false);v.play().catch(function(){v.muted=true;v.play().catch(function(){})})})();</script><script>(function(){function n(t,d){try{parent.postMessage({source:'chuglii-player',type:t,detail:d||{}},'*')}catch(e){}}var v=document.getElementById('player');v.addEventListener('playing',function(){n('player:playing')});v.addEventListener('ended',function(){n('player:ended')});v.addEventListener('error',function(){n('player:error',{code:'media_error',message:(v.error&&v.error.message)||'This stream failed to play.'})})})();</script></body></html>`;
+  return `<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1.0,user-scalable=no"><meta name="referrer" content="no-referrer"><title>${safeTitle}</title><style>*{margin:0;padding:0;box-sizing:border-box}html,body{width:100%;height:100%;background:#000;overflow:hidden;display:flex;align-items:center;justify-content:center;position:relative}video{width:100%;height:100%;max-height:100vh;object-fit:contain;background:#000}.control-overlay{position:absolute;top:12px;right:12px;z-index:50}.quality-select{background:rgba(15,23,42,.88);color:#f8fafc;border:1px solid rgba(255,255,255,.25);border-radius:6px;padding:5px 10px;font-size:13px;font-family:system-ui,-apple-system,sans-serif;cursor:pointer}.quality-select option{background:#0f172a;color:#fff}</style></head><body><div id="quality-wrap" class="control-overlay" style="display:none"><select id="quality-selector" class="quality-select" title="Select Video Quality"></select></div><video id="player" controls autoplay muted playsinline referrerpolicy="no-referrer" ${safePoster ? `poster="${safePoster}"` : ''}></video><script>(function(){var v=document.getElementById('player'),s=${JSON.stringify(list)},sel=document.getElementById('quality-selector'),w=document.getElementById('quality-wrap');if(!s.length)return;function _unmute(){try{v.muted=false}catch(e){}document.removeEventListener('pointerdown',_unmute);document.removeEventListener('keydown',_unmute);document.removeEventListener('touchstart',_unmute)}document.addEventListener('pointerdown',_unmute);document.addEventListener('keydown',_unmute);document.addEventListener('touchstart',_unmute);function label(x){var l=x.label||(x.quality?(x.quality+'p'):'Original');if(x.quality>=1080&&!/full\s*hd/i.test(l))l+=' Full HD';else if(x.quality>=720&&x.quality<1080&&!/\bhd\b/i.test(l))l+=' HD';return l}if(s.length>1){w.style.display='block';s.forEach(function(x,i){var o=document.createElement('option');o.value=String(i);o.textContent=label(x);sel.appendChild(o)})}function set(i,keep){i=Math.max(0,Math.min(s.length-1,i));var t=keep?(v.currentTime||0):0,p=v.paused;sel.value=String(i);var usedFallback=false;var onError=function(){v.removeEventListener('error',onError);var fb=s[i].fallbackUrl;if(fb&&!usedFallback){usedFallback=true;v.src=fb;v.addEventListener('error',onError);v.load()}else if(i<s.length-1){set(i+1,keep)}};v.addEventListener('error',onError);v.src=s[i].url;v.addEventListener('loadedmetadata',function m(){v.removeEventListener('loadedmetadata',m);try{if(t>0)v.currentTime=Math.min(t,Math.max(0,(v.duration||t)-.25))}catch(e){}if(!p){v.muted=true;v.play().catch(function(){})}});v.load()}sel.addEventListener('change',function(){set(parseInt(sel.value,10)||0,true)});set(0,false);v.play().catch(function(){v.muted=true;v.play().catch(function(){})})})();</script><script>(function(){function n(t,d){try{parent.postMessage({source:'chuglii-player',type:t,detail:d||{}},'*')}catch(e){}}var v=document.getElementById('player');v.addEventListener('playing',function(){n('player:playing')});v.addEventListener('ended',function(){n('player:ended')});v.addEventListener('error',function(){n('player:error',{code:'media_error',message:(v.error&&v.error.message)||'This stream failed to play.'})})})();</script></body></html>`;
 }
 
 function renderCleanHlsPlayer(streamingUrl, title = "", poster = "") {
@@ -2209,7 +2209,7 @@ function renderCleanHlsPlayer(streamingUrl, title = "", poster = "") {
       <option value="-1">Auto (Best)</option>
     </select>
   </div>
-  <video id="player" controls autoplay playsinline ${poster ? `poster="${poster}"` : ""}></video>
+  <video id="player" controls autoplay muted playsinline ${poster ? `poster="${poster}"` : ""}></video>
   <script>
     (function() {
       function notify(type, detail) {
@@ -2217,6 +2217,19 @@ function renderCleanHlsPlayer(streamingUrl, title = "", poster = "") {
       }
       var hlsRetries = 0;
       var video = document.getElementById('player');
+      // Autoplay is only permitted while MUTED, so playback starts silent and
+      // the first click/keypress restores audio. Without this the browser
+      // blocked autoplay outright and the player sat black -- which reads as
+      // "the video doesn't play".
+      function unmuteOnFirstGesture() {
+        try { video.muted = false; } catch (err) {}
+        document.removeEventListener('pointerdown', unmuteOnFirstGesture);
+        document.removeEventListener('keydown', unmuteOnFirstGesture);
+        document.removeEventListener('touchstart', unmuteOnFirstGesture);
+      }
+      document.addEventListener('pointerdown', unmuteOnFirstGesture);
+      document.addEventListener('keydown', unmuteOnFirstGesture);
+      document.addEventListener('touchstart', unmuteOnFirstGesture);
       video.addEventListener('playing', function() { notify('player:playing'); });
       video.addEventListener('ended', function() { notify('player:ended'); });
       video.addEventListener('error', function() {
@@ -2378,7 +2391,7 @@ function renderCleanHlsPlayerMulti(candidates, title = "", poster = "") {
     </select>
   </div>
   <div id="failover-badge" class="failover-badge"></div>
-  <video id="player" controls autoplay playsinline ${poster ? `poster="${poster}"` : ""}></video>
+  <video id="player" controls autoplay muted playsinline ${poster ? `poster="${poster}"` : ""}></video>
   <script>
     (function() {
       function notify(type, detail) {

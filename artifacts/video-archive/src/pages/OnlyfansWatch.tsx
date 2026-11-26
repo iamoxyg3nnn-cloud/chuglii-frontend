@@ -315,7 +315,13 @@ export default function OnlyfansWatch() {
   // Direct MP4s from these hosts must still play inside OUR player. Left to a
   // native <video> the browser renders its own bare controls, so the source
   // loses the branded player, the quality menu and next-source failover.
-  const edgePlayerMediaHosts = useMemo(() => ["media.uncut-x.com"], []);
+  // Every source whose media we host should play inside OUR player. A native
+  // <video> hands playback to the browser's own UI (and its bare controls),
+  // so the branded player, quality menu and next-source failover disappear.
+  const edgePlayerMediaHosts = useMemo(
+    () => ["media.uncut-x.com", "content.zavastream.com"],
+    [],
+  );
   const useEdgePlayerForMedia = useMemo(() => {
     if (!isDirectVideo || !activeUrl) return false;
     try {
