@@ -8,6 +8,8 @@ import {
   SpeakerSlash,
   CornersOut,
   CornersIn,
+  Broadcast,
+  ArrowUUpRight,
   PictureInPicture,
   GearSix,
   ArrowClockwise,
@@ -48,6 +50,13 @@ interface VideoPlayerProps {
   onAutoDowngrade?: (fromUrl: string) => void;
   videoRef?: React.RefObject<HTMLVideoElement | null>;
   className?: string;
+  /** Live mode: hides the seek bar / duration / hover preview, shows a LIVE
+   *  indicator and loops finite (VOD-as-live) sources — matching how the
+   *  source site presents its fake-live loops. True live manifests (duration
+   *  Infinity via liveDurationInfinity) also get a Go-to-live button. */
+  live?: boolean;
+  /** Jump back to the live edge; provided only for true live manifests. */
+  onGoLive?: () => void;
 }
 
 // Scale guard: skip all background warming/prefetch for data-saver users
@@ -90,6 +99,8 @@ export function VideoPlayer({
   onAutoDowngrade,
   videoRef: externalRef,
   className = "",
+  live = false,
+  onGoLive,
 }: VideoPlayerProps) {
   const internalRef = useRef<HTMLVideoElement>(null);
   const videoRef = externalRef || internalRef;
@@ -118,6 +129,17 @@ export function VideoPlayer({
   const seekRowRef = useRef<HTMLDivElement | null>(null);
   const [stallNotice, setStallNotice] = useState<string | null>(null);
   const stallTimer = useRef<number | null>(null);
+
+  // Live mode: loop finite sources (VOD-as-live, matching the upstream
+  // player); on true live (duration Infinity) loop is a harmless no-op.
+  useEffect(() => {
+    const v = videoRef.current;
+    if (v) v.loop = live;
+  }, [live, videoRef]);
+
+  // True live manifests get onGoLive from the HLS engine (manifest-level
+  // live detection); VOD-as-live sources only get the loop + live chrome.
+  const trueLive = live && !!onGoLive;
   const startupStallTimer = useRef<number | null>(null);
   const lastDowngradeAt = useRef(0);
   const playRequested = useRef(false);
@@ -825,9 +847,11 @@ export function VideoPlayer({
       <div className={`absolute inset-x-0 top-0 p-3 sm:p-4 flex items-start justify-between gap-3 transition-opacity duration-300 ${showControls || !playing ? "opacity-100" : "opacity-0 pointer-events-none"}`}>
         <div className="min-w-0 flex-1">{title && <p className="text-sm sm:text-base font-semibold text-white/95 line-clamp-1 drop-shadow">{title}</p>}</div>
         <div className="relative shrink-0">
-          <button type="button" onClick={() => setShowSettings((s) => !s)} className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-black/45 hover:bg-black/65 backdrop-blur-md border border-white/10 text-white text-xs font-semibold transition-colors" aria-label="Video settings">
-            <GearSix size={15} weight="bold" /><span>{qualities.length > 0 ? activeQuality : "Settings"}</span>
-          </button>
+          {!live && (
+            <button type="button" onClick={() => setShowSettings((s) => !s)} className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-black/45 hover:bg-black/65 backdrop-blur-md border border-white/10 text-white text-xs font-semibold transition-colors" aria-label="Video settings">
+              <GearSix size={15} weight="bold" /><span>{qualities.length > 0 ? activeQuality : "Settings"}</span>
+            </button>
+          )}
           {showSettings && (
             <div className="absolute right-0 top-full mt-2 w-52 rounded-xl bg-zinc-950/95 backdrop-blur-xl border border-white/10 shadow-2xl p-2 z-20">
               {qualities.length > 1 && (
@@ -865,6 +889,13 @@ export function VideoPlayer({
       </div>
 
       <div className={`absolute inset-x-0 bottom-0 px-3 sm:px-4 pb-3 sm:pb-4 transition-opacity duration-300 ${showControls || !playing ? "opacity-100" : "opacity-0 pointer-events-none"}`}>
+        {live ? (
+          <div className="relative mb-3 h-5 flex items-center" aria-hidden>
+            <div className="absolute inset-x-0 h-1 rounded-full bg-white/10">
+              <div className="absolute inset-y-0 left-0 right-0 rounded-full bg-red-500/80 animate-pulse" />
+            </div>
+          </div>
+        ) : (
         <div ref={seekRowRef} className="group/seek relative mb-3 h-5 flex items-center"
           onMouseMove={(e) => { const rect = (e.currentTarget as HTMLDivElement).getBoundingClientRect(); const pct = Math.min(1, Math.max(0, (e.clientX - rect.left) / rect.width)); setHoverTime(pct * duration); setHoverX(e.clientX - rect.left); if (duration > 0) { updatePreviewSeek(pct * duration); prefetchHoverRegion(pct * duration); } }}
           onMouseLeave={() => { setHoverTime(null); resumePreviewFollow(); }}
@@ -901,28 +932,52 @@ export function VideoPlayer({
           <div className="absolute top-1/2 -translate-y-1/2 w-3.5 h-3.5 rounded-full bg-cyan-400 shadow-[0_0_0_4px_rgba(34,211,238,0.2)] opacity-0 group-hover/seek:opacity-100 transition-opacity" style={{ left: `calc(${progress}% - 7px)` }} />
           <input type="range" min={0} max={duration || 0} step={0.1} value={currentTime} onChange={(e) => seek(Number(e.target.value))} className="absolute inset-0 w-full h-full opacity-0 cursor-pointer" aria-label="Seek" />
         </div>
+        )}
 
         <div className="flex items-center gap-2 sm:gap-3">
           <button type="button" onClick={togglePlay} className="p-2 rounded-lg text-white hover:bg-white/10 transition-colors" aria-label={playing ? "Pause" : "Play"}>
             {playing ? <Pause size={22} weight="fill" /> : <Play size={22} weight="fill" />}
           </button>
-          <button type="button" onClick={() => seekRelative(-5)} className="relative p-2 rounded-lg text-white hover:bg-white/10 transition-colors" aria-label="Back 5 seconds">
-            <ArrowCounterClockwise size={19} weight="fill" />
-            <span className="absolute inset-0 flex items-center justify-center text-[9px] font-bold pt-0.5 pointer-events-none">5</span>
-          </button>
-          <button type="button" onClick={() => seekRelative(5)} className="relative p-2 rounded-lg text-white hover:bg-white/10 transition-colors" aria-label="Forward 5 seconds">
-            <ArrowClockwise size={19} weight="fill" />
-            <span className="absolute inset-0 flex items-center justify-center text-[9px] font-bold pt-0.5 pointer-events-none">5</span>
-          </button>
+          {live ? (
+            <span className="inline-flex items-center gap-1.5 px-2 py-1 rounded-md bg-red-500/20 border border-red-500/40 text-[11px] font-bold uppercase tracking-wider text-red-400">
+              <span className="w-1.5 h-1.5 rounded-full bg-red-500 animate-pulse" />
+              Live{mainDims?.h ? ` · ${mainDims.h}p` : ""}
+            </span>
+          ) : (
+            <>
+              <button type="button" onClick={() => seekRelative(-5)} className="relative p-2 rounded-lg text-white hover:bg-white/10 transition-colors" aria-label="Back 5 seconds">
+                <ArrowCounterClockwise size={19} weight="fill" />
+                <span className="absolute inset-0 flex items-center justify-center text-[9px] font-bold pt-0.5 pointer-events-none">5</span>
+              </button>
+              <button type="button" onClick={() => seekRelative(5)} className="relative p-2 rounded-lg text-white hover:bg-white/10 transition-colors" aria-label="Forward 5 seconds">
+                <ArrowClockwise size={19} weight="fill" />
+                <span className="absolute inset-0 flex items-center justify-center text-[9px] font-bold pt-0.5 pointer-events-none">5</span>
+              </button>
+            </>
+          )}
           <div className="flex items-center gap-1 group/vol">
             <button type="button" onClick={toggleMute} className="p-2 rounded-lg text-white hover:bg-white/10 transition-colors" aria-label={muted ? "Unmute" : "Mute"}>
               <VolumeIcon size={20} weight="fill" />
             </button>
             <input type="range" min={0} max={1} step={0.05} value={muted ? 0 : volume} onChange={(e) => changeVolume(Number(e.target.value))} className="w-12 sm:w-20 sm:group-hover/vol:w-24 transition-all accent-cyan-400 h-1" aria-label="Volume" />
           </div>
-          <div className="text-xs sm:text-sm font-medium text-white/90 tabular-nums">
-            <span>{formatTime(currentTime)}</span><span className="text-white/40 mx-1">/</span><span className="text-white/70">{formatTime(duration)}</span>
-          </div>
+          {live ? (
+            trueLive ? (
+              <button
+                type="button"
+                onClick={onGoLive}
+                className="inline-flex items-center gap-1 px-2 py-1 rounded-md text-[11px] font-semibold text-white/85 hover:text-white hover:bg-white/10 transition-colors"
+                aria-label="Jump to live edge"
+              >
+                <ArrowUUpRight size={13} weight="bold" />
+                Go live
+              </button>
+            ) : null
+          ) : (
+            <div className="text-xs sm:text-sm font-medium text-white/90 tabular-nums">
+              <span>{formatTime(currentTime)}</span><span className="text-white/40 mx-1">/</span><span className="text-white/70">{formatTime(duration)}</span>
+            </div>
+          )}
           <div className="flex-1" />
           {typeof document !== "undefined" && document.pictureInPictureEnabled && (
             <button type="button" onClick={togglePiP} className="inline-flex p-2 rounded-lg text-white/85 hover:text-white hover:bg-white/10 transition-colors" aria-label="Picture in picture"><PictureInPicture size={20} /></button>

@@ -1190,6 +1190,34 @@ router.delete("/user/follows/:username", async (req, res) => {
 
 // ─── Notifications ────────────────────────────────────────────────────────────
 
+router.get("/user/notifications/stats", async (req, res) => {
+  try {
+    const userId = req.user!.id;
+    const [total, unread] = await Promise.all([
+      req.supabase!
+        .from("user_notifications")
+        .select("id", { count: "exact", head: true })
+        .eq("user_id", userId),
+      req.supabase!
+        .from("user_notifications")
+        .select("id", { count: "exact", head: true })
+        .eq("user_id", userId)
+        .eq("is_read", false),
+    ]);
+
+    if (total.error || unread.error) {
+      req.log.error({ err: total.error || unread.error }, "Supabase error fetching notification stats");
+      res.status(500).json({ error: "Internal server error" });
+      return;
+    }
+
+    res.json({ total: total.count ?? 0, unread: unread.count ?? 0 });
+  } catch (err) {
+    req.log.error({ err }, "GET /user/notifications/stats unexpected error");
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
+
 router.get("/user/notifications", async (req, res) => {
   try {
     const userId = req.user!.id;

@@ -21,6 +21,7 @@ import {
   Broadcast,
   Eye,
   Magnet,
+  MonitorPlay,
 } from "@phosphor-icons/react";
 import { NAV_LINKS } from "./DesktopNav";
 import { prefetchRoute } from "@/lib/route-chunks";
@@ -31,6 +32,7 @@ const NAV_ICON_MAP: Record<string, React.ComponentType<{ size?: number; weight?:
   "/performers": UsersThree,
   "/tags": Tag,
   "/playlists": Playlist,
+  "/live": MonitorPlay,
 };
 
 const LIBRARY_LINKS = [
@@ -229,6 +231,26 @@ export function MobileMenu({
                   </span>
                   <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-sky-500/20 text-sky-400 uppercase">
                     5 SRC
+                  </span>
+                </span>
+              </Link>
+              <Link href="/live" aria-current={isActiveNavigationRoute("/live", location) ? "page" : undefined}>
+                <span
+                  className={`w-full px-3 py-2 text-sm rounded-lg transition-all duration-150 inline-flex items-center justify-between ${
+                    isActiveNavigationRoute("/live", location)
+                      ? "text-red-400 font-medium bg-red-500/15 border border-red-500/30"
+                      : "text-red-400/90 hover:text-red-300 hover:bg-red-500/10"
+                  }`}
+                  onClick={onClose}
+                  onMouseEnter={() => prefetchRoute("/live")}
+                  onFocus={() => prefetchRoute("/live")}
+                >
+                  <span className="inline-flex items-center gap-2.5">
+                    <MonitorPlay size={16} weight="fill" className="text-red-400" />
+                    Watch Live
+                  </span>
+                  <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-red-500/20 text-red-400 uppercase">
+                    Live
                   </span>
                 </span>
               </Link>

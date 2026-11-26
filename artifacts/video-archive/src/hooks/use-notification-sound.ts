@@ -1,8 +1,17 @@
 import { useEffect, useRef } from "react";
 
+export interface SoundNotification {
+  id?: number;
+  is_read: boolean;
+  message?: string;
+  type?: string;
+}
+
+export type NotifiedNotification = Pick<SoundNotification, "id" | "message" | "type">;
+
 /**
  * Generates a short two-tone notification chime using the Web Audio API.
- * No audio files needed — the sound is synthesized on the fly.
+ * No audio files needed - the sound is synthesized on the fly.
  */
 let sharedCtx: AudioContext | null = null;
 
@@ -11,7 +20,7 @@ function getAudioContext(): AudioContext | null {
     if (!sharedCtx || sharedCtx.state === "closed") {
       sharedCtx = new AudioContext();
     } else if (sharedCtx.state === "suspended") {
-      sharedCtx.resume();
+      void sharedCtx.resume();
     }
     return sharedCtx;
   } catch {
@@ -26,93 +35,97 @@ function playNotificationSound() {
   try {
     const gain = ctx.createGain();
     gain.connect(ctx.destination);
-    gain.gain.setValueAtTime(0.08, ctx.currentTime); // Quiet & subtle
+    gain.gain.setValueAtTime(0.08, ctx.currentTime);
     gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.4);
 
-    // First tone — higher pitch "ding"
-    const osc1 = ctx.createOscillator();
-    osc1.type = "sine";
-    osc1.frequency.setValueAtTime(880, ctx.currentTime); // A5
-    osc1.connect(gain);
-    osc1.start(ctx.currentTime);
-    osc1.stop(ctx.currentTime + 0.15);
+    const first = ctx.createOscillator();
+    first.type = "sine";
+    first.frequency.setValueAtTime(880, ctx.currentTime);
+    first.connect(gain);
+    first.start(ctx.currentTime);
+    first.stop(ctx.currentTime + 0.15);
 
-    // Second tone — slightly lower "dong" (overlaps briefly)
-    const osc2 = ctx.createOscillator();
-    osc2.type = "sine";
-    osc2.frequency.setValueAtTime(660, ctx.currentTime + 0.12); // E5, delayed
-    osc2.connect(gain);
-    osc2.start(ctx.currentTime + 0.12);
-    osc2.stop(ctx.currentTime + 0.35);
+    const second = ctx.createOscillator();
+    second.type = "sine";
+    second.frequency.setValueAtTime(660, ctx.currentTime + 0.12);
+    second.connect(gain);
+    second.start(ctx.currentTime + 0.12);
+    second.stop(ctx.currentTime + 0.35);
   } catch {
-    // Web Audio API not available — silently skip
+    // Web Audio API unavailable - fail quietly.
   }
 }
 
-/**
- * Triggers a short vibration on devices that support the Vibration API.
- */
 function vibrate() {
   try {
-    if ("vibrate" in navigator) {
-      navigator.vibrate(50); // 50ms short pulse
-    }
+    if ("vibrate" in navigator) navigator.vibrate(50);
   } catch {
-    // Vibration API not available — silently skip
+    // Vibration API unavailable - fail quietly.
   }
 }
 
 /**
- * Plays a notification sound and vibrates when the unread notification
- * count increases (i.e., a new notification arrives while the page is open).
- *
- * Optionally pass `onNewNotification` to show a toast or other UI feedback.
- * The callback receives the newest unread notification.
- *
- * Pass `soundEnabled` and `vibrationEnabled` to independently control
- * whether the sound and/or vibration fire (both default true).
- *
- * Pass the list of notifications — the hook internally tracks the previous
- * unread count and fires on increases.
+ * Fires feedback for notifications whose IDs are newer than the last seen ID.
+ * Using notification identity instead of the unread count prevents false
+ * alerts when a list refetch reorders rows or an older page is loaded.
  */
 export function useNotificationSound(
-  notifications: { id?: number; is_read: boolean; message?: string; type?: string }[],
+  notifications: SoundNotification[],
   enabled = true,
-  onNewNotification?: (notification: { id?: number; message?: string; type?: string }) => void,
-  opts?: { sound?: boolean; vibration?: boolean },
+  onNewNotification?: (notification: NotifiedNotification, count: number) => void,
+  opts?: { sound?: boolean; vibration?: boolean; resetKey?: string | null },
 ) {
-  const prevUnreadRef = useRef(-1);
+  const lastSeenIdRef = useRef<number | null>(null);
+  const resetKeyRef = useRef<string | null | undefined>(opts?.resetKey);
 
   useEffect(() => {
-    if (!enabled) return;
-
-    const unread = notifications.filter((n) => !n.is_read).length;
-    const prev = prevUnreadRef.current;
-    prevUnreadRef.current = unread;
-
-    // Only fire when the count *increases* (new notification arrived).
-    // prev === -1 on first mount so we skip the initial render.
-    if (unread > prev && prev !== -1) {
-      const soundOn = opts?.sound !== false;
-      const vibrateOn = opts?.vibration !== false;
-
-      if (soundOn) playNotificationSound();
-      if (vibrateOn) vibrate();
-
-      // Find the newest unread notification (highest id or latest created_at)
-      // and pass it to the callback so the consumer can show a toast etc.
-      if (onNewNotification) {
-        const newest = notifications
-          .filter((n) => !n.is_read)
-          .sort((a, b) => (b.id ?? 0) - (a.id ?? 0))[0];
-        if (newest) {
-          onNewNotification({
-            id: newest.id,
-            message: newest.message,
-            type: newest.type,
-          });
-        }
-      }
+    if (resetKeyRef.current !== opts?.resetKey) {
+      resetKeyRef.current = opts?.resetKey;
+      lastSeenIdRef.current = null;
     }
-  }, [notifications, enabled, onNewNotification, opts?.sound, opts?.vibration]);
+  }, [opts?.resetKey]);
+
+  useEffect(() => {
+    if (!enabled) {
+      lastSeenIdRef.current = null;
+      return;
+    }
+
+    const ids = notifications
+      .map((n) => n.id)
+      .filter((id): id is number => typeof id === "number");
+    if (ids.length === 0) return;
+
+    const maxId = Math.max(...ids);
+    const previous = lastSeenIdRef.current;
+
+    if (previous === null) {
+      lastSeenIdRef.current = maxId;
+      return;
+    }
+    // Never move the watermark backwards: deleting the newest row must not
+    // cause the next arrival to be treated as an old notification.
+    if (maxId <= previous) return;
+
+    lastSeenIdRef.current = maxId;
+
+    const fresh = notifications
+      .filter((n) => typeof n.id === "number" && n.id > previous && !n.is_read)
+      .sort((a, b) => (b.id ?? 0) - (a.id ?? 0));
+    if (fresh.length === 0) return;
+
+    if (opts?.sound !== false) playNotificationSound();
+    if (opts?.vibration !== false) vibrate();
+
+    if (onNewNotification) {
+      onNewNotification(
+        {
+          id: fresh[0].id,
+          message: fresh[0].message,
+          type: fresh[0].type,
+        },
+        fresh.length,
+      );
+    }
+  }, [notifications, enabled, onNewNotification, opts?.sound, opts?.vibration, opts?.resetKey]);
 }

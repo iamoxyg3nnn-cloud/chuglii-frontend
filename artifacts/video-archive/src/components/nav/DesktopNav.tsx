@@ -1,6 +1,6 @@
 import { Link } from "wouter";
 import { useCallback, memo, useState, useRef } from "react";
-import { PaperPlaneTilt, Flame, GlobeHemisphereWest, FilmStrip, CaretDown, Broadcast, Eye, Magnet } from "@phosphor-icons/react";
+import { PaperPlaneTilt, Flame, GlobeHemisphereWest, FilmStrip, CaretDown, Broadcast, Eye, Magnet, MonitorPlay } from "@phosphor-icons/react";
 import { prefetchRoute } from "@/lib/route-chunks";
 import { isActiveNavigationRoute } from "@/lib/navigation";
 
@@ -55,6 +55,13 @@ export const SCRAPER_CATEGORIES = [
     count: "5 SRC",
     icon: Magnet,
   },
+  {
+    id: "live",
+    name: "Watch Live",
+    href: "/live",
+    count: "LIVE",
+    icon: MonitorPlay,
+  },
 ] as const;
 
 interface DesktopNavProps {
@@ -68,7 +75,8 @@ export const DesktopNav = memo(function DesktopNav({ location, onRequestOpen }: 
     isActiveNavigationRoute("/onlyfans", location) ||
     isActiveNavigationRoute("/japanese", location) ||
     isActiveNavigationRoute("/myanmar", location) ||
-    isActiveNavigationRoute("/voyeurhouse", location);
+    isActiveNavigationRoute("/voyeurhouse", location) ||
+    isActiveNavigationRoute("/live", location);
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const closeTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
@@ -82,6 +90,7 @@ export const DesktopNav = memo(function DesktopNav({ location, onRequestOpen }: 
     prefetchRoute("/japanese");
     prefetchRoute("/myanmar");
     prefetchRoute("/voyeurhouse");
+    prefetchRoute("/live");
     setDropdownOpen(true);
   };
 

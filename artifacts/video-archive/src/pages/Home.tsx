@@ -163,10 +163,6 @@ export default function Home() {
             <Link href="/browse" className="text-primary font-semibold hover:text-primary/80 transition-colors">
               Latest
             </Link>
-            <span className="text-muted-foreground/40" aria-hidden="true">·</span>
-            <Link href="/random" className="text-muted-foreground hover:text-foreground transition-colors">
-              Random
-            </Link>
           </nav>
         </div>
       </section>

@@ -3,6 +3,8 @@ import { Link, useLocation } from "wouter";
 import { Layout } from "@/components/Layout";
 import { AdBanner } from "@/components/ads/AdBanner";
 import { AdLeaderboard } from "@/components/ads/AdLeaderboard";
+import { Switch } from "@/components/ui/switch";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { useAuth } from "@/contexts/AuthContext";
 import { userApi, type UserProfile } from "@/lib/user-api";
 import { getSoundEnabled, getVibrationEnabled, fetchSoundPreferences, saveSoundPreferences } from "@/lib/sound-prefs";
@@ -163,7 +165,7 @@ export default function Settings() {
           <Link href="/profile">
             <button
               type="button"
-              className="inline-flex items-center gap-1.5 h-9 px-3.5 text-xs font-semibold rounded-lg border border-primary/30 text-primary hover:border-primary/60 bg-primary/5 hover:bg-primary/10 transition-colors cursor-pointer"
+              className="inline-flex items-center gap-1.5 h-9 px-3.5 text-xs font-semibold rounded-lg border border-primary/30 text-red-400 hover:border-primary/60 bg-primary/5 hover:bg-primary/10 transition-colors cursor-pointer"
             >
               <Pulse size={14} />
               View Profile & Activity →
@@ -192,7 +194,7 @@ export default function Settings() {
                 type="email"
                 value={user.email ?? ""}
                 disabled
-                className="w-full h-10 bg-secondary border border-border/40 rounded-lg px-3 text-sm text-muted-foreground/60 cursor-not-allowed"
+                className="w-full h-10 bg-secondary border border-border/40 rounded-lg px-3 text-sm text-muted-foreground cursor-not-allowed"
               />
             </div>
             <div className="space-y-1.5">
@@ -206,7 +208,7 @@ export default function Settings() {
                 onChange={(e) => setDisplayName(e.target.value)}
                 maxLength={60}
                 placeholder="How others see you"
-                className="w-full h-10 bg-secondary border border-border/60 focus:border-primary/50 rounded-lg px-3 text-sm outline-none transition-all placeholder:text-muted-foreground/40 focus:ring-2 focus:ring-primary/5"
+                className="w-full h-10 bg-secondary border border-border/60 focus:border-primary/50 rounded-lg px-3 text-sm outline-none transition-all placeholder:text-muted-foreground focus:ring-2 focus:ring-primary/5"
               />
             </div>
             <div className="space-y-1.5">
@@ -219,7 +221,7 @@ export default function Settings() {
                 value={avatarUrl}
                 onChange={(e) => setAvatarUrl(e.target.value)}
                 placeholder="https://example.com/avatar.jpg"
-                className="w-full h-10 bg-secondary border border-border/60 focus:border-primary/50 rounded-lg px-3 text-sm outline-none transition-all placeholder:text-muted-foreground/40 focus:ring-2 focus:ring-primary/5"
+                className="w-full h-10 bg-secondary border border-border/60 focus:border-primary/50 rounded-lg px-3 text-sm outline-none transition-all placeholder:text-muted-foreground focus:ring-2 focus:ring-primary/5"
               />
             </div>
             <div className="space-y-1.5">
@@ -233,7 +235,7 @@ export default function Settings() {
                 maxLength={300}
                 rows={3}
                 placeholder="A little about you (optional)"
-                className="w-full bg-secondary border border-border/60 focus:border-primary/50 rounded-lg px-3 py-2 text-sm outline-none transition-all resize-none placeholder:text-muted-foreground/40 focus:ring-2 focus:ring-primary/5"
+                className="w-full bg-secondary border border-border/60 focus:border-primary/50 rounded-lg px-3 py-2 text-sm outline-none transition-all resize-none placeholder:text-muted-foreground focus:ring-2 focus:ring-primary/5"
               />
             </div>
 
@@ -257,7 +259,7 @@ export default function Settings() {
             <button
               type="submit"
               disabled={saving}
-              className="inline-flex items-center gap-1.5 h-9 px-4 text-xs font-semibold border border-primary/30 text-primary hover:border-primary/60 transition-colors rounded-lg disabled:opacity-60"
+              className="inline-flex items-center gap-1.5 h-9 px-4 text-xs font-semibold border border-primary/30 text-red-400 hover:border-primary/60 transition-colors rounded-lg disabled:opacity-60"
             >
               <FloppyDisk size={14} />
               {saving ? "Saving…" : "Save profile"}
@@ -267,11 +269,16 @@ export default function Settings() {
 
         {/* Notification Preferences */}
         <section className="mb-8 border border-border/40 rounded-xl p-5 sm:p-6 bg-card">
-          <div className="flex items-center gap-2 mb-5 pb-3 border-b border-border/30">
-            <div className="w-7 h-7 rounded-lg bg-primary/10 flex items-center justify-center">
-              <Bell size={15} weight="duotone" className="text-primary" />
+          <div className="flex items-center justify-between gap-3 mb-5 pb-3 border-b border-border/30">
+            <div className="flex items-center gap-2">
+              <div className="w-7 h-7 rounded-lg bg-primary/10 flex items-center justify-center">
+                <Bell size={15} weight="duotone" className="text-primary" />
+              </div>
+              <h2 className="text-sm font-semibold">Notifications</h2>
             </div>
-            <h2 className="text-sm font-semibold">Notifications</h2>
+            <Link href="/notifications" className="text-[11px] font-medium text-red-400 hover:underline">
+              Open notification center
+            </Link>
           </div>
 
           {notifPrefsLoading ? (
@@ -288,7 +295,7 @@ export default function Settings() {
                   <div className={`w-8 h-8 rounded-lg flex items-center justify-center ${
                     notifPrefs.every((p) => p.enabled)
                       ? "bg-primary/10 text-primary"
-                      : "bg-muted/50 text-muted-foreground/50"
+                      : "bg-muted/50 text-muted-foreground"
                   }`}>
                     {notifPrefs.every((p) => p.enabled) ? (
                       <Bell size={16} weight="duotone" />
@@ -300,7 +307,7 @@ export default function Settings() {
                     <p className="text-sm font-semibold text-foreground">
                       All notifications
                     </p>
-                    <p className="text-[11px] text-muted-foreground/60 mt-0.5">
+                    <p className="text-[11px] text-muted-foreground mt-0.5">
                       {notifPrefs.every((p) => p.enabled)
                         ? "All notification types are enabled"
                         : notifPrefs.some((p) => p.enabled)
@@ -309,19 +316,16 @@ export default function Settings() {
                     </p>
                   </div>
                 </div>
-                <button
-                  type="button"
-                  role="switch"
+                <Switch
+                  checked={notifPrefs.every((p) => p.enabled)}
+                  disabled={notifPrefsSaving}
                   aria-label="Toggle all notification types"
-                  aria-checked={notifPrefs.every((p) => p.enabled)}
-                  onClick={() => {
+                  onCheckedChange={() => {
                     const allEnabled = notifPrefs.every((p) => p.enabled);
-                    // If turning all off, show confirmation
                     if (allEnabled) {
                       setShowDisableConfirm(true);
                       return;
                     }
-                    // Turning all on — proceed directly
                     const updated = notifPrefs.map((p) => ({ ...p, enabled: true }));
                     setNotifPrefs(updated);
                     setNotifPrefsSaving(true);
@@ -336,25 +340,14 @@ export default function Settings() {
                     });
                     setTimeout(() => setNotifPrefsMsg(null), 3000);
                   }}
-                  className={`relative inline-flex h-5 w-9 shrink-0 rounded-full border-2 border-transparent transition-colors duration-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-background ${
-                    notifPrefs.every((p) => p.enabled)
-                      ? "bg-primary"
-                      : "bg-border hover:bg-border/80"
-                  }`}
-                >
-                  <span
-                    className={`pointer-events-none inline-block h-4 w-4 rounded-full bg-background shadow-sm ring-0 transition-transform duration-200 ${
-                      notifPrefs.every((p) => p.enabled) ? "translate-x-4" : "translate-x-0"
-                    }`}
-                  />
-                </button>
+                />
               </label>
 
               {/* Divider */}
               <div className="h-px bg-border/30 mx-3" />
 
               {/* Column header row */}
-              <div className="flex items-center px-3 py-1.5 text-[11px] text-muted-foreground/50 uppercase tracking-wider font-medium">
+              <div className="flex items-center px-3 py-1.5 text-[11px] text-muted-foreground uppercase tracking-wider font-medium">
                 <div className="min-w-0 flex-1" />
                 <span className="w-14 text-center">In-app</span>
               </div>
@@ -368,19 +361,18 @@ export default function Settings() {
                     <p className="text-sm font-medium text-foreground">
                       {NOTIF_LABELS[pref.type]?.label ?? pref.type}
                     </p>
-                    <p className="text-[11px] text-muted-foreground/60 mt-0.5">
+                    <p className="text-[11px] text-muted-foreground mt-0.5">
                       {NOTIF_LABELS[pref.type]?.description ?? ""}
                     </p>
                   </div>
 
                   <div className="flex items-center gap-6 shrink-0">
                     {/* In-app toggle */}
-                    <button
-                      type="button"
-                      role="switch"
-                      aria-checked={pref.enabled}
+                    <Switch
+                      checked={pref.enabled}
+                      disabled={notifPrefsSaving}
                       aria-label={`${NOTIF_LABELS[pref.type]?.label ?? pref.type} in-app notifications`}
-                      onClick={() => {
+                      onCheckedChange={() => {
                         const updated = notifPrefs.map((p) =>
                           p.type === pref.type ? { ...p, enabled: !p.enabled } : p
                         );
@@ -393,25 +385,13 @@ export default function Settings() {
                         }).catch(() => {
                           setNotifPrefsSaving(false);
                           setNotifPrefsMsg({ ok: false, text: "Failed to save preferences." });
-                          // Revert on failure
                           userApi.getNotificationPreferences().then((prefs) =>
                             setNotifPrefs(prefs.map((p) => ({ type: p.type, enabled: p.enabled, email_enabled: p.email_enabled })))
                           );
                         });
                         setTimeout(() => setNotifPrefsMsg(null), 3000);
                       }}
-                      className={`relative inline-flex h-5 w-9 shrink-0 rounded-full border-2 border-transparent transition-colors duration-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-background ${
-                        pref.enabled
-                          ? "bg-primary"
-                          : "bg-border hover:bg-border/80"
-                      }`}
-                    >
-                      <span
-                        className={`pointer-events-none inline-block h-4 w-4 rounded-full bg-background shadow-sm ring-0 transition-transform duration-200 ${
-                          pref.enabled ? "translate-x-4" : "translate-x-0"
-                        }`}
-                      />
-                    </button>
+                    />
                   </div>
                 </div>
               ))}
@@ -420,6 +400,7 @@ export default function Settings() {
 
           {notifPrefsMsg && (
             <div
+              role="status"
               className={`mt-3 flex items-center gap-2 p-3 border rounded-lg text-xs ${
                 notifPrefsMsg.ok
                   ? "bg-green-500/10 border-green-500/30 text-green-400"
@@ -435,6 +416,13 @@ export default function Settings() {
             </div>
           )}
 
+          {notifPrefsSaving && !notifPrefsMsg && (
+            <p role="status" className="mt-3 flex items-center gap-2 text-[11px] text-muted-foreground">
+              <ArrowsClockwise size={13} className="animate-spin" />
+              Saving preferences...
+            </p>
+          )}
+
           {/* Sound & Vibration toggles */}
           <div className="mt-5 pt-4 border-t border-border/20">
             <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide mb-2 px-3">
@@ -444,128 +432,92 @@ export default function Settings() {
               {/* Sound toggle */}
               <label className="flex items-center justify-between px-3 py-3 rounded-lg hover:bg-secondary/30 transition-colors cursor-pointer">
                 <div className="flex items-center gap-3 min-w-0 pr-4">
-                  <div className={`w-8 h-8 rounded-lg flex items-center justify-center ${soundOn ? "bg-primary/10 text-primary" : "bg-muted/50 text-muted-foreground/50"}`}>
+                  <div className={`w-8 h-8 rounded-lg flex items-center justify-center ${soundOn ? "bg-primary/10 text-primary" : "bg-muted/50 text-muted-foreground"}`}>
                     <SpeakerHigh size={16} />
                   </div>
                   <div>
                     <p className="text-sm font-medium text-foreground">Notification Sound</p>
-                    <p className="text-[11px] text-muted-foreground/60 mt-0.5">Play a chime when a new notification arrives</p>
+                    <p className="text-[11px] text-muted-foreground mt-0.5">Play a chime when a new notification arrives</p>
                   </div>
                 </div>
-                <button
-                  type="button"
-                  role="switch"
+                <Switch
+                  checked={soundOn}
                   aria-label="Notification sound"
-                  aria-checked={soundOn}
-                  onClick={() => {
-                    const next = !soundOn;
+                  onCheckedChange={(next) => {
                     setSoundOn(next);
                     saveSoundPreferences({ sound_enabled: next });
                   }}
-                  className={`relative inline-flex h-5 w-9 shrink-0 rounded-full border-2 border-transparent transition-colors duration-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-background ${
-                    soundOn ? "bg-primary" : "bg-border hover:bg-border/80"
-                  }`}
-                >
-                  <span
-                    className={`pointer-events-none inline-block h-4 w-4 rounded-full bg-background shadow-sm ring-0 transition-transform duration-200 ${
-                      soundOn ? "translate-x-4" : "translate-x-0"
-                    }`}
-                  />
-                </button>
+                />
               </label>
 
               {/* Vibration toggle */}
               <label className="flex items-center justify-between px-3 py-3 rounded-lg hover:bg-secondary/30 transition-colors cursor-pointer">
                 <div className="flex items-center gap-3 min-w-0 pr-4">
-                  <div className={`w-8 h-8 rounded-lg flex items-center justify-center ${vibrateOn ? "bg-primary/10 text-primary" : "bg-muted/50 text-muted-foreground/50"}`}>
+                  <div className={`w-8 h-8 rounded-lg flex items-center justify-center ${vibrateOn ? "bg-primary/10 text-primary" : "bg-muted/50 text-muted-foreground"}`}>
                     <DeviceMobile size={16} />
                   </div>
                   <div>
                     <p className="text-sm font-medium text-foreground">Vibration</p>
-                    <p className="text-[11px] text-muted-foreground/60 mt-0.5">Vibrate on mobile when a notification arrives</p>
+                    <p className="text-[11px] text-muted-foreground mt-0.5">Vibrate on mobile when a notification arrives</p>
                   </div>
                 </div>
-                <button
-                  type="button"
-                  role="switch"
+                <Switch
+                  checked={vibrateOn}
                   aria-label="Vibration"
-                  aria-checked={vibrateOn}
-                  onClick={() => {
-                    const next = !vibrateOn;
+                  onCheckedChange={(next) => {
                     setVibrateOn(next);
                     saveSoundPreferences({ vibration_enabled: next });
                   }}
-                  className={`relative inline-flex h-5 w-9 shrink-0 rounded-full border-2 border-transparent transition-colors duration-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-background ${
-                    vibrateOn ? "bg-primary" : "bg-border hover:bg-border/80"
-                  }`}
-                >
-                  <span
-                    className={`pointer-events-none inline-block h-4 w-4 rounded-full bg-background shadow-sm ring-0 transition-transform duration-200 ${
-                      vibrateOn ? "translate-x-4" : "translate-x-0"
-                    }`}
-                  />
-                </button>
+                />
               </label>
             </div>
           </div>
 
-          {/* Confirmation dialog for disabling all notifications */}
-          {showDisableConfirm && (
-            <div
-              className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm"
-              onClick={() => setShowDisableConfirm(false)}
-            >
-              <div
-                className="w-full max-w-sm mx-4 bg-card border border-border/40 rounded-xl p-6 shadow-2xl"
-                onClick={(e) => e.stopPropagation()}
-              >
-                <div className="flex items-center gap-3 mb-4">
-                  <div className="w-10 h-10 rounded-xl bg-destructive/15 flex items-center justify-center">
-                    <BellSlash size={20} weight="duotone" className="text-destructive" />
-                  </div>
-                  <div>
-                    <h3 className="text-sm font-bold text-foreground">
-                      Disable all notifications?
-                    </h3>
-                    <p className="text-xs text-muted-foreground/70 mt-0.5">
-                      You won't receive any in-app notifications until you re-enable them.
-                    </p>
-                  </div>
+          <Dialog open={showDisableConfirm} onOpenChange={setShowDisableConfirm}>
+            <DialogContent>
+              <DialogHeader>
+                <div className="mb-2 flex h-10 w-10 items-center justify-center rounded-xl bg-destructive/15 text-destructive">
+                  <BellSlash size={20} weight="duotone" />
                 </div>
-                <div className="flex items-center gap-2 justify-end">
+                <DialogTitle>Disable all notifications?</DialogTitle>
+                <DialogDescription>
+                  You won't receive any in-app notifications until you turn them back on.
+                </DialogDescription>
+              </DialogHeader>
+              <div className="mt-5 flex justify-end gap-2">
+                <Dialog.Close asChild>
                   <button
                     type="button"
-                    onClick={() => setShowDisableConfirm(false)}
-                    className="h-9 px-4 text-xs font-medium border border-border/40 rounded-lg text-muted-foreground hover:text-foreground hover:border-border transition-colors"
+                    className="h-9 px-4 text-xs font-medium border border-border/40 rounded-lg text-muted-foreground hover:text-foreground hover:border-border transition-colors cursor-pointer"
                   >
                     Cancel
                   </button>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setShowDisableConfirm(false);
-                      const updated = notifPrefs.map((p) => ({ ...p, enabled: false }));
-                      setNotifPrefs(updated);
-                      setNotifPrefsSaving(true);
-                      setNotifPrefsMsg(null);
-                      userApi.updateNotificationPreferences(updated).then(() => {
-                        setNotifPrefsSaving(false);
-                        setNotifPrefsMsg({ ok: true, text: "All notifications disabled." });
-                      }).catch(() => {
-                        setNotifPrefsSaving(false);
-                        setNotifPrefsMsg({ ok: false, text: "Failed to save preferences." });
-                        userApi.getNotificationPreferences().then(setNotifPrefs);
-                      });
-                      setTimeout(() => setNotifPrefsMsg(null), 3000);
-                    }}
-                    className="h-9 px-4 text-xs font-semibold bg-destructive text-destructive-foreground rounded-lg hover:opacity-90 transition-opacity"
-                  >
-                    Yes, disable all
-                  </button>
-                </div>
+                </Dialog.Close>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowDisableConfirm(false);
+                    const updated = notifPrefs.map((p) => ({ ...p, enabled: false }));
+                    setNotifPrefs(updated);
+                    setNotifPrefsSaving(true);
+                    setNotifPrefsMsg(null);
+                    userApi.updateNotificationPreferences(updated).then(() => {
+                      setNotifPrefsSaving(false);
+                      setNotifPrefsMsg({ ok: true, text: "All notifications disabled." });
+                    }).catch(() => {
+                      setNotifPrefsSaving(false);
+                      setNotifPrefsMsg({ ok: false, text: "Failed to save preferences." });
+                      userApi.getNotificationPreferences().then(setNotifPrefs);
+                    });
+                    setTimeout(() => setNotifPrefsMsg(null), 3000);
+                  }}
+                  className="h-9 px-4 text-xs font-semibold bg-destructive text-destructive-foreground rounded-lg hover:opacity-90 transition-opacity cursor-pointer"
+                >
+                  Yes, disable all
+                </button>
               </div>
-            </div>
-          )}
+            </DialogContent>
+          </Dialog>
         </section>
 
         {/* Password */}
@@ -587,7 +539,7 @@ export default function Settings() {
                 value={newPw}
                 onChange={(e) => setNewPw(e.target.value)}
                 placeholder="At least 6 characters"
-                className="w-full h-10 bg-secondary border border-border/60 focus:border-primary/50 rounded-lg px-3 text-sm outline-none transition-all placeholder:text-muted-foreground/40 focus:ring-2 focus:ring-primary/5"
+                className="w-full h-10 bg-secondary border border-border/60 focus:border-primary/50 rounded-lg px-3 text-sm outline-none transition-all placeholder:text-muted-foreground focus:ring-2 focus:ring-primary/5"
               />
             </div>
             <div className="space-y-1.5">
@@ -600,7 +552,7 @@ export default function Settings() {
                 value={confirmPw}
                 onChange={(e) => setConfirmPw(e.target.value)}
                 placeholder="Repeat new password"
-                className="w-full h-10 bg-secondary border border-border/60 focus:border-primary/50 rounded-lg px-3 text-sm outline-none transition-all placeholder:text-muted-foreground/40 focus:ring-2 focus:ring-primary/5"
+                className="w-full h-10 bg-secondary border border-border/60 focus:border-primary/50 rounded-lg px-3 text-sm outline-none transition-all placeholder:text-muted-foreground focus:ring-2 focus:ring-primary/5"
               />
             </div>
 
@@ -624,7 +576,7 @@ export default function Settings() {
             <button
               type="submit"
               disabled={pwSaving || !newPw}
-              className="inline-flex items-center gap-1.5 h-9 px-4 text-xs font-semibold border border-primary/30 text-primary hover:border-primary/60 transition-colors rounded-lg disabled:opacity-60"
+              className="inline-flex items-center gap-1.5 h-9 px-4 text-xs font-semibold border border-primary/30 text-red-400 hover:border-primary/60 transition-colors rounded-lg disabled:opacity-60"
             >
               <Lock size={14} />
               {pwSaving ? "Updating…" : "Update password"}
@@ -661,7 +613,7 @@ export default function Settings() {
                   label="Overall"
                   value={`${cacheStats.overallHitRate.toFixed(1)}%`}
                   detail={`${cacheStats.totalLookups} total`}
-                  color="text-primary"
+                  color="text-red-400"
                 />
               </div>
 
@@ -684,17 +636,17 @@ export default function Settings() {
               {/* Cache Size */}
               {cacheSize && (
                 <div className="bg-secondary/30 rounded-lg p-3">
-                  <p className="text-[10px] text-muted-foreground/50 uppercase tracking-wider mb-2">Storage</p>
+                  <p className="text-[10px] text-muted-foreground uppercase tracking-wider mb-2">Storage</p>
                   <div className="grid grid-cols-2 gap-4">
                     <div>
-                      <p className="text-xs text-muted-foreground/60">Memory LRU</p>
+                      <p className="text-xs text-muted-foreground">Memory LRU</p>
                       <p className="text-sm font-bold text-green-400">{cacheSize.memoryEntries} entries</p>
-                      <p className="text-[10px] text-muted-foreground/40">~{(cacheSize.memoryBytes / 1024 / 1024).toFixed(1)} MB / 50 MB cap</p>
+                      <p className="text-[10px] text-muted-foreground">~{(cacheSize.memoryBytes / 1024 / 1024).toFixed(1)} MB / 50 MB cap</p>
                     </div>
                     <div>
-                      <p className="text-xs text-muted-foreground/60">IndexedDB</p>
+                      <p className="text-xs text-muted-foreground">IndexedDB</p>
                       <p className="text-sm font-bold text-blue-400">{cacheSize.idbEntries} entries</p>
-                      <p className="text-[10px] text-muted-foreground/40">{(cacheSize.idbBytes / 1024 / 1024).toFixed(1)} MB / 200 MB cap</p>
+                      <p className="text-[10px] text-muted-foreground">{(cacheSize.idbBytes / 1024 / 1024).toFixed(1)} MB / 200 MB cap</p>
                     </div>
                   </div>
                 </div>
@@ -703,7 +655,7 @@ export default function Settings() {
               {/* Category Breakdown */}
               {Object.keys(cacheStats.byCategory).length > 0 && (
                 <div>
-                  <p className="text-[11px] text-muted-foreground/50 uppercase tracking-wider font-medium mb-2">
+                  <p className="text-[11px] text-muted-foreground uppercase tracking-wider font-medium mb-2">
                     By Category
                   </p>
                   <div className="space-y-1.5">
@@ -719,7 +671,7 @@ export default function Settings() {
                               style={{ width: `${hitRate}%` }}
                             />
                           </div>
-                          <span className="text-[11px] text-muted-foreground/60 w-16 text-right">
+                          <span className="text-[11px] text-muted-foreground w-16 text-right">
                             {hitRate.toFixed(0)}% ({stats.hits}/{total})
                           </span>
                         </div>
@@ -733,7 +685,7 @@ export default function Settings() {
               <div className="flex items-center justify-between pt-2 border-t border-border/20">
                 <div className="flex items-center gap-2">
                   <div className="w-1.5 h-1.5 rounded-full bg-green-400 animate-pulse" />
-                  <span className="text-[11px] text-muted-foreground/50">
+                  <span className="text-[11px] text-muted-foreground">
                     Live • {Math.round((Date.now() - cacheStats.startTime) / 1000)}s elapsed
                   </span>
                 </div>
@@ -750,7 +702,7 @@ export default function Settings() {
                     type="button"
                     onClick={handleClearCache}
                     disabled={clearingCache}
-                    className="inline-flex items-center gap-1 h-7 px-2.5 text-[11px] font-medium border border-destructive/30 rounded-md text-destructive/80 hover:text-destructive hover:border-destructive/50 transition-colors disabled:opacity-60"
+                    className="inline-flex items-center gap-1 h-7 px-2.5 text-[11px] font-medium border border-destructive/30 rounded-md text-red-400 hover:text-destructive hover:border-destructive/50 transition-colors disabled:opacity-60"
                   >
                     <Trash size={13} />
                     {clearingCache ? "Clearing…" : "Clear Cache"}
@@ -783,9 +735,9 @@ export default function Settings() {
 function StatCard({ label, value, detail, color }: { label: string; value: string; detail: string; color: string }) {
   return (
     <div className="bg-secondary/30 rounded-lg p-3">
-      <p className="text-[10px] text-muted-foreground/50 uppercase tracking-wider mb-1">{label}</p>
+      <p className="text-[10px] text-muted-foreground uppercase tracking-wider mb-1">{label}</p>
       <p className={`text-lg font-bold ${color}`}>{value}</p>
-      <p className="text-[10px] text-muted-foreground/40 mt-0.5">{detail}</p>
+      <p className="text-[10px] text-muted-foreground mt-0.5">{detail}</p>
     </div>
   );
 }

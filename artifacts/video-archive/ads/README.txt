@@ -75,7 +75,7 @@ IMPORTANT NOTES
     site-wide top/footer strip only appears when one of its breakpoint tiers
     does — so pages never show an empty ad bar or a reserved gap.
   * Ads never show for premium members or before the age gate is passed,
-    and never on: login, signup, auth callback, premium, admin, RandomRedirect.
+    and never on: login, signup, auth callback, premium, admin.
   * All network codes: CrakRevenue (slot codes) + StripCash/Stripchat
     (smartlink from the server-side STRIPCASH_API_KEY — see
     GET /api/ads/stripcash; banner/popunder codes paste into slots as HTML).

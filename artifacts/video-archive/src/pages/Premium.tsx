@@ -32,6 +32,9 @@ export default function Premium() {
   const [cooldownSeconds, setCooldownSeconds] = useState(0);
 
   const price = config?.price_usd ?? 4.99;
+  // Premium's only benefit is removing ads. If advertising is paused, there is
+  // nothing to buy or earn — show a notice instead of purchase prompts.
+  const premiumOffered = adsEnabled && config !== undefined && config.ads_enabled !== false;
   const adsTarget = status?.ads_target ?? config?.ads_target ?? 5;
   const adsViewed = status?.ads_viewed_today ?? 0;
 
@@ -154,13 +157,23 @@ export default function Premium() {
             Watch ad-free, <span className="text-primary">forever clear</span>
           </h1>
           <p className="text-sm text-muted-foreground max-w-md mx-auto leading-relaxed">
-            {adsEnabled
+            {premiumOffered
               ? "No banners, no interruptions — plus you can earn premium days free by watching sponsored ads."
-              : "Advertising is temporarily paused across VAULT. Premium account features remain available."}
+              : "Advertising is currently paused across VAULT."}
           </p>
         </div>
 
-        {loading ? null : !user ? (
+        {!premiumOffered ? (
+          <div className="rounded-xl border border-border/40 bg-card/40 p-8 text-center space-y-2">
+            <p className="text-sm font-semibold">Premium is unavailable right now</p>
+            <p className="text-xs text-muted-foreground">
+              Ads are switched off, so there is nothing to remove. Enjoy the archive as-is.
+            </p>
+            <Link to="/">
+              <Button variant="outline" className="mt-2">Back to archive</Button>
+            </Link>
+          </div>
+        ) : loading ? null : !user ? (
           <div className="rounded-xl border border-border/40 bg-card/40 p-8 text-center space-y-4">
             <p className="text-sm text-muted-foreground">
               Premium is tied to your account so your ad-free status follows you

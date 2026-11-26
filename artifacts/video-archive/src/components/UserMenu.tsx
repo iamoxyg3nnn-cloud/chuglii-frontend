@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect } from "react";
 import { Link, useLocation } from "wouter";
 import { useAuth } from "@/contexts/AuthContext";
+import { usePremium } from "@/contexts/PremiumContext";
 import {
   UserCircle,
   Gear,
@@ -20,6 +21,8 @@ import {
 
 export function UserMenu() {
   const { user, signOut, role } = useAuth();
+  const { adsEnabled, config } = usePremium();
+  const premiumOffered = adsEnabled && config !== undefined && config.ads_enabled !== false;
   const [, setLocation] = useLocation();
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
@@ -73,7 +76,7 @@ export function UserMenu() {
         aria-expanded={open}
         aria-haspopup="true"
       >
-        <div className="w-6 h-6 rounded-full border border-primary/40 flex items-center justify-center text-[10px] font-bold text-primary">
+        <div className="w-6 h-6 rounded-full border border-primary/40 flex items-center justify-center text-[10px] font-bold text-red-400">
           {initials}
         </div>
         <CaretDown size={12} weight="bold" className={`transition-transform ${open ? "rotate-180" : ""}`} />
@@ -107,7 +110,7 @@ export function UserMenu() {
           <div className="py-1">
             {[
               { href: "/profile", label: "Profile & Activity", Icon: UserCircle },
-              { href: "/premium", label: "Go Premium", Icon: Crown },
+              ...(premiumOffered ? [{ href: "/premium", label: "Go Premium", Icon: Crown }] : []),
               { href: "/bookmarks", label: "Bookmarks", Icon: BookmarkSimple },
               { href: "/history", label: "History", Icon: ClockCounterClockwise },
               { href: "/watch-later", label: "Watch Later", Icon: Clock },

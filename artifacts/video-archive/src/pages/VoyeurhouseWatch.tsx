@@ -2,9 +2,10 @@ import { useRef, useState, useEffect, useCallback, useMemo } from "react";
 import { useParams, Link } from "wouter";
 import { Layout } from "@/components/Layout";
 import { VideoPlayer } from "@/components/VideoPlayer";
+import { HlsVideoPlayer } from "@/components/HlsVideoPlayer";
 import { PlayerFrame } from "@/components/PlayerFrame";
 import { copyText } from "@/lib/clipboard";
-import { buildEdgePlayerUrl, resolveEdgeStreams, type ResolvedStream } from "@/lib/video-source";
+import { buildEdgePlayerUrl, isDirectVideoUrl, resolveEdgeStreams, type ResolvedStream } from "@/lib/video-source";
 import { rankRelatedVideos } from "@/lib/recommendations";
 import {
   useVoyeurhouseVideoById,
@@ -79,21 +80,22 @@ export default function VoyeurhouseWatch() {
   useEffect(() => {
     if (!video?.id) return;
 
-    // DoodStream-family embeds are geo/VPN gated; keep them on the iframe path.
-    if (isDoodstreamSource(video)) {
+    // Third-party locker embeds (HQQ/Netu, DoodStream family, etc.) cannot be
+    // played as native <video> files and are blocked/empty when proxied via
+    // /api/player; keep them on the direct iframe path.
+    if (isThirdPartyEmbedOnly(video)) {
+      setResolvedStreams([]);
+      setActiveStreamIndex(0);
       setUseIframe(true);
       setResolving(false);
       return;
     }
 
     if (!isAvsDirectSource(video)) {
-      setResolvedStreams(
-        video.full_video_url
-          ? [{ url: video.full_video_url, label: "Original", type: "direct_mp4" }]
-          : [],
-      );
+      const fallback = directFallbackStream(video.full_video_url);
+      setResolvedStreams(fallback ? [fallback] : []);
       setActiveStreamIndex(0);
-      setUseIframe(false);
+      setUseIframe(!fallback);
       setResolving(false);
       return;
     }
@@ -125,13 +127,13 @@ export default function VoyeurhouseWatch() {
     )
       .then((streams) => {
         if (cancelled) return;
-        setResolvedStreams(
-          streams.length > 0
-            ? streams
-            : video.full_video_url
-              ? [{ url: video.full_video_url, label: "Original", type: "direct_mp4" }]
-              : [],
-        );
+        if (streams.length > 0) {
+          setResolvedStreams(streams);
+        } else {
+          const fallback = directFallbackStream(video.full_video_url);
+          setResolvedStreams(fallback ? [fallback] : []);
+          if (!fallback) setUseIframe(true);
+        }
         setActiveStreamIndex(0);
         setResolving(false);
       })
@@ -270,18 +272,24 @@ export default function VoyeurhouseWatch() {
 
   // AVS rows need the resolver URL carrying embed/detail, not a bare embed
   // wrapper, otherwise the worker falls back to the slow proxy path.
-  const iframeSrc = isAvsDirectSource(video) ? avsDirectPlayerUrl(video) : embedUrl(video);
-  const playerFrameSrc = iframeSrc?.startsWith("/api/player?")
-    ? iframeSrc
-    : iframeSrc
-      ? buildEdgePlayerUrl(iframeSrc, {
+  // Third-party locker embeds (HQQ/Netu, DoodStream family, Vidello/NowPlay)
+  // must load directly in the browser iframe because they block Worker IPs
+  // or bind tokens/requests to the embed origin and client IP.
+  const iframeSrc = isAvsEdgeFallbackSource(video) ? avsDirectPlayerUrl(video) : embedUrl(video);
+  const playerFrameSrc = !iframeSrc
+    ? null
+    : iframeSrc.startsWith("/api/player?") || isDirectThirdPartyEmbedUrl(iframeSrc)
+      ? iframeSrc
+      : buildEdgePlayerUrl(iframeSrc, {
           title: video.title,
           poster: video.clean_thumbnail_url || video.thumbnail_url || "",
           detail: video.detail_url || iframeSrc,
-        })
-      : null;
-  const isDirect = video.video_mime_type === "video/mp4" && Boolean(video.full_video_url);
-  const nativeStreams = resolvedStreams.filter((stream) => /^https?:\/\//i.test(stream.url));
+        });
+  const isDirect =
+    video.video_mime_type === "video/mp4" &&
+    Boolean(video.full_video_url) &&
+    isDirectVideoUrl(video.full_video_url);
+  const nativeStreams = resolvedStreams.filter((stream) => /^(?:https?:\/\/|\/)/i.test(stream.url));
   const activeStream = nativeStreams[Math.min(activeStreamIndex, Math.max(0, nativeStreams.length - 1))];
   const nativeSrc = activeStream?.url || null;
   const nativeQualities = nativeStreams.map((stream, index) => ({
@@ -340,23 +348,42 @@ export default function VoyeurhouseWatch() {
                 <p className="text-sm font-medium text-foreground">Resolving fresh stream...</p>
               </div>
             ) : nativeSrc && !useIframe ? (
-              <VideoPlayer
-                key={`vh-${site}-${nativeSrc}-${retryNonce}`}
-                src={nativeSrc}
-                poster={video.clean_thumbnail_url || video.thumbnail_url || undefined}
-                title={video.title}
-                autoPlay
-                videoRef={videoRef}
-                qualities={nativeQualities}
-                activeQualityUrl={nativeSrc}
-                onAutoDowngrade={(fromUrl) => {
-                  if (nativeStreams.length < 2) return;
-                  const current = nativeStreams.findIndex((stream) => stream.url === fromUrl);
-                  setActiveStreamIndex(((current < 0 ? 0 : current) + 1) % nativeStreams.length);
-                }}
-                onError={handleVideoError}
-                onReload={reloadStream}
-              />
+              isHlsStreamUrl(nativeSrc) || activeStream?.type === "direct_hls" ? (
+                <HlsVideoPlayer
+                  key={`vh-hls-${site}-${nativeSrc}-${retryNonce}`}
+                  candidates={Array.from(
+                    new Set(
+                      [
+                        nativeSrc,
+                        activeStream?.fallbackUrl,
+                        ...nativeStreams.map((stream) => stream.url),
+                      ].filter((candidate): candidate is string => Boolean(candidate)),
+                    ),
+                  )}
+                  poster={video.clean_thumbnail_url || video.thumbnail_url || undefined}
+                  title={video.title}
+                  autoPlay
+                  onExhausted={handleVideoError}
+                />
+              ) : (
+                <VideoPlayer
+                  key={`vh-${site}-${nativeSrc}-${retryNonce}`}
+                  src={nativeSrc}
+                  poster={video.clean_thumbnail_url || video.thumbnail_url || undefined}
+                  title={video.title}
+                  autoPlay
+                  videoRef={videoRef}
+                  qualities={nativeQualities}
+                  activeQualityUrl={nativeSrc}
+                  onAutoDowngrade={(fromUrl) => {
+                    if (nativeStreams.length < 2) return;
+                    const current = nativeStreams.findIndex((stream) => stream.url === fromUrl);
+                    setActiveStreamIndex(((current < 0 ? 0 : current) + 1) % nativeStreams.length);
+                  }}
+                  onError={handleVideoError}
+                  onReload={reloadStream}
+                />
+              )
             ) : playerFrameSrc ? (
               <PlayerFrame
                 src={playerFrameSrc}
@@ -385,7 +412,7 @@ export default function VoyeurhouseWatch() {
                 <span>Reload Stream</span>
               </button>
 
-              {iframeSrc && (
+              {iframeSrc && nativeStreams.length > 0 && (
                 <button
                   type="button"
                   onClick={() => setUseIframe((prev) => !prev)}
@@ -491,37 +518,62 @@ export default function VoyeurhouseWatch() {
   );
 }
 
-function isAvsDirectSource(video: VoyeurhouseVideo | null | undefined): boolean {
-  if (!video?.full_video_url) return false;
+const AVS_RESOLVABLE_HOST_RE = /(^|\.)(clicknplay\.to|hotscopes\.(io|net|com|org)|reallifecam\.to|reallifecams\.net|voyeur-house\.org|vidello\.net|nowplay\.to)$/i;
+const AVS_EDGE_PLAYER_HOST_RE = /(^|\.)(clicknplay\.to|hotscopes\.(io|net|com|org)|reallifecam\.to|reallifecams\.net|voyeur-house\.org)$/i;
+const DIRECT_THIRD_PARTY_EMBED_HOST_RE = /(^|\.)(hqq\.(to|tv)|netu\.tv|waaw\.(to|tv)|doodstream\.com|dood\.(la|wf|so|pm|ws|to|sh|cx|yt|re|li)|d0000?d\.com|myvidplay\.com|ds2play\.com|playmogo\.com|vidello\.net|nowplay\.to|streamtape\.com|voe\.sx|caseyseemavoid\.com|lulustream\.com|luluvdo\.com|luminscdn\.xyz|filemoon\.(sx|to)|mixdrop\.[a-z]{2,}|streamwish\.[a-z]{2,}|bysezejataos\.[a-z]{2,})$/i;
+
+function hostnameOf(value?: string | null): string {
+  if (!value) return "";
   try {
-    const host = new URL(video.full_video_url).hostname.toLowerCase();
-    return /(^|\.)(clicknplay\.to|hotscopes\.(io|net|com|org)|reallifecam\.to|reallifecams\.net|voyeur-house\.org)$/.test(host);
+    return new URL(value).hostname.toLowerCase();
   } catch {
-    return false;
+    return "";
   }
 }
 
-function isDoodstreamSource(video: VoyeurhouseVideo | null | undefined): boolean {
+function isHlsStreamUrl(value?: string | null): boolean {
+  if (!value) return false;
+  try {
+    const parsed = new URL(value, typeof window === "undefined" ? "http://localhost" : window.location.href);
+    return /\.m3u8$/i.test(parsed.pathname);
+  } catch {
+    return /\.m3u8(?:[?#]|$)/i.test(value);
+  }
+}
+
+function directFallbackStream(value?: string | null): ResolvedStream | null {
+  if (!value) return null;
+  if (isHlsStreamUrl(value)) return { url: value, label: "Original", type: "direct_hls" };
+  if (isDirectVideoUrl(value)) return { url: value, label: "Original", type: "direct_mp4" };
+  return null;
+}
+
+function isAvsDirectSource(video: VoyeurhouseVideo | null | undefined): boolean {
   const candidates = [video?.full_video_url, video?.raw_payload?.embed_url].filter(Boolean) as string[];
-  return candidates.some((value) => {
-    try {
-      const host = new URL(value).hostname.toLowerCase();
-      return /(^|\.)(doodstream\.com|dood\.(la|wf|so|pm|ws|to|sh|cx|yt|re|li)|myvidplay\.com|ds2play\.com)$/.test(host);
-    } catch {
-      return false;
-    }
-  });
+  return candidates.some((value) => AVS_RESOLVABLE_HOST_RE.test(hostnameOf(value)));
+}
+
+function isAvsEdgeFallbackSource(video: VoyeurhouseVideo | null | undefined): boolean {
+  return AVS_EDGE_PLAYER_HOST_RE.test(hostnameOf(video?.full_video_url));
+}
+
+function isDirectThirdPartyEmbedUrl(value?: string | null): boolean {
+  return DIRECT_THIRD_PARTY_EMBED_HOST_RE.test(hostnameOf(value));
+}
+
+function isThirdPartyEmbedOnly(video: VoyeurhouseVideo | null | undefined): boolean {
+  if (!video) return false;
+  if (isAvsDirectSource(video)) return false;
+  const primary = video.full_video_url || "";
+  if (isDirectVideoUrl(primary) || isHlsStreamUrl(primary)) return false;
+  const candidates = [primary, video.raw_payload?.embed_url].filter(Boolean) as string[];
+  if (candidates.some((value) => isDirectThirdPartyEmbedUrl(value))) return true;
+  return video.video_mime_type === "embed/iframe";
 }
 
 function avsDirectPlayerUrl(video: VoyeurhouseVideo | null | undefined): string | null {
   if (!video?.full_video_url) return null;
-  let host: string;
-  try {
-    host = new URL(video.full_video_url).hostname.toLowerCase();
-  } catch {
-    return null;
-  }
-  if (!/(^|\.)(clicknplay\.to|hotscopes\.(io|net|com|org)|reallifecam\.to|reallifecams\.net|voyeur-house\.org)$/.test(host)) return null;
+  if (!AVS_EDGE_PLAYER_HOST_RE.test(hostnameOf(video.full_video_url))) return null;
 
   const params = new URLSearchParams({
     url: video.full_video_url,

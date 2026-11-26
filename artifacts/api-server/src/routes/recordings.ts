@@ -16,6 +16,88 @@ function escapeLike(input: string): string {
   return input.replace(/[\\%_]/g, "\\$&");
 }
 
+interface SearchToken {
+  kind: "tag" | "performer" | "text";
+  term: string;
+  negated: boolean;
+}
+
+function searchArrayLiteral(value: string): string {
+  const escaped = value.replace(/\\/g, "\\\\").replace(/"/g, '\\"');
+  return `"${escaped}"`;
+}
+
+/** Mirror the edge worker's advanced search grammar for non-Pages deployments. */
+function tokenizeSearch(raw: string): SearchToken[] {
+  const tokens: SearchToken[] = [];
+  let i = 0;
+  while (i < raw.length && tokens.length < 8) {
+    while (i < raw.length && /\s/.test(raw[i])) i++;
+    if (i >= raw.length) break;
+
+    let negated = false;
+    if (raw[i] === "-" && i + 1 < raw.length && !/\s/.test(raw[i + 1])) {
+      negated = true;
+      i++;
+    }
+
+    let value = "";
+    if (raw[i] === '"' || raw[i] === "'") {
+      const quote = raw[i++];
+      while (i < raw.length && raw[i] !== quote) {
+        if (raw[i] === "\\" && i + 1 < raw.length) i++;
+        value += raw[i++];
+      }
+      if (i < raw.length) i++;
+    } else {
+      while (i < raw.length && !/\s/.test(raw[i])) {
+        if ((raw[i] === '"' || raw[i] === "'") && /(^|:)$/.test(value)) {
+          const quote = raw[i++];
+          while (i < raw.length && raw[i] !== quote) {
+            if (raw[i] === "\\" && i + 1 < raw.length) i++;
+            value += raw[i++];
+          }
+          if (i < raw.length) i++;
+        } else {
+          value += raw[i++];
+        }
+      }
+    }
+
+    const lower = value.toLowerCase();
+    let kind: SearchToken["kind"] = "text";
+    let term = value;
+    if (lower.startsWith("tag:")) {
+      kind = "tag";
+      term = value.slice(4);
+    } else if (lower.startsWith("performer:") || lower.startsWith("user:")) {
+      kind = "performer";
+      term = value.slice(value.indexOf(":") + 1);
+    } else if (value.startsWith("#")) {
+      kind = "tag";
+      term = value.slice(1);
+    }
+
+    term = term.trim();
+    if (term) tokens.push({ kind, term, negated });
+  }
+  return tokens;
+}
+
+function applySearchTokens(query: any, tokens: SearchToken[]): any {
+  let next = query;
+  for (const token of tokens) {
+    const like = `*${escapeLike(token.term)}*`;
+    const clause = token.kind === "tag"
+      ? `(tags.cs.{${searchArrayLiteral(token.term.toLowerCase())}})`
+      : token.kind === "performer"
+        ? `(username.ilike.${like})`
+        : `(username.ilike.${like},room_title.ilike.${like},filename.ilike.${like},tags.cs.{${searchArrayLiteral(token.term.toLowerCase())}})`;
+    next = token.negated ? next.not("or", clause) : next.or(clause);
+  }
+  return next;
+}
+
 const LIST_COLS = "id,channel_id,username,filename,timestamp,room_title,tags,viewers,resolution,framerate,filesize,duration,gender,thumbnail_url,sprite_url,embed_url,preview_url,instance_id,created_at,updated_at";
 const RELATED_COLS = "id,username,timestamp,room_title,tags,viewers,resolution,framerate,filesize,duration,gender,thumbnail_url,sprite_url,preview_url";
 const POOL_COLS = "id,username,tags,gender,timestamp,viewers,thumbnail_url,sprite_url,preview_url";
@@ -165,11 +247,12 @@ router.get("/recordings", cache({ ttlSeconds: 90, staleSeconds: 300, tags: ["rec
     const { page = 1, limit = 24, search, tags, gender, username, resolution, sort } = parsed.data;
     const normalizedPage = Math.max(1, page);
     const normalizedLimit = Math.min(Math.max(1, limit), 100);
+    const searchTokens = tokenizeSearch(search?.trim() || "");
 
     // Estimate counts for text searches. Exact counts force Postgres to walk
     // every matching row on broad substring terms, even though the UI only
     // needs a useful page count. Unfiltered browsing keeps exact counts.
-    const countMode: "exact" | "estimated" = search?.trim() ? "estimated" : "exact";
+    const countMode: "exact" | "estimated" = searchTokens.length > 0 ? "estimated" : "exact";
     const ascending = sort === "oldest";
     const sortCol = sort === "largest" ? "filesize" : sort === "popular" ? "viewers" : "timestamp";
 
@@ -181,9 +264,8 @@ router.get("/recordings", cache({ ttlSeconds: 90, staleSeconds: 300, tags: ["rec
         .select(LIST_COLS, { count: countMode })
         ;
 
-      if (search?.trim()) {
-        const s = escapeLike(search.trim());
-        next = next.or(`username.ilike.%${s}%,room_title.ilike.%${s}%,filename.ilike.%${s}%`);
+      if (searchTokens.length > 0) {
+        next = applySearchTokens(next, searchTokens);
       }
       if (tags) {
         const tagList = tags.split(",").map((t: string) => t.trim()).filter(Boolean);
@@ -237,7 +319,7 @@ router.get("/recordings", cache({ ttlSeconds: 90, staleSeconds: 300, tags: ["rec
     res.json({
       data: enriched,
       total: count ?? 0,
-      totalIsEstimate: Boolean(search?.trim()),
+      totalIsEstimate: searchTokens.length > 0,
       page: normalizedPage,
       limit: normalizedLimit,
       totalPages: Math.ceil((count ?? 0) / normalizedLimit),
@@ -414,64 +496,6 @@ router.get("/recordings/recommendations", async (req, res) => {
   } catch (err) {
     req.log.error({ err }, "GET /recordings/recommendations unexpected error");
     res.status(500).json({ error: "Failed to get recommendations" });
-  }
-});
-
-// ─── RANDOM ─────────────────────────────────────────────────────────────────
-
-router.get("/recordings/random", async (req, res) => {
-  // Never cache: a random pick must be fresh per request. Serving a cached
-  // value would send every caller (and repeated clicks) to the same video.
-  res.set("Cache-Control", "private, no-store");
-  try {
-    // Parse exclude list — comma-separated recording IDs to skip
-    const excludeRaw = typeof req.query.exclude === "string" ? req.query.exclude : "";
-    const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-    const excludeIds = new Set(
-      excludeRaw
-        .split(",")
-        .map((s) => s.trim())
-        .filter((s) => uuidRegex.test(s))
-        .slice(0, 100),
-    );
-
-    // Fetch a pool of candidate IDs — randomize in JS (PostgREST doesn't support ORDER BY random())
-    const POOL_SIZE = Math.max(200, excludeIds.size + 50);
-    const { data: pool, error } = await supabase
-      .from("linked_recordings")
-      .select("id")
-      
-      .limit(POOL_SIZE);
-
-    if (error) {
-      req.log.error({ err: error }, "Supabase error getting recordings for random");
-      res.status(500).json({ error: "Failed to get random recording" });
-      return;
-    }
-
-    // Filter out excluded IDs and pick one
-    const candidates = (pool ?? []).filter((r) => !excludeIds.has(r.id));
-
-    if (candidates.length === 0) {
-      // Fallback: try without exclusion
-      const { data: fallback } = await supabase
-        .from("linked_recordings")
-        .select("id")
-        
-        .limit(1);
-      if (fallback && fallback.length > 0) {
-        res.json({ id: fallback[0].id });
-        return;
-      }
-      res.status(404).json({ error: "No recordings found" });
-      return;
-    }
-
-    const randomId = candidates[Math.floor(Math.random() * candidates.length)].id;
-    res.json({ id: randomId });
-  } catch (err) {
-    req.log.error({ err }, "GET /recordings/random unexpected error");
-    res.status(500).json({ error: "Failed to get random recording" });
   }
 });
 

@@ -15,11 +15,20 @@ const UPSELL_EVERY_MS = 24 * 60 * 60 * 1000;
  * seen the upsell and knows premium exists).
  */
 export function PremiumUpsellPopup() {
-  const { agePassed, inGrace, isPremium, excludedPage, config } = usePremium();
+  const { agePassed, inGrace, isPremium, excludedPage, config, adsEnabled } = usePremium();
   const [open, setOpen] = useState(false);
 
   const graceOver = agePassed && !inGrace && !isPremium;
-  const shouldFire = graceOver && !excludedPage && !isPremium;
+  // Never upsell ad-free access when advertising is switched off — there is
+  // nothing to escape from. Wait for config so a server-side kill switch is
+  // respected on the first render too.
+  const shouldFire =
+    adsEnabled &&
+    config !== undefined &&
+    config.ads_enabled !== false &&
+    graceOver &&
+    !excludedPage &&
+    !isPremium;
   const price = config?.price_usd ?? 4.99;
 
   useEffect(() => {

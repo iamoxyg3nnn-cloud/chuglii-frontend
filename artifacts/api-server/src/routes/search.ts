@@ -69,9 +69,8 @@ router.get("/search", cache({ ttlSeconds: 45, staleSeconds: 120, tags: ["search"
     // these searches serially and then paged through up to 20,000 recording
     // rows to find substring matches in tag arrays on every unique prefix.
     // That scan was unindexed, request-driven, and could exhaust the function
-    // timeout. Tag suggestions are supplied client-side from the cached /tags
-    // list when the Redis snapshot is temporarily unavailable.
-    const [performerResult, recordingResult] = await Promise.all([
+    // timeout. Tags come from the small aggregate RPC rather than a table scan.
+    const [performerResult, recordingResult, tagResult] = await Promise.all([
       supabase
         .from("linked_recordings")
         .select("username, thumbnail_url, sprite_url, preview_url, links")
@@ -88,6 +87,7 @@ router.get("/search", cache({ ttlSeconds: 45, staleSeconds: 120, tags: ["search"
         )
         .order("timestamp", { ascending: false }).order("id", { ascending: false })
         .limit(4),
+      supabase.rpc("get_tag_counts"),
     ]);
 
     if (performerResult.error) {

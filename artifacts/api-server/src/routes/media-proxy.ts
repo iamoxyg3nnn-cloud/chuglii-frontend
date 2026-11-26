@@ -143,6 +143,266 @@ function acquireHostGate(
   });
 }
 
+// ─── HLS segment cache + read-ahead prefetch ───────────────────────────────
+// The live feature's upstream segment CDNs are slow (~0.15 MB/s measured —
+// barely above playback realtime). hls.js fetches segments strictly one at a
+// time, so a single slow segment stalls playback. Two fixes:
+//   1. A DEDICATED segment cache — separate from the thumbnail cache above so
+//      grid-image churn can never evict media. Long TTL + byte budget: the
+//      streams are loops, so viewers re-request the same segments every cycle
+//      and 2nd-loop onward is served from RAM.
+//   2. Read-ahead prefetch: when a playlist is served we remember its segment
+//      order; whenever a segment is served the NEXT few are fetched in parallel
+//      in the background, turning the client's serial slow fetches into
+//      server-side parallel ones. The per-host gate allows 10 concurrent.
+
+const SEGMENT_MEM_TTL_MS = 2 * 60 * 60_000;
+const SEGMENT_MEM_MAX_BYTES = 256 * 1024 * 1024;
+const SEGMENT_MEM_MAX_ENTRIES = 4000;
+const SEGMENT_MAX_BYTES = 12 * 1024 * 1024; // never cache absurd bodies
+const SEGMENT_TIMEOUT_MS = 20_000; // slow origin — be patient
+const PREFETCH_ON_PLAYLIST = 8;
+// Measured: the origin throttles PER CONNECTION (~1.6s/segment) but scales
+// near-linearly with parallel connections (~0.31s/segment at 6-way). So keep
+// a deep read-ahead window: by the time the player finishes segment i, the
+// next dozen are already in RAM and the client's fetch is instant.
+const PREFETCH_READAHEAD = 12;
+const PREFETCH_MAX_CONCURRENT = 6;
+
+interface CachedSegment {
+  buffer: Buffer;
+  contentType: string;
+  expires: number;
+}
+
+const segmentMemCache = new Map<string, CachedSegment>();
+let segmentCacheBytes = 0;
+const segmentInflight = new Map<string, Promise<CachedSegment | null>>();
+const prefetchActive = new Set<string>();
+let prefetchRunning = 0;
+const prefetchWaiters: Array<() => void> = [];
+
+async function acquirePrefetchSlot(): Promise<() => void> {
+  if (prefetchRunning < PREFETCH_MAX_CONCURRENT) {
+    prefetchRunning += 1;
+    return () => {
+      prefetchRunning -= 1;
+      const next = prefetchWaiters.shift();
+      if (next) next();
+    };
+  }
+  return new Promise((resolve) => {
+    prefetchWaiters.push(() => {
+      prefetchRunning += 1;
+      resolve(() => {
+        prefetchRunning -= 1;
+        const next = prefetchWaiters.shift();
+        if (next) next();
+      });
+    });
+  });
+}
+
+// playlist base directory → ordered absolute segment URLs (TTL-bound)
+const playlistSegments = new Map<
+  string,
+  { urls: string[]; expires: number }
+>();
+
+function isHlsSegmentUrl(u: URL): boolean {
+  return /\.ts$|\.key$/i.test(u.pathname);
+}
+
+function cacheSegment(url: string, buf: Buffer, contentType: string): void {
+  if (buf.length > SEGMENT_MAX_BYTES) return;
+  const prev = segmentMemCache.get(url);
+  if (prev) {
+    segmentCacheBytes -= prev.buffer.length;
+    segmentMemCache.delete(url);
+  }
+  segmentMemCache.set(url, {
+    buffer: buf,
+    contentType,
+    expires: Date.now() + SEGMENT_MEM_TTL_MS,
+  });
+  segmentCacheBytes += buf.length;
+  // LRU-ish: evict oldest until under budget. Map iteration is insertion
+  // order; re-inserting on hit (below) keeps hot segments at the back.
+  while (
+    (segmentCacheBytes > SEGMENT_MEM_MAX_BYTES ||
+      segmentMemCache.size > SEGMENT_MEM_MAX_ENTRIES) &&
+    segmentMemCache.size > 0
+  ) {
+    const oldest = segmentMemCache.keys().next().value;
+    if (oldest === undefined) break;
+    const entry = segmentMemCache.get(oldest);
+    if (entry) segmentCacheBytes -= entry.buffer.length;
+    segmentMemCache.delete(oldest);
+  }
+}
+
+function getCachedSegment(url: string): CachedSegment | null {
+  const hit = segmentMemCache.get(url);
+  if (!hit) return null;
+  if (hit.expires < Date.now()) {
+    segmentCacheBytes -= hit.buffer.length;
+    segmentMemCache.delete(url);
+    return null;
+  }
+  // refresh LRU position
+  segmentMemCache.delete(url);
+  segmentMemCache.set(url, hit);
+  return hit;
+}
+
+function parsePlaylistSegments(text: string, baseUrl: string): string[] {
+  const out: string[] = [];
+  for (const line of text.split("\n")) {
+    const t = line.trim();
+    if (!t || t.startsWith("#")) continue;
+    try {
+      out.push(new URL(t, baseUrl).toString());
+    } catch {
+      /* skip malformed line */
+    }
+  }
+  return out;
+}
+
+async function prefetchSegment(
+  url: string,
+  headers: Record<string, string>,
+  log: any,
+): Promise<void> {
+  if (getCachedSegment(url)) return;
+  if (segmentInflight.has(url) || prefetchActive.has(url)) return;
+  prefetchActive.add(url);
+  try {
+    const release = await acquirePrefetchSlot();
+    try {
+      const res = await fetch(url, {
+        headers,
+        signal: AbortSignal.timeout(SEGMENT_TIMEOUT_MS),
+      });
+      if (!res.ok) return;
+      const contentType = res.headers.get("content-type") || "video/mp2t";
+      if (!isSafeMediaType(contentType, new URL(url))) return;
+      const buf = await readBodyBounded(res, SEGMENT_MAX_BYTES);
+      cacheSegment(url, buf, contentType);
+    } finally {
+      release();
+    }
+  } catch (err) {
+    log?.debug?.({ err, url }, "segment prefetch failed (best effort)");
+  } finally {
+    prefetchActive.delete(url);
+  }
+}
+
+/** Prefetch the first N segments of a freshly served playlist. */
+function prefetchPlaylistHead(
+  text: string,
+  playlistBase: string,
+  headers: Record<string, string>,
+  log: any,
+): void {
+  try {
+    const urls = parsePlaylistSegments(text, playlistBase);
+    if (!urls.length) return;
+    const baseDir = playlistBase.slice(0, playlistBase.lastIndexOf("/") + 1);
+    playlistSegments.set(baseDir, {
+      urls,
+      expires: Date.now() + 30 * 60_000,
+    });
+    if (playlistSegments.size > 50) {
+      // drop the oldest playlist entry
+      const oldest = playlistSegments.keys().next().value;
+      if (oldest !== undefined) playlistSegments.delete(oldest);
+    }
+    for (let i = 0; i < PREFETCH_ON_PLAYLIST && i < urls.length; i++) {
+      void prefetchSegment(urls[i], headers, log);
+    }
+  } catch {
+    /* best effort */
+  }
+}
+
+/** After serving segment i of a known playlist, prefetch i+1..i+3. */
+function scheduleSegmentReadAhead(
+  segmentUrl: string,
+  headers: Record<string, string>,
+  log: any,
+): void {
+  try {
+    for (const [baseDir, entry] of playlistSegments) {
+      if (entry.expires < Date.now()) {
+        playlistSegments.delete(baseDir);
+        continue;
+      }
+      if (!segmentUrl.startsWith(baseDir)) continue;
+      const idx = entry.urls.indexOf(segmentUrl);
+      if (idx < 0) continue;
+      for (
+        let i = idx + 1;
+        i <= idx + PREFETCH_READAHEAD && i < entry.urls.length;
+        i++
+      ) {
+        void prefetchSegment(entry.urls[i], headers, log);
+      }
+      return;
+    }
+  } catch {
+    /* best effort */
+  }
+}
+
+async function fetchSegmentOnce(
+  urlStr: string,
+  upstreamHeaders: Record<string, string>,
+  log: any,
+): Promise<CachedSegment | null> {
+  const existing = segmentInflight.get(urlStr);
+  if (existing) return existing;
+  const job = (async () => {
+    const release = await acquireHostGate(
+      new URL(urlStr).hostname,
+      CONNECTION_TIMEOUT_MS,
+    );
+    if (!release) return null;
+    try {
+      const response = await fetchWithRetry(
+        urlStr,
+        upstreamHeaders,
+        log,
+        SEGMENT_TIMEOUT_MS,
+        Date.now() + SEGMENT_TIMEOUT_MS + 10_000,
+      );
+      if (!response || !response.ok) return null;
+      const contentType =
+        response.headers.get("content-type") || "video/mp2t";
+      if (!isSafeMediaType(contentType, new URL(urlStr))) return null;
+      const buffer = await readBodyBounded(response, SEGMENT_MAX_BYTES);
+      const seg: CachedSegment = {
+        buffer,
+        contentType,
+        expires: Date.now() + SEGMENT_MEM_TTL_MS,
+      };
+      cacheSegment(urlStr, buffer, contentType);
+      return seg;
+    } catch {
+      return null;
+    } finally {
+      release();
+    }
+  })();
+  segmentInflight.set(urlStr, job);
+  try {
+    return await job;
+  } finally {
+    segmentInflight.delete(urlStr);
+  }
+}
+
 // ─── In-memory single-flight + success cache (images only) ──────────────────
 // The grid card AND the background catalog warmer routinely request the same
 // first-screen thumbnails at the same moment. Without de-duplication each opens
@@ -449,8 +709,16 @@ function isSafeMediaType(
 ): boolean {
   if (contentType && typeof contentType === "string") {
     const ct = contentType.split(";")[0]!.trim();
-    if (ct && ct !== "*/*" && ct !== "application/stream")
-      return SAFE_MEDIA_RE.test(ct);
+    if (ct && ct !== "*/*" && ct !== "application/stream") {
+      if (SAFE_MEDIA_RE.test(ct)) return true;
+      // Some CDNs serve HLS playlists as text/plain (verified on the sstp
+      // stream CDN). Allow it only when the URL is unambiguously a playlist —
+      // the playlist path rewrites and re-serves it, never renders it.
+      if (/^text\/plain$/i.test(ct) && /\.m3u8(\?|$)/i.test(url.pathname)) {
+        return true;
+      }
+      return false;
+    }
   }
   return MEDIA_EXT_RE.test(url.pathname);
 }
@@ -1111,6 +1379,36 @@ router.get("/media", async (req, res) => {
 
   const isVideoRequest = !!rangeHeader;
 
+  // ── HLS segment / AES-key fast path ──────────────────────────────────────
+  // Serve .ts/.key from the dedicated segment cache when possible and trigger
+  // read-ahead prefetch so the player never waits on the slow origin. Must run
+  // BEFORE the image path (segments would otherwise land in the 5-min
+  // thumbnail cache and get evicted by grid churn).
+  if (!isVideoRequest && isHlsSegmentUrl(parsedUrl)) {
+    const hit = getCachedSegment(urlStr);
+    if (hit) {
+      res.setHeader("Content-Type", hit.contentType);
+      res.setHeader("Content-Length", String(hit.buffer.length));
+      res.setHeader("Cache-Control", "public, max-age=1800");
+      res.setHeader("X-Content-Type-Options", "nosniff");
+      res.status(200).end(hit.buffer);
+      scheduleSegmentReadAhead(urlStr, upstreamHeaders, req.log);
+      return;
+    }
+    const seg = await fetchSegmentOnce(urlStr, upstreamHeaders, req.log);
+    if (seg) {
+      res.setHeader("Content-Type", seg.contentType);
+      res.setHeader("Content-Length", String(seg.buffer.length));
+      res.setHeader("Cache-Control", "public, max-age=1800");
+      res.setHeader("X-Content-Type-Options", "nosniff");
+      res.status(200).end(seg.buffer);
+      scheduleSegmentReadAhead(urlStr, upstreamHeaders, req.log);
+      return;
+    }
+    // Fall through to the generic path on failure (it will retry upstream
+    // through fetchWithRetry / getImage and produce the usual error handling).
+  }
+
   // Optional server-side resize/format for IMAGE requests only. The frontend
   // sends the adaptive tier width (400/800/1200) so thumbnails download as a
   // few tens of KB instead of full-res; `fmt=webp` converts for ~half the
@@ -1237,9 +1535,13 @@ router.get("/media", async (req, res) => {
     if (response.ok && looksLikePlaylist) {
       const playlist = await response.text();
       const playlistBase = response.url || urlStr;
+      // Remember segment order and warm the head of the stream so playback
+      // starts from RAM instead of the slow origin.
+      prefetchPlaylistHead(playlist, playlistBase, upstreamHeaders, req.log);
       res.setHeader("Content-Type", "application/vnd.apple.mpegurl");
       res.setHeader("Cache-Control", "public, max-age=30");
       res.setHeader("X-Content-Type-Options", "nosniff");
+      res.setHeader("Content-Type", "application/vnd.apple.mpegurl");
       res.status(200).send(rewritePlaylistUris(playlist, playlistBase));
       return;
     }

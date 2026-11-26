@@ -68,6 +68,23 @@ function describeRoute(path: string, params: URLSearchParams): RouteSeo {
     };
   }
 
+  if (path === "/live") {
+    return {
+      title: "Watch Live — Real-Time Monitoring Streams | VAULT",
+      description:
+        "Watch live monitoring streams in up to 1080p on VAULT. A constantly refreshed grid of real-time candid streams with quality badges. Adults only (18+).",
+      type: "website",
+    };
+  }
+  if (path.startsWith("/live/")) {
+    return {
+      title: "Watch a Live Stream | VAULT",
+      description:
+        "Watch a live monitoring stream on VAULT in the highest quality available. Adults only (18+).",
+      type: "video.other" as const,
+    };
+  }
+
   if (path === "/browse" || path.startsWith("/browse/")) {
     const search = (params.get("search") ?? "").trim();
     const tags = (params.get("tags") ?? "")
@@ -227,15 +244,6 @@ function describeRoute(path: string, params: URLSearchParams): RouteSeo {
     return {
       title: "Signing In",
       description: "Completing sign-in to your VAULT account.",
-      type: "website",
-    };
-  }
-
-  if (path === "/random") {
-    return {
-      title: "Random Recording",
-      description:
-        "Jump into a random public adult cam recording from the VAULT archive and discover performers you may not have found yet. Adults only (18+).",
       type: "website",
     };
   }

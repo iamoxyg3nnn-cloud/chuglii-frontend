@@ -31,6 +31,8 @@ const ROUTE_IMPORTS: ReadonlyArray<[string, () => Promise<unknown>]> = [
   ["/profile", () => import("@/pages/Profile")],
   ["/user", () => import("@/pages/Profile")],
   ["/premium", () => import("@/pages/Premium")],
+  ["/live/", () => import("@/pages/LiveWatch")],
+  ["/live", () => import("@/pages/LiveFeed")],
   ["/leak/spicymms/video", () => import("@/pages/LeakWatch")],
   ["/leak/desi49/video", () => import("@/pages/LeakWatch")],
   ["/leak/mydesi/video", () => import("@/pages/LeakWatch")],

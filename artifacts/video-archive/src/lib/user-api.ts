@@ -282,6 +282,8 @@ export const userApi = {
       method: "DELETE",
     }),
 
+  getNotificationStats: () =>
+    apiFetch<{ total: number; unread: number }>("/api/user/notifications/stats"),
   getNotifications: (opts?: { limit?: number; offset?: number }) => {
     const params = new URLSearchParams();
     if (opts?.limit) params.set("limit", String(opts.limit));

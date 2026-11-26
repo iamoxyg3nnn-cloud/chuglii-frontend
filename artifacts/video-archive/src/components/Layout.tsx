@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef, lazy, Suspense } from "react";
 import * as DialogPrimitive from "@radix-ui/react-dialog";
 import { Link, useLocation } from "wouter";
-import { FilmStrip, SunDim, MoonStars, Crown, Check, Shuffle, List, X } from "@phosphor-icons/react";
+import { FilmStrip, SunDim, MoonStars, Crown, Check, List, X } from "@phosphor-icons/react";
 import { UserMenu } from "@/components/UserMenu";
 import { usePremium } from "@/contexts/PremiumContext";
 import { useAds } from "@/contexts/AdsContext";
@@ -42,23 +42,6 @@ function Logo() {
         <span className="w-1.5 h-1.5 rounded-full bg-primary inline-block" />
       </div>
     </Link>
-  );
-}
-
-function RandomButton() {
-  const [, setLocation] = useLocation();
-  const { showAds } = usePremium();
-  return (
-    <button
-      onClick={() => setLocation("/random")}
-      className={`fixed right-6 sm:right-8 z-40 h-11 w-11 rounded-xl bg-card/90 backdrop-blur-md border border-border/80 shadow-md hover:border-primary/50 text-muted-foreground hover:text-primary transition-colors flex items-center justify-center cursor-pointer pointer-events-auto ${
-        showAds ? "bottom-24 sm:bottom-8" : "bottom-8"
-      }`}
-      aria-label="Random video"
-      title="Surprise me / Random recording"
-    >
-      <Shuffle size={16} weight="regular" />
-    </button>
   );
 }
 
@@ -267,7 +250,10 @@ export function Navbar() {
   const { isDark: dark, toggleTheme } = useTheme();
   const [scrolled, setScrolled] = useState(false);
   const [requestOpen, setRequestOpen] = useState(false);
-  const { isPremium, loading } = usePremium();
+  const { isPremium, loading, adsEnabled, config } = usePremium();
+  // Premium only removes ads. When advertising is paused there is nothing to
+  // sell, so every premium CTA is hidden until it is switched back on.
+  const premiumOffered = adsEnabled && config !== undefined && config.ads_enabled !== false;
 
   useEffect(() => {
     let ticking = false;
@@ -321,27 +307,29 @@ export function Navbar() {
             </button>
           )}
 
-          <Link
-            href="/premium"
-            className={`nav-btn ${searchOpen ? "hidden sm:flex" : ""}`}
-            aria-label={isPremium ? "Premium member — see benefits" : "Go Premium — see details & upgrade"}
-            title={isPremium ? "You're Premium — see benefits" : "Go Premium — see details & upgrade"}
-          >
-            <Crown
-              size={17}
-              weight={isPremium ? "fill" : "regular"}
-              className={`transition-colors ${isPremium ? "text-primary" : ""}`}
-            />
-            {isPremium ? (
-              <span className="absolute -top-0.5 -right-0.5 w-3 h-3 rounded-full bg-primary text-background flex items-center justify-center border border-background">
-                <Check size={9} weight="bold" />
-              </span>
-            ) : (
-              !loading && (
-                <span className="absolute top-0.5 right-0.5 w-1.5 h-1.5 rounded-full bg-amber-400" />
-              )
-            )}
-          </Link>
+          {premiumOffered && (
+            <Link
+              href="/premium"
+              className={`nav-btn ${searchOpen ? "hidden sm:flex" : ""}`}
+              aria-label={isPremium ? "Premium member — see benefits" : "Go Premium — see details & upgrade"}
+              title={isPremium ? "You're Premium — see benefits" : "Go Premium — see details & upgrade"}
+            >
+              <Crown
+                size={17}
+                weight={isPremium ? "fill" : "regular"}
+                className={`transition-colors ${isPremium ? "text-primary" : ""}`}
+              />
+              {isPremium ? (
+                <span className="absolute -top-0.5 -right-0.5 w-3 h-3 rounded-full bg-primary text-background flex items-center justify-center border border-background">
+                  <Check size={9} weight="bold" />
+                </span>
+              ) : (
+                !loading && (
+                  <span className="absolute top-0.5 right-0.5 w-1.5 h-1.5 rounded-full bg-amber-400" />
+                )
+              )}
+            </Link>
+          )}
 
           <div className={searchOpen ? "hidden sm:block" : ""}>
             <Suspense fallback={null}><NotificationBell /></Suspense>
@@ -382,7 +370,8 @@ export function Navbar() {
 }
 
 export function Layout({ children }: { children: React.ReactNode }) {
-  const { showAds } = usePremium();
+  const { showAds, adsEnabled, config } = usePremium();
+  const premiumOffered = adsEnabled && config !== undefined && config.ads_enabled !== false;
   const { creativesFor } = useAds();
   // Site-wide strips only take space once a creative exists for one of their
   // tiers — an empty strip would otherwise leave a bordered bar / gap.
@@ -423,7 +412,6 @@ export function Layout({ children }: { children: React.ReactNode }) {
         {children}
       </main>
 
-      <RandomButton />
       <PremiumUpsellPopup />
 
       <footer className="border-t border-border/40 mt-20 bg-card/40 backdrop-blur-md">
@@ -457,7 +445,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
               <p className="text-xs text-muted-foreground max-w-sm leading-relaxed">
                 A public recording index and performer archive. Explore listed streams, discover performer profiles, and curate your personal collection.
               </p>
-              <div className="flex items-center gap-2 text-[11px] text-muted-foreground/80">
+              <div className="flex items-center gap-2 text-[11px] text-muted-foreground">
                 <span className="inline-block w-2 h-2 rounded-full bg-emerald-500/80" />
                 <span>Archive index operational</span>
                 <span className="text-border/60">·</span>
@@ -521,11 +509,13 @@ export function Layout({ children }: { children: React.ReactNode }) {
                     My requests
                   </Link>
                 </li>
-                <li>
-                  <Link href="/premium" className="text-primary hover:text-primary/90 transition-colors font-medium" onMouseEnter={() => prefetchFooter("/premium")} onFocus={() => prefetchFooter("/premium")}>
-                    Premium membership
-                  </Link>
-                </li>
+                {premiumOffered && (
+                  <li>
+                    <Link href="/premium" className="text-primary hover:text-primary/90 transition-colors font-medium" onMouseEnter={() => prefetchFooter("/premium")} onFocus={() => prefetchFooter("/premium")}>
+                      Premium membership
+                    </Link>
+                  </li>
+                )}
               </ul>
             </div>
 
@@ -548,7 +538,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
                     Viewing analytics
                   </Link>
                 </li>
-                <li className="pt-1 text-muted-foreground/60 text-[11px]">
+                <li className="pt-1 text-muted-foreground text-[11px]">
                   <span>Terms of Service</span>
                   <span className="mx-2">·</span>
                   <span>Privacy Policy</span>
@@ -561,7 +551,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
             <div>
               &copy; <span className="tabular-nums">{new Date().getFullYear()}</span> VAULT. Public Recording Archive &amp; Performer Directory.
             </div>
-            <div className="text-muted-foreground/75 text-[11px]">
+            <div className="text-muted-foreground text-[11px]">
               Adult content intended strictly for audiences 18 years or older.
             </div>
           </div>
