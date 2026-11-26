@@ -1077,7 +1077,6 @@ router.get("/media", async (req, res) => {
     "files.litterbox.catbox.moe",
     "influencersgonewild.com",
     "influencersgonewild.net",
-    "internetchicks.com",
     "sheeshfans.com",
   ];
   const upstreamHostname = parsedUrl.hostname;
@@ -1087,7 +1086,7 @@ router.get("/media", async (req, res) => {
     )
   ) {
     upstreamHeaders["Referer"] = "https://chuglii.in/";
-  } else if (upstreamHostname.includes("influencersgonewild") || upstreamHostname.includes("internetchicks")) {
+  } else if (upstreamHostname.includes("influencersgonewild")) {
     upstreamHeaders["Referer"] = `${parsedUrl.origin}/`;
   }
 

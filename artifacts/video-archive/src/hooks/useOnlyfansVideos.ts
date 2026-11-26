@@ -58,11 +58,10 @@ export interface OnlyfansVideo {
 }
 
 export type OnlyfansSortOption = "newest" | "views" | "rating" | "quality" | "oldest";
-export const ONLYFANS_SITES = ["internetchicks", "influencersgonewild", "sheeshfans"] as const;
+export const ONLYFANS_SITES = ["influencersgonewild", "sheeshfans"] as const;
 export type OnlyfansSite = (typeof ONLYFANS_SITES)[number];
 
 export const ONLYFANS_SITE_LABELS: Record<OnlyfansSite, string> = {
-  internetchicks: "Internet Chicks",
   influencersgonewild: "Influencers Gone Wild",
   sheeshfans: "SheeshFans",
 };

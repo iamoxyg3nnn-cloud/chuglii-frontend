@@ -43,7 +43,6 @@ const NO_PROXY_HOSTS: string[] = [
   // OnlyFans leak sources: protect against hotlink blocks by loading direct with no-referrer
   "influencersgonewild.com",
   "influencersgonewild.net",
-  "internetchicks.com",
   "sheeshfans.com",
   // NOTE: imgchest.com was removed from this list on 2026-09-26. The old note
   // claimed it "returns 403 when loaded directly" — re-probed against

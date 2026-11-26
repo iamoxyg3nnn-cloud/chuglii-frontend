@@ -140,7 +140,7 @@ router.get("/player", async (req, res) => {
 
 /**
  * Stream proxy for direct MP4/WebM files that require a spoofed Referer and
- * Range-capable passthrough (internetchicks, sheeshfans, influencersgonewild).
+ * Range-capable passthrough (sheeshfans, influencersgonewild).
  * The browser's native <video> element cannot inject a custom Referer header,
  * so we proxy the bytes server-side and add the right origin header.
  *
@@ -158,9 +158,7 @@ router.get("/player/stream", async (req, res) => {
 
     // Determine the correct spoofed Referer based on the CDN origin.
     let referer = `${destObj.protocol}//${destObj.hostname}/`;
-    if (destObj.hostname.includes("internetchicks")) {
-      referer = "https://internetchicks.com/";
-    } else if (destObj.hostname.includes("sheeshfans")) {
+    if (destObj.hostname.includes("sheeshfans")) {
       referer = "https://sheeshfans.com/";
     } else if (destObj.hostname.includes("influencersgonewild")) {
       referer = "https://influencersgonewild.com/";

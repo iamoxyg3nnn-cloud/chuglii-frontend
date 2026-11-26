@@ -78,8 +78,7 @@ function needsStreamProxy(url: string): boolean {
   const u = url.toLowerCase();
   return (
     u.includes("influencersgonewild") ||
-    u.includes("sheeshfans") ||
-    u.includes("internetchicks")
+    u.includes("sheeshfans")
   );
 }
 
@@ -271,11 +270,8 @@ export default function OnlyfansWatch() {
     ) {
       return false;
     }
-    if (site === "internetchicks" && !u.includes("internetchicks.com")) {
-      return false;
-    }
     return true;
-  }, [activeUrl, site]);
+  }, [activeUrl]);
 
   // First-party/site-hosted embed URLs go through the edge player, which
   // applies the right Referer and can unwrap direct streams.

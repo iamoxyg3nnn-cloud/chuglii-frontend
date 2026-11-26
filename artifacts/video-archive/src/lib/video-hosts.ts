@@ -155,7 +155,6 @@ export function iframeReferrerPolicy(
       hostname.includes("upns") ||
       hostname.includes("vidara") ||
       // These CDNs require the origin Referer header to authorize playback
-      hostname.includes("internetchicks") ||
       hostname.includes("sheeshfans") ||
       hostname.includes("influencersgonewild")
     ) {

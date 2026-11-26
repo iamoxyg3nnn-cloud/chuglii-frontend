@@ -738,7 +738,6 @@ async function handleApi(request, env, url, ctx) {
       let referer = "https://chuglii.in/";
       if (
         targetObj.hostname.includes("influencersgonewild") ||
-        targetObj.hostname.includes("internetchicks") ||
         targetObj.hostname.includes("sheeshfans") ||
         targetObj.hostname.includes("pixhost.to") ||
         targetObj.hostname.includes("catbox.moe") ||
@@ -871,7 +870,7 @@ async function resolveStreamtapeGate(streamtapeUrl) {
   const pageRes = await fetch(streamtapeUrl, {
     headers: {
       "User-Agent": ua,
-      "Referer": "https://internetchicks.com/",
+      "Referer": "https://supjav.com/",
       "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
     },
     redirect: "follow",
@@ -1884,7 +1883,7 @@ async function resolveHotScopesEmbed(targetUrl, searchParams) {
     // Only hosts that actually appear in stored media URLs are proxied.
     const STREAM_HOST_SUFFIXES = [
       "taobao-cdn.com", "supjav.com", "supremejav.com", "clicknplay.to",
-      "sheeshfans.com", "internetchicks.com", "influencersgonewild.com",
+      "sheeshfans.com", "influencersgonewild.com",
       "influencersgonewild.net", "mmsvibex.fit", "voyeur-house.org",
       "reallifecam.to", "reallifecams.net", "hotscopes.net",
       "lulustream.com", "vidara.so", "vidara.to", "whitetrafsa.com",
@@ -1990,8 +1989,6 @@ async function resolveHotScopesEmbed(targetUrl, searchParams) {
         referer = "https://influencersgonewild.com/";
       } else if (targetObj.hostname.includes("sheeshfans")) {
         referer = "https://sheeshfans.com/";
-      } else if (targetObj.hostname.includes("internetchicks")) {
-        referer = "https://internetchicks.com/";
       } else if (targetObj.hostname.includes("xianshipian") || targetObj.hostname.includes("aomcyou") || targetObj.hostname.includes("apianmeng") || targetObj.hostname.includes("atukjhesk") || targetObj.hostname.includes("cdn2020") || targetObj.hostname.includes("97img") || targetObj.hostname.includes("thm3u8") || targetObj.hostname.includes("sxtmo") || targetObj.hostname.includes("micgqv") || targetObj.hostname.includes("mkimfs") || targetObj.hostname.includes("ucjosl") || targetObj.hostname.includes("cloudfront")) {
         // fangsung CDNs: bbcdn 403s any FOREIGN referer but allows none at all
         // (it also 403s Cloudflare-worker egress even with the site referer,
@@ -2661,51 +2658,7 @@ async function resolveHotScopesEmbed(targetUrl, searchParams) {
         return Response.redirect(targetUrl, 302);
       }
 
-      // 7. InternetChicks locker resolver (PlayMogo/StreamWish/VOE/Dood/Byse).
-      // These are embed iframes; spoof IC referer, inject <base>, and try to
-      // extract packed HLS/mp4 sources when present for cleaner playback.
-      if (/(playmogo|streamwish|voe\.sx|dood|bysezejataos)/i.test(destObj.hostname)) {
-        try {
-          const icRes = await fetch(targetUrl, {
-            headers: {
-              "User-Agent": request.headers.get("user-agent") || "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
-              "Referer": "https://internetchicks.com/",
-              "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
-            },
-            redirect: "follow",
-          });
-          if (icRes.ok) {
-            const ct = icRes.headers.get("content-type") || "text/html; charset=utf-8";
-            if (ct.includes("text/html")) {
-              let html = await icRes.text();
-              const streamInfo = extractPackedStreamInfo(html);
-              if (streamInfo?.hls4 || streamInfo?.file) {
-                const streamUrl = streamInfo.hls4
-                  ? `/api/player/stream?origin=${encodeURIComponent(new URL(targetUrl).origin)}&path=${encodeURIComponent(streamInfo.hls4)}`
-                  : streamInfo.file;
-                const isHls = /\.m3u8(?:[?#]|$)/i.test(streamUrl) || streamInfo.hls4;
-                return new Response(isHls ? renderCleanHlsPlayer(streamUrl, streamInfo.title || "Video", streamInfo.poster) : renderCleanMp4Player([{ url: streamUrl, rawUrl: streamUrl, type: "direct_mp4", quality: 1080, label: "1080p" }], streamInfo.title || "Video", streamInfo.poster), {
-                  status: 200,
-                  headers: { "Content-Type": "text/html; charset=utf-8", "Access-Control-Allow-Origin": "*", "Cache-Control": "no-store" },
-                });
-              }
-              html = html.replace(/if\s*\(\s*top\.location\.href\s*==\s*location\.href\s*\)\s*\{[^}]*\}/g, "");
-              html = html.replace(/top\.location[^;]+;/g, "/* neutral */");
-              const baseTag = `<base href="${destObj.origin}/">`;
-              html = html.includes("<head>") ? html.replace("<head>", `<head>${baseTag}`) : `${baseTag}${html}`;
-              return new Response(html, {
-                status: 200,
-                headers: { "Content-Type": "text/html; charset=utf-8", "Access-Control-Allow-Origin": "*", "Cache-Control": "no-store" },
-              });
-            }
-            return new Response(icRes.body, { status: icRes.status, headers: { "Content-Type": ct, "Access-Control-Allow-Origin": "*" } });
-          }
-        } catch (e) {
-          console.error("IC locker proxy error:", e);
-        }
-      }
-
-      // 8. Streamtape Resolver: extract the short-lived /get_video URL and let
+      // 7. Streamtape Resolver: extract the short-lived /get_video URL and let
       // the browser fetch it directly. Streaming it through the edge fails
       // because Streamtape rejects Cloudflare's datacenter IP on consumption.
       // Fall back to the upstream HTML only if the gate format changes.
@@ -2772,13 +2725,11 @@ async function resolveHotScopesEmbed(targetUrl, searchParams) {
         }
       }
 
-      // 6. Generic Fallback Proxy (EarnVids / evsishere / legacy / IC lockers):
+      // 6. Generic Fallback Proxy (EarnVids / evsishere / legacy):
       // Edge worker proxies HTML with a spoofed Referer and injects <base>.
       let referer = "https://supjav.com/";
       if (targetUrl.includes("mmsvibex")) referer = "https://mmsvibex.life/";
       if (destObj.hostname.includes("sheeshfans")) referer = "https://sheeshfans.com/";
-      const icLocker = /playmogo|streamwish|dood|bysezejataos|voe\.sx|streamtape|internetchicks/i.test(destObj.hostname);
-      if (icLocker) referer = "https://internetchicks.com/";
 
       const upstreamRes = await fetch(targetUrl, {
         headers: {
