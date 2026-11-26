@@ -41,44 +41,72 @@ async function get(url, headers = {}) {
   return res;
 }
 
-/** A currently-live borntobefuck row (referer-locked HLS, the hardest case). */
-async function pickReference() {
-  if (!SUPABASE_URL || !SUPABASE_ANON) return null;
-  try {
-    // The public feed RPC the SPA itself uses (anon-callable). The service-role
-    // revalidation RPC is deliberately not exposed to anon.
-    const res = await fetch(`${SUPABASE_URL.replace(/\/+$/, "")}/rest/v1/rpc/scraper_get_onlyfans_videos`, {
-      method: "POST",
-      headers: {
-        apikey: SUPABASE_ANON,
-        authorization: `Bearer ${SUPABASE_ANON}`,
-        "content-type": "application/json",
-      },
-      body: JSON.stringify({
-        p_source_site: "borntobefuck",
-        p_tag: null,
-        p_category: null,
-        p_search: null,
-        p_sort: "newest",
-        p_limit: 5,
-        p_offset: 0,
-      }),
-    });
-    if (!res.ok) return null;
-    const rows = await res.json();
-    const row = (Array.isArray(rows) ? rows : []).find(
-      (r) => r.full_video_url && r.thumbnail_url,
-    );
-    return row ? { stream: row.full_video_url, thumb: row.thumbnail_url, id: row.source_post_id } : null;
-  } catch {
-    return null;
+/**
+ * Known-good samples used when the database is unreachable.
+ *
+ * The media checks must NOT depend on Supabase: supabase.chuglii.in sits behind
+ * a Cloudflare tunnel that intermittently answers 530/52x HTML. Treating that
+ * as a media regression blocked a deploy for no reason. These are real
+ * borntobefuck assets (referer-locked HLS -- the hardest case); if they all
+ * fail, the media path really is broken.
+ */
+const STATIC_SAMPLES = [
+  {
+    stream: "https://content.zavastream.com/621742/3a839f2f-2784-4047-a58b-beda470caf48/index.m3u8",
+    thumb: "https://content.zavastream.com/621742/3a839f2f-2784-4047-a58b-beda470caf48/thumbnail.jpg",
+  },
+];
+
+async function pickFromDb() {
+  if (!SUPABASE_URL || !SUPABASE_ANON) return { row: null, note: "no Supabase env" };
+  for (let attempt = 1; attempt <= 2; attempt++) {
+    try {
+      // The public feed RPC the SPA itself uses (anon-callable). The service-role
+      // revalidation RPC is deliberately not exposed to anon.
+      const res = await fetch(`${SUPABASE_URL.replace(/\/+$/, "")}/rest/v1/rpc/scraper_get_onlyfans_videos`, {
+        method: "POST",
+        headers: {
+          apikey: SUPABASE_ANON,
+          authorization: `Bearer ${SUPABASE_ANON}`,
+          "content-type": "application/json",
+        },
+        body: JSON.stringify({
+          p_source_site: "borntobefuck",
+          p_tag: null,
+          p_category: null,
+          p_search: null,
+          p_sort: "newest",
+          p_limit: 5,
+          p_offset: 0,
+        }),
+      });
+      const contentType = res.headers.get("content-type") || "";
+      if (!res.ok || !contentType.includes("json")) {
+        throw new Error(`HTTP ${res.status} ${contentType || "no content-type"}`);
+      }
+      const rows = await res.json();
+      const row = (Array.isArray(rows) ? rows : []).find(
+        (r) => r.full_video_url && r.thumbnail_url,
+      );
+      if (!row) return { row: null, note: "db returned no usable row" };
+      return {
+        row: { stream: row.full_video_url, thumb: row.thumbnail_url, id: row.source_post_id },
+        note: "db",
+      };
+    } catch (err) {
+      if (attempt === 2) return { row: null, note: `db unreachable (${err.message})` };
+      await new Promise((r) => setTimeout(r, 1500));
+    }
   }
+  return { row: null, note: "db unreachable" };
 }
 
 async function main() {
   console.log(`Smoke-testing ${BASE}\n`);
   const proxied = (u) => `${BASE}/api/media?url=${encodeURIComponent(u)}`;
-  const ref = await pickReference();
+  const db = await pickFromDb();
+  const ref = db.row || STATIC_SAMPLES[0];
+  console.log(`  (reference: ${db.row ? "live row from db" : `static sample — ${db.note}`})\n`);
 
   // 1. The proxy must answer for a plain static image (baseline reachability).
   {

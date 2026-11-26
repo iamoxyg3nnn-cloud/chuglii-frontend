@@ -96,6 +96,15 @@ describe("deployed worker: media proxy", () => {
     expect(worker).toContain('"content.zavastream.com", "media.uncut-x.com"');
   });
 
+  it("renders our player for a direct mp4 instead of dumping the file", () => {
+    // /api/player used to return the raw .mp4 as the iframe document, so the
+    // browser rendered its own bare player and uncut-x lost our controls,
+    // quality menu and next-source failover.
+    expect(worker).toContain("Direct media file (mp4 / webm) requested through the player");
+    expect(worker).toMatch(/\.\(mp4\|webm\|m4v\)/);
+    expect(worker).toContain("renderCleanMp4Player([entry]");
+  });
+
   it("does not long-cache streams and never caches under a poisoned key", () => {
     const block = mediaLines().join("\n");
     // Streams/playlists bypass the edge cache entirely.
