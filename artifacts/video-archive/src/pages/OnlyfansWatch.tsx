@@ -6,7 +6,7 @@ import { PlayerFrame } from "@/components/PlayerFrame";
 import { copyText } from "@/lib/clipboard";
 import { buildEdgePlayerUrl } from "@/lib/video-source";
 import { iframeReferrerPolicy, detectHostLabel } from "@/lib/video-hosts";
-import { proxyImageUrl } from "@/lib/proxy-url";
+import { proxyImageUrl, proxyUrl } from "@/lib/proxy-url";
 import {
   useOnlyfansVideoById,
   useOnlyfansRelatedVideos,
@@ -39,6 +39,33 @@ import {
  */
 function normalizeStreamUrl(url: string): string {
   return url.replace(/cdn\d+\.influencersgonewild\.net/gi, "cdn04.influencersgonewild.net");
+}
+
+/**
+ * Hosts whose streams only serve bytes behind OUR proxy.
+ *
+ * content.zavastream.com (borntobefuck) answers 403 unless the request carries
+ * a referer from the site, which a browser cannot send cross-origin. The media
+ * proxy injects it and rewrites the playlist's relative variant/segment URIs,
+ * so the master m3u8 has to be fetched through the proxy.
+ */
+const PROXY_ONLY_STREAM_HOSTS = ["content.zavastream.com"];
+
+function maybeProxyStreamUrl(url: string): string {
+  if (!url) return url;
+  try {
+    const host = new URL(url, window.location.origin).hostname;
+    if (
+      PROXY_ONLY_STREAM_HOSTS.some(
+        (h) => host === h || host.endsWith(`.${h}`),
+      )
+    ) {
+      return proxyUrl(url) || url;
+    }
+  } catch {
+    /* keep the original URL when it cannot be parsed */
+  }
+  return url;
 }
 
 /**
@@ -117,13 +144,13 @@ export default function OnlyfansWatch() {
     for (const item of rawList) {
       let u = item.embed_url || item.url;
       if (!u) continue;
-      u = normalizeStreamUrl(u);
+      u = maybeProxyStreamUrl(normalizeStreamUrl(u));
       const qLabel = formatQualityLabel(item.quality_label || item.name || item.server, u);
       const label = item.name || item.server || detectHostLabel(u);
       pushUnique({ server: label, url: u, quality_score: item.quality_score, quality_label: qLabel });
     }
 
-    const primaryUrl = normalizeStreamUrl(video?.full_video_url || "");
+    const primaryUrl = maybeProxyStreamUrl(normalizeStreamUrl(video?.full_video_url || ""));
     if (primaryUrl && !list.some((m) => m.url === primaryUrl)) {
       list.unshift({
         server: "Primary Stream",

@@ -14,6 +14,7 @@ import {
   isFailureInRedis,
   markFailureInRedis,
 } from "../lib/media-cache.js";
+import { rewritePlaylistUris } from "../lib/hls-playlist.js";
 
 // Connection pooling: reuse TLS/TCP connections to upstream hosts instead of
 // opening a fresh handshake for every thumbnail. Without this, a burst of
@@ -1090,6 +1091,19 @@ router.get("/media", async (req, res) => {
     upstreamHeaders["Referer"] = `${parsedUrl.origin}/`;
   }
 
+  // Hosts that only serve bytes when the request carries THEIR referer.
+  // content.zavastream.com (borntobefuck.com) answers 403 to any other
+  // referer and to none at all — verified against the live CDN.
+  const REFERER_OVERRIDES: Record<string, string> = {
+    "content.zavastream.com": "https://borntobefuck.com/",
+  };
+  for (const [host, referer] of Object.entries(REFERER_OVERRIDES)) {
+    if (upstreamHostname === host || upstreamHostname.endsWith(`.${host}`)) {
+      upstreamHeaders["Referer"] = referer;
+      break;
+    }
+  }
+
   const rangeHeader = req.headers["range"];
   if (rangeHeader) {
     upstreamHeaders["Range"] = rangeHeader;
@@ -1210,6 +1224,23 @@ router.get("/media", async (req, res) => {
       // durable failure cache — the upstream may recover within seconds.
       if (!isTransientStatus(response.status)) markCachedFailure(urlStr);
       res.status(404).end();
+      return;
+    }
+
+    // HLS playlists from referer-locked CDNs carry RELATIVE variant/segment
+    // URIs (`720p/video.m3u8`, `seg_00000.ts`). Streamed verbatim the browser
+    // would resolve those against OUR origin and 404, so every URI is rewritten
+    // back through this proxy.
+    const upstreamType = (response.headers.get("content-type") || "").toLowerCase();
+    const looksLikePlaylist =
+      upstreamType.includes("mpegurl") || /\.m3u8(\?|$)/i.test(parsedUrl.pathname);
+    if (response.ok && looksLikePlaylist) {
+      const playlist = await response.text();
+      const playlistBase = response.url || urlStr;
+      res.setHeader("Content-Type", "application/vnd.apple.mpegurl");
+      res.setHeader("Cache-Control", "public, max-age=30");
+      res.setHeader("X-Content-Type-Options", "nosniff");
+      res.status(200).send(rewritePlaylistUris(playlist, playlistBase));
       return;
     }
 
