@@ -2,6 +2,7 @@ import { useRef, useState, useEffect, useMemo } from "react";
 import { useParams, Link } from "wouter";
 import { Layout } from "@/components/Layout";
 import { VideoPlayer } from "@/components/VideoPlayer";
+import { HlsVideoPlayer } from "@/components/HlsVideoPlayer";
 import { PlayerFrame } from "@/components/PlayerFrame";
 import { copyText } from "@/lib/clipboard";
 import { buildEdgePlayerUrl } from "@/lib/video-source";
@@ -112,8 +113,35 @@ function needsStreamProxy(url: string): boolean {
   const u = url.toLowerCase();
   return (
     u.includes("influencersgonewild") ||
-    u.includes("sheeshfans")
+    u.includes("sheeshfans") ||
+    // uncut-x media answers only behind our proxy (hotlink protection), and the
+    // proxy supports Range (206), so the branded player can seek it directly.
+    u.includes("media.uncut-x.com")
   );
+}
+
+/**
+ * The stream the branded player has to play, unwrapped from our proxy URLs.
+ * The edge iframe exists only for third-party embed lockers, whose own player
+ * we cannot replace; every stream we can fetch ourselves plays in OUR player.
+ */
+function classifyStream(url: string): "hls" | "direct" | "embed" {
+  if (!url) return "embed";
+  let inner = url;
+  try {
+    const parsed = new URL(url, window.location.origin);
+    if (parsed.pathname.startsWith("/api/media") || parsed.pathname.startsWith("/api/player/stream")) {
+      inner = parsed.searchParams.get("url") || "";
+    } else {
+      inner = url;
+    }
+  } catch {
+    /* fall through with the raw value */
+  }
+  const path = (inner.split("?")[0] || "").toLowerCase();
+  if (/\.m3u8$/.test(path)) return "hls";
+  if (/\.(mp4|webm|mov)$/.test(path)) return "direct";
+  return "embed";
 }
 
 export default function OnlyfansWatch() {
@@ -325,38 +353,16 @@ export default function OnlyfansWatch() {
   // Direct MP4s from these hosts must still play inside OUR player. Left to a
   // native <video> the browser renders its own bare controls, so the source
   // loses the branded player, the quality menu and next-source failover.
-  // Every source whose media we host should play inside OUR player. A native
-  // <video> hands playback to the browser's own UI (and its bare controls),
-  // so the branded player, quality menu and next-source failover disappear.
-  const edgePlayerMediaHosts = useMemo(
-    () => ["media.uncut-x.com", "content.zavastream.com"],
-    [],
+  //
+  // The edge iframe is kept for third-party embed lockers only: its templates
+  // render a native-control <video>, so sending a first-party mp4/HLS there
+  // silently replaced our player with the browser's. Everything we can fetch
+  // ourselves now goes through VideoPlayer / HlsVideoPlayer.
+  const streamKind = useMemo(() => classifyStream(activeUrl || ""), [activeUrl]);
+  const hlsCandidates = useMemo(
+    () => (streamKind === "hls" && activeUrl ? [maybeProxyStreamUrl(activeUrl)] : []),
+    [streamKind, activeUrl],
   );
-  const useEdgePlayerForMedia = useMemo(() => {
-    if (!isDirectVideo || !activeUrl) return false;
-    try {
-      const host = new URL(activeUrl, window.location.origin).hostname.toLowerCase();
-      return edgePlayerMediaHosts.some((h) => host === h || host.endsWith(`.${h}`));
-    } catch {
-      return false;
-    }
-  }, [isDirectVideo, activeUrl, edgePlayerMediaHosts]);
-
-  const edgePlayerUrlForMedia = useMemo(() => {
-    if (!useEdgePlayerForMedia || !activeUrl) return "";
-    return buildEdgePlayerUrl(activeUrl, {
-      title: video?.title,
-      poster: video?.clean_thumbnail_url || video?.thumbnail_url || "",
-      detail: video?.detail_url || activeUrl,
-    });
-  }, [
-    useEdgePlayerForMedia,
-    activeUrl,
-    video?.title,
-    video?.clean_thumbnail_url,
-    video?.thumbnail_url,
-    video?.detail_url,
-  ]);
 
   const cleanPosterUrl = useMemo(() => {
     const raw = video?.clean_thumbnail_url || video?.thumbnail_url;
@@ -532,7 +538,22 @@ export default function OnlyfansWatch() {
           {/* Main Video Player Container */}
           <div className="relative aspect-video w-full bg-black rounded-2xl overflow-hidden border border-white/10 shadow-[0_20px_80px_-20px_rgba(0,0,0,0.8)] ring-1 ring-cyan-500/10 mb-6">
             {activeUrl ? (
-              isDirectVideo && !useEdgePlayerForMedia ? (
+              streamKind === "hls" && hlsCandidates.length > 0 ? (
+                <HlsVideoPlayer
+                  key={`${hlsCandidates[0]}-${playerKey}`}
+                  candidates={hlsCandidates}
+                  poster={cleanPosterUrl}
+                  title={video.title}
+                  sourceQualityLabel={video.quality_label || undefined}
+                  onExhausted={() => {
+                    const curIdx = allServers.findIndex((s) => s.url === activeUrl);
+                    if (curIdx >= 0 && curIdx < allServers.length - 1) {
+                      setSelectedServerUrl(allServers[curIdx + 1].url);
+                      setPlayerKey((key) => key + 1);
+                    }
+                  }}
+                />
+              ) : isDirectVideo ? (
                 <VideoPlayer
                   key={`${directPlaybackUrl}-${playerKey}`}
                   src={directPlaybackUrl}
@@ -556,7 +577,7 @@ export default function OnlyfansWatch() {
                 />
               ) : (
                 <PlayerFrame
-                  src={useEdgePlayerForMedia ? edgePlayerUrlForMedia : embedPlaybackUrl}
+                  src={embedPlaybackUrl}
                   resetKey={`${activeUrl}-${playerKey}`}
                   title={video.title}
                   poster={cleanPosterUrl || undefined}
