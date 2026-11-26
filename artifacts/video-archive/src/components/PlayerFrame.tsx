@@ -7,6 +7,7 @@ interface PlayerFrameProps {
   poster?: string;
   resetKey?: string | number;
   referrerPolicy?: IframeHTMLAttributes<HTMLIFrameElement>["referrerPolicy"];
+  sandbox?: string;
   allow?: string;
   onRetry?: () => void;
   onNextSource?: () => void;
@@ -37,6 +38,7 @@ export function PlayerFrame({
   poster,
   resetKey,
   referrerPolicy = "no-referrer",
+  sandbox,
   allow = "autoplay *; fullscreen *; picture-in-picture *; encrypted-media *; accelerometer *; gyroscope *",
   onRetry,
   onNextSource,
@@ -133,6 +135,7 @@ export function PlayerFrame({
         src={src}
         title={title || "Video player"}
         referrerPolicy={referrerPolicy}
+        sandbox={sandbox}
         allow={allow}
         allowFullScreen
         className="w-full h-full border-none bg-black"

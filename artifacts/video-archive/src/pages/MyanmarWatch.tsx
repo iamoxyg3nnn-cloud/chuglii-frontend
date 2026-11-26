@@ -64,17 +64,11 @@ function isUrlExpired(url: string | null | undefined): boolean {
   return Date.now() > expiresAt - 120_000;
 }
 
-function toMyanmarPlaybackUrl(rawUrl: string): string {
-  if (rawUrl.toLowerCase().includes("samusar.com")) {
-    return `/api/player/stream?url=${encodeURIComponent(rawUrl)}`;
-  }
-  return rawUrl;
-}
-
 export default function MyanmarWatch() {
   const { site: routeSite, id } = useParams<{ site?: string; id: string }>();
   const activeSite: MyanmarSite = isMyanmarSite(routeSite) ? routeSite : "buumal";
   const feedBasePath = activeSite === "buumal" ? "/myanmar" : `/myanmar/${activeSite}`;
+  const isSamusar = activeSite === "samusar";
   const [, setLocation] = useLocation();
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const failedStreamsRef = useRef<Set<string>>(new Set());
@@ -101,11 +95,22 @@ export default function MyanmarWatch() {
   const resolveFreshStream = useCallback(async (force = false) => {
     if (!video) return;
 
+    // Samusar streams are IP-bound to the client and reject Worker proxies with 403;
+    // render the official /embed/{id} inside a sandboxed iframe (allow-scripts allow-same-origin)
+    // so the browser plays directly with its own IP and without top-level redirects.
+    if (isSamusar) {
+      setStreamUrl(null);
+      setUseIframePlayer(true);
+      setStreamError(false);
+      setIsResolving(false);
+      return;
+    }
+
     const candidateUrl = video.full_video_url;
 
     // If candidate URL is already fresh and not forced, use it directly
     if (!force && candidateUrl && !isUrlExpired(candidateUrl)) {
-      setStreamUrl(toMyanmarPlaybackUrl(candidateUrl));
+      setStreamUrl(candidateUrl);
       setStreamError(false);
       setIsResolving(false);
       return;
@@ -115,14 +120,14 @@ export default function MyanmarWatch() {
     setStreamError(false);
 
     // 1) Database-side resolver for BuuMal (bypasses Cloudflare bot challenge)
-    if (activeSite === "buumal" && video.source_post_id) {
+    if (video.source_post_id) {
       try {
         const sb = await getSupabase();
         const { data, error: rpcError } = await sb.rpc("scraper_resolve_myanmar_stream_by_id", {
           p_post_id: video.source_post_id,
         });
         if (!rpcError && typeof data === "string" && data.startsWith("http")) {
-          setStreamUrl(toMyanmarPlaybackUrl(data));
+          setStreamUrl(data);
           setIsResolving(false);
           return;
         }
@@ -134,14 +139,14 @@ export default function MyanmarWatch() {
       }
     }
 
-    // 2) Edge worker resolver (Samusar token refresh / legacy BuuMal records)
+    // 2) Edge worker resolver (covers legacy BuuMal records)
     if (video.detail_url) {
       try {
         const res = await fetch(`/api/player?url=${encodeURIComponent(video.detail_url)}&format=json`);
         if (!res.ok) throw new Error(`Resolver status ${res.status}`);
         const data = await res.json();
         if (data && data.streamUrl) {
-          setStreamUrl(toMyanmarPlaybackUrl(data.streamUrl));
+          setStreamUrl(data.streamUrl);
           setStreamError(false);
           setIsResolving(false);
           return;
@@ -153,7 +158,7 @@ export default function MyanmarWatch() {
 
     // 3) Fall back to a still-valid stored URL, otherwise the clean embed.
     if (candidateUrl && !isUrlExpired(candidateUrl)) {
-      setStreamUrl(toMyanmarPlaybackUrl(candidateUrl));
+      setStreamUrl(candidateUrl);
       setIsResolving(false);
     } else if (video.detail_url) {
       setUseIframePlayer(true);
@@ -162,7 +167,7 @@ export default function MyanmarWatch() {
       setStreamError(true);
       setIsResolving(false);
     }
-  }, [video]);
+  }, [video, isSamusar]);
 
   // Trigger stream resolution whenever video data changes or playerKey increments
   useEffect(() => {
@@ -295,7 +300,12 @@ export default function MyanmarWatch() {
     );
   }
 
-  const primaryDownloadUrl = streamUrl || (video.full_video_url && !isUrlExpired(video.full_video_url) ? toMyanmarPlaybackUrl(video.full_video_url) : null);
+  const primaryDownloadUrl = !isSamusar
+    ? (streamUrl || (video.full_video_url && !isUrlExpired(video.full_video_url) ? video.full_video_url : null))
+    : null;
+  const samusarEmbedUrl = isSamusar && video.source_post_id
+    ? `https://www.samusar.com/embed/${video.source_post_id}`
+    : null;
 
   return (
     <Layout>
@@ -340,7 +350,7 @@ export default function MyanmarWatch() {
                 <p className="text-sm font-medium text-foreground">Loading Video Stream...</p>
                 <p className="text-xs text-muted-foreground mt-1">Connecting to Cloudflare high-speed stream server</p>
               </div>
-            ) : !useIframePlayer && streamUrl ? (
+            ) : !isSamusar && !useIframePlayer && streamUrl ? (
               <VideoPlayer
                 key={`video-${streamUrl}-${retryNonce}`}
                 src={streamUrl}
@@ -352,6 +362,19 @@ export default function MyanmarWatch() {
                 onReload={() => {
                   setUseIframePlayer(false);
                   setRetryNonce((n) => n + 1);
+                  resolveFreshStream(true);
+                }}
+              />
+            ) : samusarEmbedUrl ? (
+              <PlayerFrame
+                src={samusarEmbedUrl}
+                resetKey={`${video.id}-${playerKey}`}
+                title={video.title}
+                poster={video.clean_thumbnail_url || video.thumbnail_url || undefined}
+                referrerPolicy="origin"
+                sandbox="allow-scripts allow-same-origin allow-presentation"
+                onRetry={() => {
+                  setPlayerKey((key) => key + 1);
                   resolveFreshStream(true);
                 }}
               />
@@ -406,7 +429,7 @@ export default function MyanmarWatch() {
               </button>
 
               {/* Player Mode Switcher: Native HTML5 vs Cinema Embed */}
-              {video.detail_url && streamUrl && (
+              {!isSamusar && video.detail_url && streamUrl && (
                 <button
                   type="button"
                   onClick={() => setUseIframePlayer((prev) => !prev)}
