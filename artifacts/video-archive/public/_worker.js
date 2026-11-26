@@ -4115,6 +4115,28 @@ async function resolveHotScopesEmbed(targetUrl, searchParams) {
         }
       }
 
+      // 5b. Direct media file (mp4 / webm) requested through the player.
+      // Without this the raw file was returned AS the iframe document: Chrome
+      // then rendered its own bare player, so uncut-x lost our controls,
+      // branding, quality menu and the next-source failover entirely.
+      if (/\.(mp4|webm|m4v)(?:[?#]|$)/i.test(destObj.pathname)) {
+        const entry = buildStreamEntry(targetUrl, "", "", "direct_mp4");
+        if (entry) {
+          const poster = url.searchParams.get("poster") || "";
+          return new Response(
+            renderCleanMp4Player([entry], url.searchParams.get("title") || "Video", poster),
+            {
+              status: 200,
+              headers: {
+                "Content-Type": "text/html; charset=utf-8",
+                "Access-Control-Allow-Origin": "*",
+                "Cache-Control": "no-store",
+              },
+            },
+          );
+        }
+      }
+
       // 6. Generic Fallback Proxy (EarnVids / evsishere / legacy):
       // Edge worker proxies HTML with a spoofed Referer and injects <base>.
       let referer = "https://supjav.com/";

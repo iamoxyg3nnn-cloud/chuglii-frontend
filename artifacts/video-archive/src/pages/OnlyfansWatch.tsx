@@ -312,6 +312,36 @@ export default function OnlyfansWatch() {
     });
   }, [activeUrl, needsEdgePlayer, video?.title, video?.clean_thumbnail_url, video?.thumbnail_url, video?.detail_url]);
 
+  // Direct MP4s from these hosts must still play inside OUR player. Left to a
+  // native <video> the browser renders its own bare controls, so the source
+  // loses the branded player, the quality menu and next-source failover.
+  const edgePlayerMediaHosts = useMemo(() => ["media.uncut-x.com"], []);
+  const useEdgePlayerForMedia = useMemo(() => {
+    if (!isDirectVideo || !activeUrl) return false;
+    try {
+      const host = new URL(activeUrl, window.location.origin).hostname.toLowerCase();
+      return edgePlayerMediaHosts.some((h) => host === h || host.endsWith(`.${h}`));
+    } catch {
+      return false;
+    }
+  }, [isDirectVideo, activeUrl, edgePlayerMediaHosts]);
+
+  const edgePlayerUrlForMedia = useMemo(() => {
+    if (!useEdgePlayerForMedia || !activeUrl) return "";
+    return buildEdgePlayerUrl(activeUrl, {
+      title: video?.title,
+      poster: video?.clean_thumbnail_url || video?.thumbnail_url || "",
+      detail: video?.detail_url || activeUrl,
+    });
+  }, [
+    useEdgePlayerForMedia,
+    activeUrl,
+    video?.title,
+    video?.clean_thumbnail_url,
+    video?.thumbnail_url,
+    video?.detail_url,
+  ]);
+
   const cleanPosterUrl = useMemo(() => {
     const raw = video?.clean_thumbnail_url || video?.thumbnail_url;
     if (raw && !raw.startsWith("data:")) {
@@ -486,7 +516,7 @@ export default function OnlyfansWatch() {
           {/* Main Video Player Container */}
           <div className="relative aspect-video w-full bg-black rounded-2xl overflow-hidden border border-white/10 shadow-[0_20px_80px_-20px_rgba(0,0,0,0.8)] ring-1 ring-cyan-500/10 mb-6">
             {activeUrl ? (
-              isDirectVideo ? (
+              isDirectVideo && !useEdgePlayerForMedia ? (
                 <VideoPlayer
                   key={`${directPlaybackUrl}-${playerKey}`}
                   src={directPlaybackUrl}
@@ -510,7 +540,7 @@ export default function OnlyfansWatch() {
                 />
               ) : (
                 <PlayerFrame
-                  src={embedPlaybackUrl}
+                  src={useEdgePlayerForMedia ? edgePlayerUrlForMedia : embedPlaybackUrl}
                   resetKey={`${activeUrl}-${playerKey}`}
                   title={video.title}
                   poster={cleanPosterUrl || undefined}
