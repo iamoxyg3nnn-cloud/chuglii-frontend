@@ -559,6 +559,7 @@ export default function OnlyfansWatch() {
                   src={directPlaybackUrl}
                   poster={cleanPosterUrl}
                   title={video.title}
+                  autoPlay
                   videoRef={videoPlayerRef}
                   onReload={() => {
                     const curIdx = allServers.findIndex((s) => s.url === activeUrl);
