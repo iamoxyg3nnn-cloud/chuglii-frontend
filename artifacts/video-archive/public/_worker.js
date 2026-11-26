@@ -2399,6 +2399,18 @@ function renderCleanHlsPlayerMulti(candidates, title = "", poster = "") {
       }
       var video = document.getElementById('player');
       var badge = document.getElementById('failover-badge');
+      // Autoplay is only permitted while MUTED, so playback starts silent and
+      // the first click/keypress restores audio. Without this the browser
+      // blocked autoplay and the player sat black ("it does not play").
+      function unmuteOnFirstGesture() {
+        try { video.muted = false; } catch (err) {}
+        document.removeEventListener('pointerdown', unmuteOnFirstGesture);
+        document.removeEventListener('keydown', unmuteOnFirstGesture);
+        document.removeEventListener('touchstart', unmuteOnFirstGesture);
+      }
+      document.addEventListener('pointerdown', unmuteOnFirstGesture);
+      document.addEventListener('keydown', unmuteOnFirstGesture);
+      document.addEventListener('touchstart', unmuteOnFirstGesture);
       var candidates = ${JSON.stringify(candidates)};
       var ci = 0;
       var hls = null;
