@@ -124,12 +124,17 @@ export function OnlyfansCard({ video, isSaved = false, onToggleSave }: OnlyfansC
     return text || "HD";
   };
   const bestServer = [...rawServers].sort((a: any, b: any) => rankServer(b) - rankServer(a))[0];
+  // The row's quality_label is the canonical, measured value (repaired
+  // server-side); raw_payload.servers is an ingest-time copy that can be stale
+  // -- it kept claiming 1080p for uncut-x rows whose files are really 720p.
+  const canonicalQuality =
+    parseQuality(video.quality_label) || Number(video.quality_score) || 0;
   const bestQuality =
+    canonicalQuality ||
     rankServer(bestServer) ||
-    parseQuality(video.full_video_url) ||
-    parseQuality(video.quality_label);
+    parseQuality(video.full_video_url);
   const quality = formatQuality(
-    bestServer?.quality_label || bestServer?.name || video.quality_label,
+    video.quality_label || bestServer?.quality_label || bestServer?.name,
     bestServer?.embed_url || bestServer?.url || video.full_video_url || undefined
   );
   const watchHref = isOnlyfansSite(video.source_site)
