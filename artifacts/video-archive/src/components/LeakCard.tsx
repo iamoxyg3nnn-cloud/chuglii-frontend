@@ -1,8 +1,20 @@
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import { Link } from "wouter";
 import { Eye, Clock, BookmarkSimple, Check, ThumbsUp, Play } from "@phosphor-icons/react";
 import { formatRelativeTime, formatViewers } from "@/lib/formatters";
 import type { ScrapedVideo, ViralMmsSite } from "@/hooks/useScrapedVideos";
+
+function toMediaProxyUrl(raw: string): string {
+  return raw.startsWith("http") ? `/api/media?url=${encodeURIComponent(raw)}` : raw;
+}
+
+function toPreviewStreamUrl(raw: string): string {
+  const low = raw.toLowerCase();
+  if (low.includes("spicymms.com") || low.includes("indianbfclips.com")) {
+    return `/api/player/stream?url=${encodeURIComponent(raw)}`;
+  }
+  return raw;
+}
 
 interface LeakCardProps {
   video: ScrapedVideo;
@@ -15,7 +27,24 @@ export function LeakCard({ video, site, isSaved = false, onToggleSave }: LeakCar
   const [isHovered, setIsHovered] = useState(false);
   const [imageError, setImageError] = useState(false);
   const [justSaved, setJustSaved] = useState(false);
+  const [frameIndex, setFrameIndex] = useState(0);
   const hoverTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
+  const rawPreviewFrames = ((video.raw_payload as any)?.media?.preview_frames ?? []) as unknown[];
+  const previewFrames = Array.isArray(rawPreviewFrames)
+    ? rawPreviewFrames.filter((u): u is string => typeof u === "string" && u.length > 0).map(toMediaProxyUrl)
+    : [];
+
+  useEffect(() => {
+    if (!isHovered || previewFrames.length <= 1 || video.trailer_preview_url) {
+      setFrameIndex(0);
+      return;
+    }
+    const timer = setInterval(() => {
+      setFrameIndex((prev) => (prev + 1) % previewFrames.length);
+    }, 550);
+    return () => clearInterval(timer);
+  }, [isHovered, previewFrames.length, video.trailer_preview_url]);
 
   const handleMouseEnter = () => {
     if (hoverTimeoutRef.current) clearTimeout(hoverTimeoutRef.current);
@@ -27,6 +56,7 @@ export function LeakCard({ video, site, isSaved = false, onToggleSave }: LeakCar
   const handleMouseLeave = () => {
     if (hoverTimeoutRef.current) clearTimeout(hoverTimeoutRef.current);
     setIsHovered(false);
+    setFrameIndex(0);
   };
 
   const handleSaveClick = (e: React.MouseEvent) => {
@@ -40,9 +70,12 @@ export function LeakCard({ video, site, isSaved = false, onToggleSave }: LeakCar
   };
 
   const rawThumb = video.clean_thumbnail_url || video.thumbnail_url || "";
-  const thumbUrl = imageError || !rawThumb
+  const baseThumbUrl = imageError || !rawThumb
     ? "/placeholder-thumb.jpg"
-    : (rawThumb.startsWith("http") ? `/api/media?url=${encodeURIComponent(rawThumb)}` : rawThumb);
+    : toMediaProxyUrl(rawThumb);
+  const thumbUrl = isHovered && previewFrames.length > 1
+    ? previewFrames[frameIndex] || baseThumbUrl
+    : baseThumbUrl;
 
   // Derive a clean badge label (category or primary tag)
   const categoryBadge = video.categories?.find((c) => c !== "viral-mms") || video.tags?.[0] || "Viral";
@@ -69,7 +102,7 @@ export function LeakCard({ video, site, isSaved = false, onToggleSave }: LeakCar
         <div className="relative aspect-video rounded-lg overflow-hidden bg-muted/60 mb-2 border border-border/20 group-hover:border-primary/40 transition-colors">
           {isHovered && video.trailer_preview_url ? (
             <video
-              src={video.trailer_preview_url}
+              src={toPreviewStreamUrl(video.trailer_preview_url)}
               autoPlay
               muted
               loop
@@ -124,7 +157,7 @@ export function LeakCard({ video, site, isSaved = false, onToggleSave }: LeakCar
           </div>
 
           {/* Bottom-right: Duration badge */}
-          {video.duration_formatted && (
+          {video.duration_formatted && video.duration_formatted !== "00:00" && (
             <div className="absolute bottom-2 right-2 pointer-events-none z-10">
               <span className="flex items-center gap-1 text-[10px] font-medium text-white/90 bg-black/70 backdrop-blur-md ring-1 ring-white/10 px-1.5 py-0.5 rounded-md tabular-nums">
                 <Clock size={11} weight="regular" />

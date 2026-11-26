@@ -41,6 +41,7 @@ function isDirectIframeEmbed(url: string): boolean {
   const u = url.toLowerCase();
   return (
     u.includes("lplaygo") ||
+    u.includes("luluvido") ||
     u.includes("lulustream") ||
     u.includes("luluvdo") ||
     u.includes("voe.sx") ||
@@ -345,7 +346,7 @@ export default function LeakWatch() {
               {/* Direct Download / External Stream Button */}
               {primaryStream && (
                 <a
-                  href={primaryStream}
+                  href={activeDirectSrc || primaryStream}
                   target="_blank"
                   rel="noopener noreferrer"
                   download={activeDirectSrc ? "" : undefined}
@@ -399,7 +400,7 @@ export default function LeakWatch() {
                 </h1>
 
                 <div className="flex flex-wrap items-center gap-4 mt-3 text-xs sm:text-sm text-muted-foreground">
-                  {video.duration_formatted && (
+                  {video.duration_formatted && video.duration_formatted !== "00:00" && (
                     <span className="flex items-center gap-1 text-foreground font-medium">
                       <Clock size={15} className="text-rose-500" /> {video.duration_formatted}
                     </span>

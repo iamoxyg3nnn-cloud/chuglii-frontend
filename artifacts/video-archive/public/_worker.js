@@ -27,6 +27,62 @@ function errorResponse(error, status = 500) {
   return jsonResponse({ error: typeof error === "string" ? error : error?.message || "Internal error" }, status);
 }
 
+// ─── Origin site resolution (chaturbate vs stripchat) ───────────────────────
+// `linked_recordings` has no `site` column, and `instance_id` identifies the
+// recorder node ("node-1".."node-N") — NOT the cam site. Deriving the site
+// from instance_id therefore labelled every node recording as Stripchat.
+// Resolve the origin from channel_assignments (username -> site) instead,
+// caching the map per isolate so this costs at most one query every 5 min.
+let _siteMapCache = null;
+let _siteMapExpires = 0;
+const SITE_MAP_TTL_MS = 5 * 60 * 1000;
+
+async function getSiteMap(supabaseUrl, postgrestHeaders) {
+  const now = Date.now();
+  if (_siteMapCache && now < _siteMapExpires) return _siteMapCache;
+
+  try {
+    const res = await fetch(
+      `${supabaseUrl}/rest/v1/channel_assignments?select=username,site`,
+      { headers: postgrestHeaders },
+    );
+    if (res.ok) {
+      const rows = await res.json();
+      const map = new Map();
+      for (const row of rows || []) {
+        const username = String(row?.username || "").trim().toLowerCase();
+        const site = String(row?.site || "").trim().toLowerCase();
+        if (username && (site === "chaturbate" || site === "stripchat")) {
+          map.set(username, site);
+        }
+      }
+      _siteMapCache = map;
+      _siteMapExpires = now + SITE_MAP_TTL_MS;
+      return map;
+    }
+  } catch (_) {
+    // Fall through to the stale cache (if any) below.
+  }
+
+  return _siteMapCache || new Map();
+}
+
+function resolveSite(item, siteMap) {
+  const raw = String(item?.site || "").trim().toLowerCase();
+  if (raw === "chaturbate" || raw === "stripchat") return raw;
+
+  const username = String(item?.username || "").trim().toLowerCase();
+  const mapped = username ? siteMap?.get(username) : null;
+  if (mapped === "chaturbate" || mapped === "stripchat") return mapped;
+
+  // Legacy/unmapped recordings: default to the majority platform.
+  return "chaturbate";
+}
+
+function withResolvedSite(item, siteMap) {
+  return { ...item, site: resolveSite(item, siteMap) };
+}
+
 function escapeXml(unsafe) {
   if (!unsafe) return "";
   return String(unsafe)
@@ -1885,7 +1941,7 @@ async function resolveHotScopesEmbed(targetUrl, searchParams) {
       "taobao-cdn.com", "supjav.com", "supremejav.com", "clicknplay.to",
       "sheeshfans.com", "influencersgonewild.com",
       "influencersgonewild.net", "mmsvibex.fit", "voyeur-house.org",
-      "spicymms.com", "indianbfclips.com", "desibp.cam", "mydesi.rest", "mastiraja.tv", "viralmms.net",
+      "spicymms.com", "indianbfclips.com", "desibp.cam", "mydesi.sbs", "mydesi.rest", "mastiraja.tv", "viralmms.net",
       "reallifecam.to", "reallifecams.net", "hotscopes.net",
       "lulustream.com", "vidara.so", "vidara.to", "whitetrafsa.com",
       "tiktokcdn.com", "838238.xyz", "xianshipian.com", "aomcyou.site",
@@ -1994,6 +2050,8 @@ async function resolveHotScopesEmbed(targetUrl, searchParams) {
         referer = "https://www.spicymms.com/";
       } else if (targetObj.hostname.includes("indianbfclips")) {
         referer = "https://www.indianbfclips.com/";
+      } else if (targetObj.hostname.includes("mydesi")) {
+        referer = "https://mydesi.sbs/";
       } else if (targetObj.hostname.includes("xianshipian") || targetObj.hostname.includes("aomcyou") || targetObj.hostname.includes("apianmeng") || targetObj.hostname.includes("atukjhesk") || targetObj.hostname.includes("cdn2020") || targetObj.hostname.includes("97img") || targetObj.hostname.includes("thm3u8") || targetObj.hostname.includes("sxtmo") || targetObj.hostname.includes("micgqv") || targetObj.hostname.includes("mkimfs") || targetObj.hostname.includes("ucjosl") || targetObj.hostname.includes("cloudfront")) {
         // fangsung CDNs: bbcdn 403s any FOREIGN referer but allows none at all
         // (it also 403s Cloudflare-worker egress even with the site referer,
@@ -2896,12 +2954,12 @@ async function resolveHotScopesEmbed(targetUrl, searchParams) {
   if (path === "/api/recordings/recommendations") {
     const limit = Math.min(30, Math.max(1, parseInt(url.searchParams.get("limit") || "16", 10)));
     const restUrl = `${supabaseUrl}/rest/v1/linked_recordings?select=id,channel_id,username,filename,timestamp,room_title,tags,viewers,resolution,framerate,filesize,duration,gender,thumbnail_url,sprite_url,embed_url,preview_url,instance_id,created_at,updated_at&limit=${limit}&order=timestamp.desc`;
-    const res = await fetch(restUrl, { headers: postgrestHeaders });
+    const [res, siteMap] = await Promise.all([
+      fetch(restUrl, { headers: postgrestHeaders }),
+      getSiteMap(supabaseUrl, postgrestHeaders),
+    ]);
     const data = await res.json();
-    const enriched = (data || []).map(item => ({
-      ...item,
-      site: item.site || (item.instance_id?.includes("node") ? "stripchat" : "chaturbate"),
-    }));
+    const enriched = (data || []).map(item => withResolvedSite(item, siteMap));
     return jsonResponse({
       data: enriched,
       total: enriched.length,
@@ -2955,13 +3013,16 @@ async function resolveHotScopesEmbed(targetUrl, searchParams) {
     }
 
     const restUrl = `${supabaseUrl}/rest/v1/linked_recordings?${params.toString()}`;
-    const res = await fetch(restUrl, {
-      method: "GET",
-      headers: {
-        ...postgrestHeaders,
-        "Prefer": "count=exact",
-      },
-    });
+    const [res, siteMap] = await Promise.all([
+      fetch(restUrl, {
+        method: "GET",
+        headers: {
+          ...postgrestHeaders,
+          "Prefer": "count=exact",
+        },
+      }),
+      getSiteMap(supabaseUrl, postgrestHeaders),
+    ]);
 
     if (!res.ok) {
       const errText = await res.text();
@@ -2976,10 +3037,7 @@ async function resolveHotScopesEmbed(targetUrl, searchParams) {
       if (totalStr && totalStr !== "*") total = parseInt(totalStr, 10);
     }
 
-    const enriched = data.map(item => ({
-      ...item,
-      site: item.site || (item.instance_id?.includes("node") ? "stripchat" : "chaturbate"),
-    }));
+    const enriched = data.map(item => withResolvedSite(item, siteMap));
 
     return jsonResponse({
       data: enriched,
@@ -3010,26 +3068,29 @@ async function resolveHotScopesEmbed(targetUrl, searchParams) {
     if (username) {
       restUrl += `&username=eq.${encodeURIComponent(username)}`;
     }
-    const res = await fetch(restUrl, { headers: postgrestHeaders });
+    const [res, siteMap] = await Promise.all([
+      fetch(restUrl, { headers: postgrestHeaders }),
+      getSiteMap(supabaseUrl, postgrestHeaders),
+    ]);
     const data = await res.json();
-    return jsonResponse(data);
+    return jsonResponse((data || []).map(item => withResolvedSite(item, siteMap)));
   }
 
   // GET /api/recordings/:id
   const recordingMatch = path.match(/^\/api\/recordings\/([a-zA-Z0-9_-]+)$/);
   if (recordingMatch) {
     const id = recordingMatch[1];
-    const res = await fetch(`${supabaseUrl}/rest/v1/linked_recordings?id=eq.${encodeURIComponent(id)}&select=*`, {
-      headers: postgrestHeaders,
-    });
+    const [res, siteMap] = await Promise.all([
+      fetch(`${supabaseUrl}/rest/v1/linked_recordings?id=eq.${encodeURIComponent(id)}&select=*`, {
+        headers: postgrestHeaders,
+      }),
+      getSiteMap(supabaseUrl, postgrestHeaders),
+    ]);
     if (!res.ok) return errorResponse("Recording not found", 404);
     const rows = await res.json();
     if (!rows || rows.length === 0) return errorResponse("Recording not found", 404);
     const item = rows[0];
-    return jsonResponse({
-      ...item,
-      site: item.site || (item.instance_id?.includes("node") ? "stripchat" : "chaturbate"),
-    }, 200, {
+    return jsonResponse(withResolvedSite(item, siteMap), 200, {
       "Cache-Control": "public, s-maxage=120, stale-while-revalidate=300",
     });
   }
@@ -3040,12 +3101,15 @@ async function resolveHotScopesEmbed(targetUrl, searchParams) {
     const limit = Math.min(50, Math.max(1, parseInt(url.searchParams.get("limit") || "24", 10)));
     const offset = (page - 1) * limit;
 
-    const res = await fetch(`${supabaseUrl}/rest/v1/channels?select=*&limit=${limit}&offset=${offset}&order=updated_at.desc`, {
-      headers: {
-        ...postgrestHeaders,
-        "Prefer": "count=exact",
-      },
-    });
+    const [res, siteMap] = await Promise.all([
+      fetch(`${supabaseUrl}/rest/v1/channels?select=*&limit=${limit}&offset=${offset}&order=updated_at.desc`, {
+        headers: {
+          ...postgrestHeaders,
+          "Prefer": "count=exact",
+        },
+      }),
+      getSiteMap(supabaseUrl, postgrestHeaders),
+    ]);
     const data = await res.json();
     const contentRange = res.headers.get("Content-Range") || "";
     let total = data.length;
@@ -3054,7 +3118,7 @@ async function resolveHotScopesEmbed(targetUrl, searchParams) {
       if (totalStr && totalStr !== "*") total = parseInt(totalStr, 10);
     }
     return jsonResponse({
-      data,
+      data: (data || []).map(item => withResolvedSite(item, siteMap)),
       total,
       page,
       limit,
@@ -3068,15 +3132,17 @@ async function resolveHotScopesEmbed(targetUrl, searchParams) {
   const performerMatch = path.match(/^\/api\/performers\/([a-zA-Z0-9_.-]+)$/);
   if (performerMatch) {
     const username = performerMatch[1];
-    const [chanRes, recRes] = await Promise.all([
+    const [chanRes, recRes, siteMap] = await Promise.all([
       fetch(`${supabaseUrl}/rest/v1/channels?username=eq.${encodeURIComponent(username)}&select=*`, { headers: postgrestHeaders }),
       fetch(`${supabaseUrl}/rest/v1/linked_recordings?username=eq.${encodeURIComponent(username)}&select=*&order=timestamp.desc&limit=50`, { headers: postgrestHeaders }),
+      getSiteMap(supabaseUrl, postgrestHeaders),
     ]);
     const chan = await chanRes.json();
     const recs = await recRes.json();
+    const performer = chan[0] || { username, display_name: username };
     return jsonResponse({
-      performer: chan[0] || { username, display_name: username },
-      recordings: recs || [],
+      performer: withResolvedSite(performer, siteMap),
+      recordings: (recs || []).map(item => withResolvedSite(item, siteMap)),
       totalRecordings: recs ? recs.length : 0,
     });
   }
