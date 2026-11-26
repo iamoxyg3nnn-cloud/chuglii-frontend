@@ -92,12 +92,19 @@ function parseQuality(value: unknown): number {
 
 function formatQualityLabel(raw: unknown, url?: string): string {
   const quality = parseQuality(raw) || parseQuality(url);
-  if (quality >= 2160) return "4K UHD";
-  if (quality === 1440) return "1440p QHD";
-  if (quality === 1080) return "1080p Full HD";
-  if (quality > 0) return `${quality}p`;
+  // Bucket to the standard tiers, with a 5% tolerance, so legacy payloads that
+  // stored a rendition's WIDTH ("1280p", "854p") still read as the real class.
+  // A 1280-wide portrait clip and a 1280-wide landscape clip are 720p and 720p;
+  // showing "1280p" next to a row labelled 720p looked like a bug to viewers.
+  if (quality >= 2160 * 0.95) return "4K UHD";
+  if (quality >= 1440 * 0.95) return "1440p QHD";
+  if (quality >= 1080 * 0.95) return "1080p Full HD";
+  if (quality >= 720 * 0.95) return "720p HD";
+  if (quality >= 480 * 0.95) return "480p SD";
+  if (quality >= 360 * 0.95) return "360p";
   const text = String(raw || "").trim();
-  return text || "Original";
+  if (text) return text;
+  return "Original";
 }
 
 /** Hosts that require a spoofed Referer / Range-capable proxy for direct MP4s. */
@@ -146,7 +153,10 @@ export default function OnlyfansWatch() {
       if (!u) continue;
       u = maybeProxyStreamUrl(normalizeStreamUrl(u));
       const qLabel = formatQualityLabel(item.quality_label || item.name || item.server, u);
-      const label = item.name || item.server || detectHostLabel(u);
+      // The payload's `name` bakes the quality into the server name
+      // ("BornToBeFuck 1280p"); rendering it beside the quality badge printed
+      // two different-looking qualities for one rendition. Keep them separate.
+      const label = item.server || detectHostLabel(u);
       pushUnique({ server: label, url: u, quality_score: item.quality_score, quality_label: qLabel });
     }
 
