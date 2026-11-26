@@ -907,6 +907,22 @@ async function handleUserApi(request, opts) {
   }
 
   // ─── Notifications ────────────────────────────────────────────────────────
+  // Accurate totals even when the client has only loaded the first page.
+  if (path === "/api/user/notifications/stats" && method === "GET") {
+    const countHeaders = { ...postgrestHeaders, "Prefer": "count=exact" };
+    const readCount = async (extra = "") => {
+      const res = await pg(`user_notifications?select=id&user_id=eq.${uid}${extra}&limit=0`, {
+        headers: countHeaders,
+      });
+      if (!res.ok) return null;
+      const range = res.headers.get("content-range") || "";
+      const total = Number(range.split("/").pop());
+      return Number.isFinite(total) ? total : 0;
+    };
+    const [total, unread] = await Promise.all([readCount(), readCount("&is_read=eq.false")]);
+    if (total === null || unread === null) return fail();
+    return jsonResponse({ total, unread }, 200, noStore);
+  }
   if (path === "/api/user/notifications") {
     if (method === "GET") {
       const rawLimit = parseInt(url.searchParams.get("limit") || "50", 10);
@@ -1715,6 +1731,117 @@ async function syncMmsvibex(env, maxPages = 2, category = null) {
   };
 }
 
+// ─── Search helpers ──────────────────────────────────────────────────
+// The edge worker is the deployed API for this app, so search parsing lives
+// here as well as in the Express contract. Queries support:
+//   plain terms          -> AND across username/title/filename/tags
+//   "quoted phrase"      -> one phrase/term
+//   tag:name or #name    -> exact tag
+//   performer:name       -> username substring
+//   -term                -> exclude a term
+function escapeIlike(value) {
+  return String(value ?? "").replace(/[\\%_]/g, "\\$&");
+}
+
+function searchArrayLiteral(value) {
+  const escaped = String(value ?? "").replace(/\\/g, "\\\\").replace(/"/g, '\\"');
+  return `"${escaped}"`;
+}
+
+function normalizeSearchText(value) {
+  return String(value ?? "")
+    .normalize("NFKD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLocaleLowerCase()
+    .trim()
+    .replace(/\s+/g, " ");
+}
+
+function tokenizeSearch(raw) {
+  const input = String(raw ?? "");
+  const tokens = [];
+  let i = 0;
+
+  while (i < input.length && tokens.length < 8) {
+    while (i < input.length && /\s/.test(input[i])) i++;
+    if (i >= input.length) break;
+
+    let negated = false;
+    if (input[i] === "-" && i + 1 < input.length && !/\s/.test(input[i + 1])) {
+      negated = true;
+      i++;
+    }
+
+    let value = "";
+    if (input[i] === '"' || input[i] === "'") {
+      const quote = input[i++];
+      while (i < input.length && input[i] !== quote) {
+        if (input[i] === "\\" && i + 1 < input.length) i++;
+        value += input[i++];
+      }
+      if (i < input.length) i++;
+    } else {
+      while (i < input.length && !/\s/.test(input[i])) {
+        if ((input[i] === '"' || input[i] === "'") && /(^|:)$/.test(value)) {
+          const quote = input[i++];
+          while (i < input.length && input[i] !== quote) {
+            if (input[i] === "\\" && i + 1 < input.length) i++;
+            value += input[i++];
+          }
+          if (i < input.length) i++;
+        } else {
+          value += input[i++];
+        }
+      }
+    }
+
+    const lower = value.toLocaleLowerCase();
+    let kind = "text";
+    let term = value;
+    if (lower.startsWith("tag:")) {
+      kind = "tag";
+      term = value.slice(4);
+    } else if (lower.startsWith("performer:") || lower.startsWith("user:")) {
+      kind = "performer";
+      term = value.slice(value.indexOf(":") + 1);
+    } else if (value.startsWith("#")) {
+      kind = "tag";
+      term = value.slice(1);
+    }
+
+    term = term.trim();
+    if (term) tokens.push({ kind, term, negated });
+  }
+
+  return tokens;
+}
+
+function applyAdvancedSearch(params, raw) {
+  const tokens = tokenizeSearch(raw);
+  for (const token of tokens) {
+    const key = token.negated ? "not.or" : "or";
+    const like = `*${escapeIlike(token.term)}*`;
+    if (token.kind === "tag") {
+      params.append(key, `(tags.cs.{${searchArrayLiteral(token.term.toLocaleLowerCase())}})`);
+    } else if (token.kind === "performer") {
+      params.append(key, `(username.ilike.${like})`);
+    } else {
+      params.append(key, `(username.ilike.${like},room_title.ilike.${like},filename.ilike.${like},tags.cs.{${searchArrayLiteral(token.term.toLocaleLowerCase())}})`);
+    }
+  }
+  return tokens.length;
+}
+
+function suggestionScore(label, query) {
+  const value = normalizeSearchText(label);
+  if (!value || !query) return Number.MAX_SAFE_INTEGER;
+  if (value === query) return 0;
+  if (value.startsWith(query)) return 1;
+  if (value.split(/\s+/).some((word) => word.startsWith(query))) return 2;
+  if (value.includes(query)) return 3;
+  return Number.MAX_SAFE_INTEGER;
+}
+
 // ─── API Router ──────────────────────────────────────────────────────
 
 async function handleApi(request, env, url, ctx) {
@@ -1790,29 +1917,79 @@ async function handleApi(request, env, url, ctx) {
         referer = `${targetObj.origin}/`;
       }
 
-      let upstreamRes = await fetch(targetUrl, {
+      // Hosts that only serve bytes when the request carries THEIR referer.
+      // content.zavastream.com (borntobefuck.com) answers 403 to every other
+      // referer, so the default `https://chuglii.in/` above is guaranteed to
+      // fail for it.
+      const REFERER_OVERRIDES = {
+        "content.zavastream.com": "https://borntobefuck.com/",
+      };
+      const hostMatches = (h) =>
+        targetObj.hostname === h || targetObj.hostname.endsWith(`.${h}`);
+      let refererLocked = false;
+      for (const [h, r] of Object.entries(REFERER_OVERRIDES)) {
+        if (hostMatches(h)) {
+          referer = r;
+          refererLocked = true;
+          break;
+        }
+      }
+
+      // Playlists and byte ranges are the player, not a thumbnail: they need
+      // Range forwarding, no long-lived edge caching, and a Range/206 status
+      // passed through instead of being flattened to 200.
+      const rangeHeader = request.headers.get("range");
+      const isPlaylist = /\.m3u8(\?|$)/i.test(targetObj.pathname);
+      const isMediaStream =
+        !!rangeHeader || isPlaylist || /\.(ts|m4s|mp4)(\?|$)/i.test(targetObj.pathname);
+
+      // Images are fetched under a cache-busted URL: the edge still holds 403s
+      // cached back when this Worker sent the wrong referer, and `cf.cacheKey`
+      // does not re-key SUBrequests. Changing the URL is the only thing that
+      // reliably produces a fresh cache entry. The CDN ignores the parameter
+      // (verified: same bytes, HTTP 200), and it is applied to images only so
+      // stream byte ranges keep their upstream identity.
+      const fetchUrl = isMediaStream
+        ? targetUrl
+        : `${targetUrl}${targetUrl.includes("?") ? "&" : "?"}_cf=2`;
+
+      let upstreamRes = await fetch(fetchUrl, {
         headers: {
           "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
           "Referer": referer,
-          "Accept": "image/avif,image/webp,image/apng,image/svg+xml,image/*,*/*;q=0.8",
+          ...(rangeHeader ? { "Range": rangeHeader } : {}),
+          "Accept": isMediaStream
+            ? "*/*"
+            : "image/avif,image/webp,image/apng,image/svg+xml,image/*,*/*;q=0.8",
         },
-        cf: {
-          cacheTtl: 31536000,
-          cacheEverything: true,
-        },
+        // Only streams get an explicit `cf` override (never edge-cache media
+        // bytes). Images keep Cloudflare's default caching -- but under a
+        // DIFFERENT cache key.
+        //
+        // Why the key: `cacheEverything: true` had cached the 403 produced
+        // while this Worker still sent the wrong referer. After the referer
+        // was fixed the edge kept replaying that cached 403
+        // (`cf-cache-status: HIT`, a Bunny "403 Forbidden" page) for a URL
+        // that now answers 200 to curl with byte-identical headers. A fresh
+        // key abandons those poisoned entries; 4xx are not cached by default,
+        // so they cannot come back.
+        ...(isMediaStream ? { cf: { cacheTtl: 0, cacheEverything: false } } : {}),
       });
 
-      // If upstream failed with 403, retry without Referer header
+      // If upstream failed with 403, retry without Referer header. Several
+      // CDNs accept an EMPTY referer but reject every foreign one -- the
+      // zavastream CDN above is exactly this shape (no referer: 200,
+      // borntobefuck.com: 200, anything else: 403).
       if (!upstreamRes.ok && upstreamRes.status === 403) {
-        upstreamRes = await fetch(targetUrl, {
+        upstreamRes = await fetch(fetchUrl, {
           headers: {
             "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
-            "Accept": "image/avif,image/webp,image/apng,image/svg+xml,image/*,*/*;q=0.8",
+            ...(rangeHeader ? { "Range": rangeHeader } : {}),
+            "Accept": isMediaStream
+              ? "*/*"
+              : "image/avif,image/webp,image/apng,image/svg+xml,image/*,*/*;q=0.8",
           },
-          cf: {
-            cacheTtl: 31536000,
-            cacheEverything: true,
-          },
+          ...(isMediaStream ? { cf: { cacheTtl: 0, cacheEverything: false } } : {}),
         });
       }
 
@@ -1849,10 +2026,76 @@ async function handleApi(request, env, url, ctx) {
       }
 
       if (!upstreamRes.ok) {
+        // NEVER redirect a referer-locked or streaming URL to the raw origin:
+        // the browser would re-request it with `Referer: https://chuglii.in/`
+        // and the CDN answers 403. That redirect is what made every
+        // borntobefuck thumbnail and stream fail in production.
+        if (refererLocked || isMediaStream) {
+          return new Response(null, {
+            status: upstreamRes.status >= 400 ? upstreamRes.status : 502,
+            headers: { "X-Content-Type-Options": "nosniff" },
+          });
+        }
         return Response.redirect(targetUrl, 302);
       }
 
-      const contentType = upstreamRes.headers.get("content-type") || "image/jpeg";
+      const rawType = (upstreamRes.headers.get("content-type") || "").toLowerCase();
+
+      // HLS playlists from referer-locked CDNs carry RELATIVE variant/segment
+      // URIs (`720p/video.m3u8`, `seg_00000.ts`). Streamed verbatim the browser
+      // resolves those against OUR origin and 404s, so every URI is resolved
+      // against the playlist URL and wrapped back through this proxy.
+      if (rawType.includes("mpegurl") || isPlaylist) {
+        const playlist = await upstreamRes.text();
+        const playlistBase = upstreamRes.url || targetUrl;
+        const toProxy = (uri) => {
+          try {
+            return `/api/media?url=${encodeURIComponent(new URL(uri, playlistBase).toString())}`;
+          } catch {
+            return uri;
+          }
+        };
+        const rewritten = playlist
+          .split(/\r?\n/)
+          .map((line) => {
+            const trimmed = line.trim();
+            if (!trimmed) return line;
+            if (trimmed.startsWith("#")) {
+              return line.replace(/URI="([^"]+)"/g, (_m, uri) => `URI="${toProxy(uri)}"`);
+            }
+            return toProxy(trimmed);
+          })
+          .join("\n");
+        return new Response(rewritten, {
+          status: 200,
+          headers: {
+            "Content-Type": "application/vnd.apple.mpegurl",
+            "Cache-Control": "public, max-age=30",
+            "Access-Control-Allow-Origin": "*",
+            "X-Content-Type-Options": "nosniff",
+          },
+        });
+      }
+
+      // Video bytes: pass the upstream status (206 for Range) and its
+      // Content-Range straight through, so seeking works and a truncated body
+      // is never reported as a complete 200.
+      if (isMediaStream) {
+        const streamHeaders = new Headers();
+        streamHeaders.set("Content-Type", rawType || "application/octet-stream");
+        streamHeaders.set("Accept-Ranges", "bytes");
+        streamHeaders.set("Access-Control-Allow-Origin", "*");
+        const contentRange = upstreamRes.headers.get("content-range");
+        if (contentRange) streamHeaders.set("Content-Range", contentRange);
+        const contentLength = upstreamRes.headers.get("content-length");
+        if (contentLength) streamHeaders.set("Content-Length", contentLength);
+        return new Response(upstreamRes.body, {
+          status: upstreamRes.status === 206 ? 206 : 200,
+          headers: streamHeaders,
+        });
+      }
+
+      const contentType = rawType || "image/jpeg";
       const headers = new Headers();
       headers.set("Content-Type", contentType);
       headers.set("Cache-Control", "public, max-age=31536000, immutable");
@@ -1861,6 +2104,14 @@ async function handleApi(request, env, url, ctx) {
 
       return new Response(upstreamRes.body, { status: 200, headers });
     } catch {
+      // A redirect here would send the browser to the raw origin carrying our
+      // own referer -- fatal for referer-locked CDNs and pointless for streams.
+      if (refererLocked || isMediaStream) {
+        return new Response(null, {
+          status: 502,
+          headers: { "X-Content-Type-Options": "nosniff" },
+        });
+      }
       return Response.redirect(targetUrl, 302);
     }
   }
@@ -2453,10 +2704,16 @@ function buildStreamEntry(raw, pageUrl = "", label = "", typeHint = "") {
   // their HTTPS certificate, while Cloudflare egress does not, so play them
   // directly and keep the worker proxy only as a fallback.
   const useDirectAvs = AVS_DIRECT_HOST_RE.test(parsed.hostname);
+  // An already-proxied URL (`/api/media?url=...`) must NOT be wrapped again:
+  // that double hop put our own origin through the /api/player/stream host
+  // allowlist, which does not list itself, so every btb stream 403'd. The
+  // media proxy already handles the referer and rewrites playlist URIs.
+  const isOwnMediaProxy = parsed.pathname === "/api/media";
   const proxyUrl = `/api/player/stream?url=${encodeURIComponent(abs)}`;
+  const playDirect = useDirectAvs || isOwnMediaProxy;
   return {
-    url: useDirectAvs ? abs : proxyUrl,
-    fallbackUrl: useDirectAvs ? proxyUrl : "",
+    url: playDirect ? abs : proxyUrl,
+    fallbackUrl: playDirect ? (isOwnMediaProxy ? "" : proxyUrl) : "",
     rawUrl: abs,
     type,
     quality,
@@ -2930,6 +3187,8 @@ async function resolveHotScopesEmbed(targetUrl, searchParams) {
       "influencersgonewild.net", "mmsvibex.fit", "voyeur-house.org",
       "spicymms.com", "indianbfclips.com", "desibp.cam", "mydesi.sbs", "mydesi.rest", "mastiraja.tv", "viralmms.net", "samusar.com",
       "reallifecam.to", "reallifecams.net", "hotscopes.net",
+      // onlyfans sources added 2026-11-27 (referer-locked / public mp4)
+      "content.zavastream.com", "media.uncut-x.com",
       "lulustream.com", "vidara.so", "vidara.to", "whitetrafsa.com",
       "tiktokcdn.com", "838238.xyz", "xianshipian.com", "aomcyou.site",
       "apianmeng.com", "atukjhesk.com",
@@ -3384,8 +3643,22 @@ async function resolveHotScopesEmbed(targetUrl, searchParams) {
   // ─── Edge Video Player Proxy (/api/player) ─────────────────────────
   if (path === "/api/player") {
     let targetUrl = url.searchParams.get("url");
-    if (!targetUrl || (!targetUrl.startsWith("http://") && !targetUrl.startsWith("https://"))) {
+    // Our own media proxy path is RELATIVE by design (`/api/media?url=...`,
+    // same origin), because the SPA builds it without knowing the API host.
+    // Rejecting it made every referer-locked stream 400 before it played.
+    const isOwnProxyPath = !!targetUrl && targetUrl.startsWith("/api/media?");
+    if (
+      !targetUrl ||
+      (!isOwnProxyPath &&
+        !targetUrl.startsWith("http://") &&
+        !targetUrl.startsWith("https://"))
+    ) {
       return errorResponse("Missing or invalid url parameter", 400);
+    }
+    if (isOwnProxyPath) {
+      // Normalise to an absolute same-origin URL so every downstream check
+      // (hostname sniffing, hls.js source) keeps working unchanged.
+      targetUrl = new URL(targetUrl, url.origin).toString();
     }
 
     try {
@@ -3435,7 +3708,14 @@ async function resolveHotScopesEmbed(targetUrl, searchParams) {
             }
           } catch (e) { /* malformed fallbacks ignored */ }
         }
-        const proxied = candidates.map((c) => `/api/player/stream?url=${encodeURIComponent(c)}`);
+        // Our OWN /api/media output is already referer-corrected and has its
+        // playlist URIs rewritten, so wrapping it again in /api/player/stream
+        // is both redundant and fatal: that route only proxies allowlisted
+        // hosts, so our own origin 403'd and nothing played.
+        const proxied =
+          destObj.pathname === "/api/media"
+            ? [targetUrl]
+            : candidates.map((c) => `/api/player/stream?url=${encodeURIComponent(c)}`);
         return new Response(renderCleanHlsPlayerMulti(
           proxied,
           url.searchParams.get("title") || "Video",
@@ -3919,6 +4199,127 @@ async function resolveHotScopesEmbed(targetUrl, searchParams) {
     "User-Agent": "Cloudflare-Pages-Worker/1.0",
   };
 
+  // GET /api/search?q=... — bounded suggestion index for the global search UI.
+  // The Express server has a Redis-backed equivalent, but Cloudflare Pages only
+  // runs this worker, so the edge route must exist here too.
+  if (path === "/api/search") {
+    const q = (url.searchParams.get("q") || "").trim();
+    if (q.length < 2) {
+      return jsonResponse({ suggestions: [], query: q }, 200, {
+        "Cache-Control": "public, s-maxage=60, stale-while-revalidate=120",
+      });
+    }
+
+    const normalized = normalizeSearchText(q);
+    const like = `*${escapeIlike(q)}*`;
+    const tagLiteral = searchArrayLiteral(q.toLocaleLowerCase());
+    const performerParams = new URLSearchParams({
+      select: "username,thumbnail_url,sprite_url,preview_url",
+      username: `ilike.${like}`,
+      order: "timestamp.desc.nullslast,id.desc",
+      limit: "20",
+    });
+    const recordingParams = new URLSearchParams({
+      select: "id,username,room_title,filename,thumbnail_url",
+      or: `(username.ilike.${like},room_title.ilike.${like},filename.ilike.${like},tags.cs.{${tagLiteral}})`,
+      order: "timestamp.desc.nullslast,id.desc",
+      limit: "12",
+    });
+
+    const [performerRes, recordingRes, tagRes] = await Promise.all([
+      fetch(`${supabaseUrl}/rest/v1/linked_recordings?${performerParams}`, { headers: postgrestHeaders }),
+      fetch(`${supabaseUrl}/rest/v1/linked_recordings?${recordingParams}`, { headers: postgrestHeaders }),
+      fetch(`${supabaseUrl}/rest/v1/rpc/get_tag_counts`, {
+        method: "POST",
+        headers: postgrestHeaders,
+        body: "{}",
+      }),
+    ]);
+
+    const suggestions = [];
+    const seenPerformers = new Set();
+
+    if (performerRes.ok) {
+      const rows = await performerRes.json();
+      const performers = (Array.isArray(rows) ? rows : [])
+        .map((row) => ({
+          label: String(row?.username || "").trim(),
+          image_url: row?.thumbnail_url || row?.sprite_url || row?.preview_url || null,
+        }))
+        .filter((row) => row.label && !seenPerformers.has(row.label.toLocaleLowerCase()))
+        .sort((a, b) => suggestionScore(a.label, normalized) - suggestionScore(b.label, normalized))
+        .slice(0, 4);
+      for (const performer of performers) {
+        seenPerformers.add(performer.label.toLocaleLowerCase());
+        suggestions.push({
+          type: "performer",
+          label: performer.label,
+          subtitle: "Performer",
+          image_url: performer.image_url,
+          href: `/performers/${encodeURIComponent(performer.label)}`,
+        });
+      }
+    }
+
+    if (recordingRes.ok) {
+      const rows = await recordingRes.json();
+      const recordings = (Array.isArray(rows) ? rows : [])
+        .map((row) => {
+          const rawTitle = String(row?.room_title || row?.filename || "").trim();
+          const label = rawTitle
+            ? rawTitle.length > 60 ? rawTitle.slice(0, 57) + "…" : rawTitle
+            : "Untitled";
+          return {
+            label,
+            username: String(row?.username || "").trim(),
+            image_url: row?.thumbnail_url || null,
+            id: String(row?.id || ""),
+            score: suggestionScore(`${row?.username || ""} ${rawTitle}`, normalized),
+          };
+        })
+        .filter((row) => row.id)
+        .sort((a, b) => a.score - b.score)
+        .slice(0, 4);
+      for (const recording of recordings) {
+        suggestions.push({
+          type: "recording",
+          label: recording.label,
+          subtitle: recording.username || undefined,
+          image_url: recording.image_url,
+          href: `/video/${encodeURIComponent(recording.id)}`,
+        });
+      }
+    }
+
+    if (tagRes.ok) {
+      const rows = await tagRes.json();
+      const tags = (Array.isArray(rows) ? rows : [])
+        .map((row) => ({
+          tag: String(row?.tag ?? row?.name ?? "").trim(),
+          count: Number(row?.count ?? 0) || 0,
+        }))
+        .filter((row) => row.tag && normalizeSearchText(row.tag).includes(normalized))
+        .sort((a, b) =>
+          suggestionScore(a.tag, normalized) - suggestionScore(b.tag, normalized) ||
+          b.count - a.count ||
+          a.tag.localeCompare(b.tag),
+        )
+        .slice(0, 4);
+      for (const tag of tags) {
+        suggestions.push({
+          type: "tag",
+          label: tag.tag,
+          subtitle: "Tag",
+          href: `/browse?tags=${encodeURIComponent(tag.tag)}`,
+        });
+      }
+    }
+
+    return jsonResponse({ suggestions, query: q, source: "edge" }, 200, {
+      "Cache-Control": "public, s-maxage=45, stale-while-revalidate=120",
+    });
+  }
+
   // POST /api/rum -> 204 No Content
   if (path === "/api/rum") {
     return new Response(null, { status: 204, headers: CORS_HEADERS });
@@ -4128,8 +4529,7 @@ async function resolveHotScopesEmbed(targetUrl, searchParams) {
       if (tagList.length > 0) params.set("tags", `ov.{${tagList.join(",")}}`);
     }
     if (search) {
-      const s = search.replace(/[\\%_]/g, "\\$&");
-      params.set("or", `(username.ilike.*${s}*,room_title.ilike.*${s}*,filename.ilike.*${s}*)`);
+      applyAdvancedSearch(params, search);
     }
 
     const restUrl = `${supabaseUrl}/rest/v1/linked_recordings?${params.toString()}`;
