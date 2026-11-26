@@ -243,6 +243,8 @@ function Router() {
         <Route path="/admin/*">
           <ProtectedRoute requiredRole="admin"><AdminPage /></ProtectedRoute>
         </Route>
+        <Route path="/leak/:site/video/:id" component={LeakWatch} />
+        <Route path="/leak/:site" component={LeakFeed} />
         <Route path="/leak/video/:id" component={LeakWatch} />
         <Route path="/leak" component={LeakFeed} />
         <Route path="/japanese/video/:id" component={JapaneseWatch} />

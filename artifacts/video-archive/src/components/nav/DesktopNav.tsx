@@ -17,7 +17,7 @@ export const SCRAPER_CATEGORIES = [
     id: "viral-mms",
     name: "Viral MMS",
     href: "/leak?category=viral-mms",
-    count: "9.2k",
+    count: "5 SRC",
     icon: Flame,
   },
   {

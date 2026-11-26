@@ -1885,6 +1885,7 @@ async function resolveHotScopesEmbed(targetUrl, searchParams) {
       "taobao-cdn.com", "supjav.com", "supremejav.com", "clicknplay.to",
       "sheeshfans.com", "influencersgonewild.com",
       "influencersgonewild.net", "mmsvibex.fit", "voyeur-house.org",
+      "spicymms.com", "indianbfclips.com", "desibp.cam", "mydesi.rest", "mastiraja.tv", "viralmms.net",
       "reallifecam.to", "reallifecams.net", "hotscopes.net",
       "lulustream.com", "vidara.so", "vidara.to", "whitetrafsa.com",
       "tiktokcdn.com", "838238.xyz", "xianshipian.com", "aomcyou.site",
@@ -1989,6 +1990,10 @@ async function resolveHotScopesEmbed(targetUrl, searchParams) {
         referer = "https://influencersgonewild.com/";
       } else if (targetObj.hostname.includes("sheeshfans")) {
         referer = "https://sheeshfans.com/";
+      } else if (targetObj.hostname.includes("spicymms")) {
+        referer = "https://www.spicymms.com/";
+      } else if (targetObj.hostname.includes("indianbfclips")) {
+        referer = "https://www.indianbfclips.com/";
       } else if (targetObj.hostname.includes("xianshipian") || targetObj.hostname.includes("aomcyou") || targetObj.hostname.includes("apianmeng") || targetObj.hostname.includes("atukjhesk") || targetObj.hostname.includes("cdn2020") || targetObj.hostname.includes("97img") || targetObj.hostname.includes("thm3u8") || targetObj.hostname.includes("sxtmo") || targetObj.hostname.includes("micgqv") || targetObj.hostname.includes("mkimfs") || targetObj.hostname.includes("ucjosl") || targetObj.hostname.includes("cloudfront")) {
         // fangsung CDNs: bbcdn 403s any FOREIGN referer but allows none at all
         // (it also 403s Cloudflare-worker egress even with the site referer,

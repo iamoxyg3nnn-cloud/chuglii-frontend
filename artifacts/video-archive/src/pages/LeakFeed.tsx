@@ -1,7 +1,15 @@
 import { useState, useRef, useEffect, useCallback } from "react";
-import { Link, useLocation, useSearch } from "wouter";
+import { Link, useLocation, useParams, useSearch } from "wouter";
 import { Layout } from "@/components/Layout";
-import { useScrapedVideos, type ScrapedVideo, type ScrapedSortOption } from "@/hooks/useScrapedVideos";
+import {
+  useScrapedVideos,
+  VIRAL_MMS_SITES,
+  VIRAL_MMS_SITE_LABELS,
+  isViralMmsSite,
+  type ViralMmsSite,
+  type ScrapedVideo,
+  type ScrapedSortOption,
+} from "@/hooks/useScrapedVideos";
 import { AppPagination } from "@/components/ui/app-pagination";
 import { LeakCard, LeakCardSkeleton } from "@/components/LeakCard";
 import {
@@ -48,6 +56,9 @@ const SORT_OPTIONS: { id: ScrapedSortOption; label: string }[] = [
 const ITEMS_PER_PAGE = 24;
 
 export default function LeakFeed() {
+  const { site: routeSite } = useParams<{ site?: string }>();
+  const activeSite: ViralMmsSite = isViralMmsSite(routeSite) ? routeSite : "mmsvibex";
+  const feedBasePath = activeSite === "mmsvibex" ? "/leak" : `/leak/${activeSite}`;
   const [location, setLocation] = useLocation();
   const searchString = useSearch();
 
@@ -85,8 +96,8 @@ export default function LeakFeed() {
     if (sort && sort !== "newest") params.set("sort", sort);
     if (q && q.trim().length > 0) params.set("q", q.trim());
     const str = params.toString();
-    setLocation(str ? `/leak?${str}` : "/leak", { replace: true });
-  }, [setLocation]);
+    setLocation(str ? `${feedBasePath}?${str}` : feedBasePath, { replace: true });
+  }, [feedBasePath, setLocation]);
 
   // Sync state if URL query params change externally
   useEffect(() => {
@@ -156,6 +167,7 @@ export default function LeakFeed() {
   const queryTag = activeTag === "Saved" || activeTag === "All" || activeTag === "viral-mms" ? undefined : activeTag;
 
   const { data, isLoading, isFetching, refetch } = useScrapedVideos({
+    site: activeSite,
     category: queryCategory,
     tag: queryTag,
     search: debouncedSearch || undefined,
@@ -195,7 +207,7 @@ export default function LeakFeed() {
               <div>
                 <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-rose-500/10 text-rose-500 border border-rose-500/20 text-xs font-semibold uppercase tracking-wider mb-3">
                   <Flame size={14} weight="fill" className="animate-pulse" />
-                  Category: Viral MMS &bull; MMSVibeX Archive
+                  Category: Viral MMS &bull; {VIRAL_MMS_SITE_LABELS[activeSite]} Archive
                 </div>
                 <h1 className="text-2xl sm:text-4xl font-extrabold tracking-tight text-foreground">
                   Viral MMS Leaks & Video Feed
@@ -203,6 +215,26 @@ export default function LeakFeed() {
                 <p className="mt-2 text-sm sm:text-base text-muted-foreground max-w-2xl leading-relaxed">
                   Stream thousands of viral clips, uncut web-series, and exclusive leaked private tapes in high quality with instant previews.
                 </p>
+
+                <nav aria-label="Viral MMS source sites" className="flex items-center gap-2 overflow-x-auto no-scrollbar pt-4">
+                  {VIRAL_MMS_SITES.map((srcSite) => {
+                    const href = srcSite === "mmsvibex" ? "/leak" : `/leak/${srcSite}`;
+                    const isActiveSite = srcSite === activeSite;
+                    return (
+                      <Link key={srcSite} href={href} aria-current={isActiveSite ? "page" : undefined}>
+                        <span
+                          className={`shrink-0 inline-flex items-center px-3 py-1.5 rounded-lg text-xs font-semibold border transition-colors cursor-pointer ${
+                            isActiveSite
+                              ? "bg-rose-500 text-white border-rose-500 shadow-sm shadow-rose-500/25"
+                              : "bg-card/70 text-muted-foreground hover:text-foreground border-border/50 hover:bg-secondary/70"
+                          }`}
+                        >
+                          {VIRAL_MMS_SITE_LABELS[srcSite]}
+                        </span>
+                      </Link>
+                    );
+                  })}
+                </nav>
               </div>
 
               {/* Stats badges */}
@@ -395,6 +427,7 @@ export default function LeakFeed() {
                   <LeakCard
                     key={item.id}
                     video={item}
+                    site={activeSite}
                     isSaved={savedIds.includes(item.id)}
                     onToggleSave={handleToggleSave}
                   />

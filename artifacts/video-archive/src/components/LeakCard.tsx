@@ -2,15 +2,16 @@ import { useState, useRef } from "react";
 import { Link } from "wouter";
 import { Eye, Clock, BookmarkSimple, Check, ThumbsUp, Play } from "@phosphor-icons/react";
 import { formatRelativeTime, formatViewers } from "@/lib/formatters";
-import type { ScrapedVideo } from "@/hooks/useScrapedVideos";
+import type { ScrapedVideo, ViralMmsSite } from "@/hooks/useScrapedVideos";
 
 interface LeakCardProps {
   video: ScrapedVideo;
+  site?: ViralMmsSite;
   isSaved?: boolean;
   onToggleSave?: (id: string) => void;
 }
 
-export function LeakCard({ video, isSaved = false, onToggleSave }: LeakCardProps) {
+export function LeakCard({ video, site, isSaved = false, onToggleSave }: LeakCardProps) {
   const [isHovered, setIsHovered] = useState(false);
   const [imageError, setImageError] = useState(false);
   const [justSaved, setJustSaved] = useState(false);
@@ -52,9 +53,13 @@ export function LeakCard({ video, isSaved = false, onToggleSave }: LeakCardProps
     video.scraped_at && Date.now() - new Date(video.scraped_at).getTime() < 48 * 60 * 60 * 1000,
   );
 
+  const targetHref = site && site !== "mmsvibex"
+    ? `/leak/${site}/video/${video.id}`
+    : `/leak/video/${video.id}`;
+
   return (
     <Link
-      href={`/leak/video/${video.id}`}
+      href={targetHref}
       className="group block select-none"
       onMouseEnter={handleMouseEnter}
       onMouseLeave={handleMouseLeave}

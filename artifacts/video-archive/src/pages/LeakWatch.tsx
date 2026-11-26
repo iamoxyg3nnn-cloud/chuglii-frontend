@@ -6,7 +6,13 @@ import { PlayerFrame } from "@/components/PlayerFrame";
 import { LeakCard } from "@/components/LeakCard";
 import { copyText } from "@/lib/clipboard";
 import { buildEdgePlayerUrl, isDirectVideoUrl } from "@/lib/video-source";
-import { useScrapedVideoById, useScrapedRelatedVideos, type ScrapedVideo } from "@/hooks/useScrapedVideos";
+import {
+  useScrapedVideoById,
+  useScrapedRelatedVideos,
+  isViralMmsSite,
+  type ViralMmsSite,
+  type ScrapedVideo,
+} from "@/hooks/useScrapedVideos";
 import {
   Flame,
   ArrowLeft,
@@ -26,8 +32,31 @@ import {
   User
 } from "@phosphor-icons/react";
 
+function needsViralStreamProxy(url: string): boolean {
+  const u = url.toLowerCase();
+  return u.includes("spicymms.com") || u.includes("indianbfclips.com");
+}
+
+function isDirectIframeEmbed(url: string): boolean {
+  const u = url.toLowerCase();
+  return (
+    u.includes("lplaygo") ||
+    u.includes("lulustream") ||
+    u.includes("luluvdo") ||
+    u.includes("voe.sx") ||
+    u.includes("streamtape") ||
+    u.includes("filemoon") ||
+    u.includes("dood") ||
+    u.includes("bysezejataos") ||
+    u.includes("streamwish") ||
+    u.includes("mixdrop")
+  );
+}
+
 export default function LeakWatch() {
-  const { id } = useParams<{ id: string }>();
+  const { site: routeSite, id } = useParams<{ site?: string; id: string }>();
+  const activeSite: ViralMmsSite = isViralMmsSite(routeSite) ? routeSite : "mmsvibex";
+  const feedBasePath = activeSite === "mmsvibex" ? "/leak" : `/leak/${activeSite}`;
   const [, setLocation] = useLocation();
   const videoRef = useRef<HTMLVideoElement | null>(null);
 
@@ -43,8 +72,8 @@ export default function LeakWatch() {
     setPlayerKey(0);
   }, [id]);
 
-  const { data: video, isLoading, error } = useScrapedVideoById(id);
-  const { data: relatedVideos, isLoading: relatedLoading } = useScrapedRelatedVideos(id, video, 12);
+  const { data: video, isLoading, error } = useScrapedVideoById(id, activeSite);
+  const { data: relatedVideos, isLoading: relatedLoading } = useScrapedRelatedVideos(id, video, 12, activeSite);
 
   const poster = video?.clean_thumbnail_url || video?.thumbnail_url || "";
   const primaryVideoUrl = video?.full_video_url || "";
@@ -59,16 +88,21 @@ export default function LeakWatch() {
   const servers: Array<{ name: string; embed_url: string }> = rawPayload?.servers || [];
   const defaultEmbedUrl = rawPayload?.embed_url || (!primaryIsPlainDirect ? (primaryVideoUrl || video?.trailer_preview_url) : null);
   const activeEmbedUrl = selectedServerUrl || defaultEmbedUrl;
-  const activeDirectSrc = activeEmbedUrl && isDirectVideoUrl(activeEmbedUrl)
+  const rawDirectSrc = activeEmbedUrl && isDirectVideoUrl(activeEmbedUrl)
     ? activeEmbedUrl
     : primaryIsPlainDirect ? primaryVideoUrl : null;
+  const activeDirectSrc = rawDirectSrc && needsViralStreamProxy(rawDirectSrc)
+    ? `/api/player/stream?url=${encodeURIComponent(rawDirectSrc)}`
+    : rawDirectSrc;
 
   const resolvedEmbedUrl = activeEmbedUrl && !isDirectVideoUrl(activeEmbedUrl)
-    ? buildEdgePlayerUrl(activeEmbedUrl, {
-        title: video?.title,
-        poster,
-        detail: video?.detail_url || activeEmbedUrl,
-      })
+    ? (isDirectIframeEmbed(activeEmbedUrl)
+        ? activeEmbedUrl
+        : buildEdgePlayerUrl(activeEmbedUrl, {
+            title: video?.title,
+            poster,
+            detail: video?.detail_url || activeEmbedUrl,
+          }))
     : null;
 
   const mirrorUrls = servers.map((server) => server.embed_url).filter(Boolean);
@@ -180,7 +214,7 @@ export default function LeakWatch() {
           <p className="text-sm text-muted-foreground mb-6">
             This leak video may have been removed or the ID is invalid.
           </p>
-          <Link href="/leak">
+          <Link href={feedBasePath}>
             <span className="px-4 py-2 rounded-xl text-sm font-medium bg-rose-500 text-white cursor-pointer hover:bg-rose-600 transition-colors inline-flex items-center gap-2">
               <ArrowLeft size={16} /> Return to Leaks Catalog
             </span>
@@ -198,7 +232,7 @@ export default function LeakWatch() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-6">
           {/* Breadcrumb Header */}
           <div className="flex items-center justify-between gap-4 mb-4">
-            <Link href="/leak">
+            <Link href={feedBasePath}>
               <span className="inline-flex items-center gap-1.5 text-xs sm:text-sm font-medium text-muted-foreground hover:text-rose-400 transition-colors cursor-pointer">
                 <ArrowLeft size={15} /> Back to Leaks Feed
               </span>
@@ -399,7 +433,7 @@ export default function LeakWatch() {
                   <User size={13} className="text-rose-400" /> Model / Performer:
                 </span>
                 {video.actors.map((actor) => (
-                  <Link key={actor} href={`/leak?q=${encodeURIComponent(actor)}`}>
+                  <Link key={actor} href={`${feedBasePath}?q=${encodeURIComponent(actor)}`}>
                     <span className="px-2.5 py-1 rounded-lg bg-rose-500/10 hover:bg-rose-500/20 text-xs text-rose-400 font-semibold border border-rose-500/20 transition-colors cursor-pointer">
                       {actor.replace(/-/g, " ")}
                     </span>
@@ -415,7 +449,7 @@ export default function LeakWatch() {
                   <TagIcon size={13} /> Tags:
                 </span>
                 {video.tags.map((t) => (
-                  <Link key={t} href={`/leak?tag=${encodeURIComponent(t)}`}>
+                  <Link key={t} href={`${feedBasePath}?tag=${encodeURIComponent(t)}`}>
                     <span className="px-2.5 py-1 rounded-lg bg-secondary/80 hover:bg-secondary text-xs text-muted-foreground hover:text-foreground font-medium border border-border/30 transition-colors cursor-pointer">
                       #{t}
                     </span>
@@ -440,7 +474,7 @@ export default function LeakWatch() {
                 </div>
               </div>
               <Link
-                href="/leak"
+                href={feedBasePath}
                 className="shrink-0 text-xs font-semibold text-rose-400 hover:text-rose-300 hover:underline"
               >
                 View all
@@ -459,13 +493,13 @@ export default function LeakWatch() {
             ) : relatedVideos && relatedVideos.length > 0 ? (
               <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4 sm:gap-5">
                 {relatedVideos.map((item) => (
-                  <LeakCard key={item.id} video={item} />
+                  <LeakCard key={item.id} video={item} site={activeSite} />
                 ))}
               </div>
             ) : (
               <div className="text-center py-10 rounded-xl border border-border/40 bg-card/40 text-muted-foreground text-sm">
                 No close matches yet.{" "}
-                <Link href="/leak" className="text-rose-400 hover:underline font-semibold">
+                <Link href={feedBasePath} className="text-rose-400 hover:underline font-semibold">
                   Browse the full leak feed
                 </Link>
                 .

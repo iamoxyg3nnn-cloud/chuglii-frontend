@@ -162,6 +162,10 @@ router.get("/player/stream", async (req, res) => {
       referer = "https://sheeshfans.com/";
     } else if (destObj.hostname.includes("influencersgonewild")) {
       referer = "https://influencersgonewild.com/";
+    } else if (destObj.hostname.includes("spicymms")) {
+      referer = "https://www.spicymms.com/";
+    } else if (destObj.hostname.includes("indianbfclips")) {
+      referer = "https://www.indianbfclips.com/";
     }
 
     const upstreamHeaders: Record<string, string> = {
