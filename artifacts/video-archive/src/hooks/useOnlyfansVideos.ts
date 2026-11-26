@@ -58,12 +58,19 @@ export interface OnlyfansVideo {
 }
 
 export type OnlyfansSortOption = "newest" | "views" | "rating" | "quality" | "oldest";
-export const ONLYFANS_SITES = ["influencersgonewild", "sheeshfans"] as const;
+export const ONLYFANS_SITES = [
+  "influencersgonewild",
+  "sheeshfans",
+  "borntobefuck",
+  "uncutx",
+] as const;
 export type OnlyfansSite = (typeof ONLYFANS_SITES)[number];
 
 export const ONLYFANS_SITE_LABELS: Record<OnlyfansSite, string> = {
   influencersgonewild: "Influencers Gone Wild",
   sheeshfans: "SheeshFans",
+  borntobefuck: "BornToBeFuck",
+  uncutx: "Uncut-X",
 };
 
 export function isOnlyfansSite(site: string | undefined): site is OnlyfansSite {
