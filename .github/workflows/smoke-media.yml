@@ -1,0 +1,41 @@
+name: Production Media Health
+
+# Verifies the LIVE site, not the repo. A build that compiles and deploys can
+# still serve nothing: on 2026-11-26 every borntobefuck thumbnail and stream was
+# dead in production for four independent reasons while CI stayed green.
+#
+# Runs nightly so a regression that no push caused (expired CDN referer rules,
+# DNS/proxy change, revoked secret, upstream hotlink policy change) is caught
+# within a day instead of whenever someone happens to look.
+
+on:
+  schedule:
+    - cron: "17 6 * * *" # daily 06:17 UTC
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: production-media-health
+  cancel-in-progress: true
+
+jobs:
+  smoke:
+    name: Smoke-test deployed media path
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Run media smoke test
+        run: node scripts/smoke-media.mjs --base "${{ vars.PUBLIC_SITE_URL || 'https://chuglii.in' }}"
+        env:
+          VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
+          VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY }}

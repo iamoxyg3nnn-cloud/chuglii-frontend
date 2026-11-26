@@ -55,3 +55,24 @@ jobs:
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CF_ACCOUNT_ID }}
+
+      # A green build is not a working site: the media proxy lives in
+      # public/_worker.js, which CI never exercises. These four faults all
+      # shipped to production while every test passed (wrong referer, redirect
+      # to the origin, cached 403s, double-proxying through /api/player/stream).
+      # Verify the deployed origin the way a browser does, and fail the deploy
+      # if it regressed.
+      - name: Smoke-test the deployed media path
+        run: |
+          for attempt in 1 2 3 4 5; do
+            if node scripts/smoke-media.mjs --base "${{ vars.PUBLIC_SITE_URL || 'https://chuglii.in' }}"; then
+              exit 0
+            fi
+            echo "attempt $attempt failed; edge may still be propagating, retrying in 15s"
+            sleep 15
+          done
+          echo "::error::media smoke test failed against the deployed site"
+          exit 1
+        env:
+          VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
+          VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY }}
