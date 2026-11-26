@@ -4807,6 +4807,7 @@ async function handleLiveStreams(env, url) {
     }));
     return jsonResponse(
       { streams, cached: false },
+      200,
       { "Cache-Control": "public, max-age=15, s-maxage=30, stale-while-revalidate=60" },
     );
   } catch (err) {
