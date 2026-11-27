@@ -1871,7 +1871,9 @@ function isLiveSegmentUrl(targetObj) {
 
 function liveSegmentCacheKey(targetObj) {
   // Strip the rotating auth_key — content depends only on the path.
-  return new Request(`https://live-seg.cache${targetObj.pathname}`);
+  // NOTE: cache.put/match only work for URLs on our own zone, so the key is
+  // a synthetic path on the production host.
+  return new Request(`https://chuglii.in/__live-seg${targetObj.pathname}`);
 }
 
 async function fetchAndCacheSegment(segUrl, log) {
