@@ -1844,6 +1844,118 @@ function suggestionScore(label, query) {
 
 // ─── API Router ──────────────────────────────────────────────────────
 
+// ═══════════════════════════════════════════════════════════════════════════
+// Live segment edge cache + read-ahead prefetch.
+// The live streams' origin CDN throttles each connection (~0.15 MB/s —
+// playback can barely keep up). Two fixes at the edge:
+//   1. Segments are cached under a NORMALIZED key (auth_key query param
+//      stripped) — the bytes for videos5/{md5}/xxx.ts are identical no
+//      matter which token fetched them, so every viewer and every loop
+//      shares one warm edge copy. First fetch is slow; every later one is
+//      edge-speed.
+//   2. When a playlist is served we remember its segment order and prefetch
+//      the head (and, on each segment hit, the next few) via waitUntil —
+//      turning the client's serial slow fetches into parallel edge warmups.
+// ═══════════════════════════════════════════════════════════════════════════
+
+const LIVE_SEG_MAX_BYTES = 8 * 1024 * 1024;
+const LIVE_PREFETCH_ON_PLAYLIST = 8;
+const LIVE_PREFETCH_READAHEAD = 4;
+const livePlaylistOrder = new Map(); // base dir -> { urls: [], expires }
+let livePrefetchActive = 0;
+
+function isLiveSegmentUrl(targetObj) {
+  if (!/\.(ts|key)$/i.test(targetObj.pathname)) return false;
+  return targetObj.hostname.endsWith(".cn") && targetObj.pathname.includes("/videos");
+}
+
+function liveSegmentCacheKey(targetObj) {
+  // Strip the rotating auth_key — content depends only on the path.
+  return new Request(`https://live-seg.cache${targetObj.pathname}`);
+}
+
+async function fetchAndCacheSegment(segUrl, log) {
+  let targetObj;
+  try {
+    targetObj = new URL(segUrl);
+  } catch {
+    return null;
+  }
+  const cacheKey = liveSegmentCacheKey(targetObj);
+  const cache = caches.default;
+  const hit = await cache.match(cacheKey);
+  if (hit) return hit;
+  if (livePrefetchActive >= 6) return null; // don't stampede
+  livePrefetchActive += 1;
+  try {
+    const res = await fetch(targetObj.toString(), {
+      headers: { "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/124.0.0.0 Safari/537.36", "Referer": "https://chuglii.in/" },
+    });
+    if (!res.ok) return null;
+    const buf = await res.arrayBuffer();
+    if (buf.byteLength > LIVE_SEG_MAX_BYTES) return null;
+    const cachedRes = new Response(buf, {
+      headers: {
+        "Content-Type": res.headers.get("content-type") || "video/mp2t",
+        "Cache-Control": "public, max-age=86400",
+      },
+    });
+    try {
+      await cache.put(cacheKey, cachedRes.clone());
+    } catch { /* best effort */ }
+    return cachedRes;
+  } catch {
+    return null;
+  } finally {
+    livePrefetchActive -= 1;
+  }
+}
+
+function rememberPlaylistOrder(playlistText, playlistBase) {
+  try {
+    const urls = playlistText
+      .split(/\r?\n/)
+      .map((l) => l.trim())
+      .filter((l) => l && !l.startsWith("#"))
+      .map((l) => {
+        try { return new URL(l, playlistBase).toString(); } catch { return null; }
+      })
+      .filter(Boolean);
+    if (!urls.length) return;
+    const baseDir = playlistBase.slice(0, playlistBase.lastIndexOf("/") + 1);
+    livePlaylistOrder.set(baseDir, { urls, expires: Date.now() + 30 * 60_000 });
+    if (livePlaylistOrder.size > 40) {
+      const oldest = livePlaylistOrder.keys().next().value;
+      if (oldest) livePlaylistOrder.delete(oldest);
+    }
+  } catch { /* best effort */ }
+}
+
+function scheduleLivePrefetch(text, playlistBase, log, waitUntil) {
+  try {
+    const baseDir = playlistBase.slice(0, playlistBase.lastIndexOf("/") + 1);
+    rememberPlaylistOrder(text, playlistBase);
+    const entry = livePlaylistOrder.get(baseDir);
+    if (!entry) return;
+    const head = entry.urls.slice(0, LIVE_PREFETCH_ON_PLAYLIST).map((u) => fetchAndCacheSegment(u, log));
+    waitUntil(Promise.allSettled(head));
+  } catch { /* best effort */ }
+}
+
+function scheduleSegmentReadAhead(segUrl, log, waitUntil) {
+  try {
+    for (const [baseDir, entry] of livePlaylistOrder) {
+      if (entry.expires < Date.now()) { livePlaylistOrder.delete(baseDir); continue; }
+      if (!segUrl.startsWith(baseDir)) continue;
+      const idx = entry.urls.indexOf(segUrl);
+      if (idx < 0) return;
+      const next = entry.urls.slice(idx + 1, idx + 1 + LIVE_PREFETCH_READAHEAD).map((u) => fetchAndCacheSegment(u, log));
+      if (next.length) waitUntil(Promise.allSettled(next));
+      return;
+    }
+  } catch { /* best effort */ }
+}
+
 async function handleApi(request, env, url, ctx) {
   const supabaseUrl = env.SUPABASE_URL || "https://supabase.chuglii.in";
   const supabaseKey = env.SUPABASE_SERVICE_ROLE_KEY || env.SUPABASE_ANON_KEY || "eyJhbGciOiAiSFMyNTYiLCAidHlwIjogIkpXVCJ9.eyJyb2xlIjogImFub24iLCAiaXNzIjogInN1cGFiYXNlIiwgImlhdCI6IDE3MDAwMDAwMDAsICJleHAiOiAyMDE1MzYwMDAwfQ.NSqjip-vQHwHjATurt4ensfmKBHa4Pt5m_dLP909lV8";
@@ -1978,6 +2090,28 @@ async function handleApi(request, env, url, ctx) {
       const isMediaStream =
         !!rangeHeader || isPlaylist || /\.(ts|m4s|mp4)(\?|$)/i.test(targetObj.pathname);
 
+      // ── Live segment fast path ──────────────────────────────────────
+      // Serve .ts/.key for the live CDN from the normalized-key edge cache
+      // and trigger read-ahead prefetch. Range requests fall through.
+      if (!rangeHeader && isLiveSegmentUrl(targetObj)) {
+        const cacheKey = liveSegmentCacheKey(targetObj);
+        const hit = await caches.default.match(cacheKey);
+        if (hit) {
+          const headers = new Headers(hit.headers);
+          headers.set("Access-Control-Allow-Origin", "*");
+          if (ctx) scheduleSegmentReadAhead(targetObj.toString(), null, (p) => ctx.waitUntil(p));
+          return new Response(hit.body, { status: 200, headers });
+        }
+        const segRes = await fetchAndCacheSegment(targetObj.toString(), null);
+        if (segRes) {
+          const headers = new Headers(segRes.headers);
+          headers.set("Access-Control-Allow-Origin", "*");
+          if (ctx) scheduleSegmentReadAhead(targetObj.toString(), null, (p) => ctx.waitUntil(p));
+          return new Response(segRes.body, { status: 200, headers });
+        }
+        // cache/fetch failed — fall through to the generic stream path
+      }
+
       // Images are fetched under a cache-busted URL: the edge still holds 403s
       // cached back when this Worker sent the wrong referer, and `cf.cacheKey`
       // does not re-key SUBrequests. Changing the URL is the only thing that
@@ -2083,6 +2217,9 @@ async function handleApi(request, env, url, ctx) {
       if (rawType.includes("mpegurl") || isPlaylist) {
         const playlist = await upstreamRes.text();
         const playlistBase = upstreamRes.url || targetUrl;
+        // Remember segment order + warm the head of the stream at the edge
+        // so playback starts from cache instead of the slow origin.
+        if (ctx) scheduleLivePrefetch(playlist, playlistBase, null, (p) => ctx.waitUntil(p));
         const toProxy = (uri) => {
           try {
             return `/api/media?url=${encodeURIComponent(new URL(uri, playlistBase).toString())}`;
