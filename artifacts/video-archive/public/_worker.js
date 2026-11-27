@@ -1979,19 +1979,36 @@ async function handleApi(request, env, url, ctx) {
     return handleLiveThumb(env, url);
   }
   if (path.startsWith("/api/live/live-thumb/")) {
-    // Real-time frame thumbnails need a remux/origin — not part of the
-    // storage-free deployment. Redirect to the decrypted static cover.
+    // Serve the worker-captured live frame (rotates every worker cycle) when
+    // one exists; otherwise redirect to the decrypted static cover.
     const id = path.split("/").pop() || "";
     if (!/^\d{1,7}$/.test(id)) return new Response("Bad id", { status: 400 });
     try {
-      const rows = await liveQuery(env, "id,thumbnail_url");
-      const row = rows.find((r) => String(r.id) === id);
-      if (row && row.thumbnail_url) {
-        const target = new URL(
-          `/api/live/thumb?url=${encodeURIComponent(row.thumbnail_url)}`,
-          url.origin,
-        );
-        return Response.redirect(target.toString(), 302);
+      const supabaseUrl = env.SUPABASE_URL || "https://supabase.chuglii.in";
+      const supabaseKey = env.SUPABASE_SERVICE_ROLE_KEY || env.SUPABASE_ANON_KEY;
+      const rowRes = await fetch(
+        `${supabaseUrl}/rest/v1/live_streams?select=frame_jpeg,has_frame,thumbnail_url&id=eq.${id}`,
+        { headers: { apikey: supabaseKey, Authorization: `Bearer ${supabaseKey}` } },
+      );
+      if (rowRes.ok) {
+        const row = (await rowRes.json())[0];
+        if (row && row.has_frame && row.frame_jpeg) {
+          const bin = Uint8Array.from(atob(row.frame_jpeg), (c) => c.charCodeAt(0));
+          return new Response(bin, {
+            headers: {
+              "Content-Type": "image/jpeg",
+              // frames rotate per worker cycle — brief edge/browser cache only
+              "Cache-Control": "public, max-age=120, s-maxage=120",
+              "Access-Control-Allow-Origin": "*",
+            },
+          });
+        }
+        if (row && row.thumbnail_url) {
+          return Response.redirect(
+            new URL(`/api/live/thumb?url=${encodeURIComponent(row.thumbnail_url)}`, url.origin).toString(),
+            302,
+          );
+        }
       }
     } catch {
       /* fall through */
@@ -4936,7 +4953,7 @@ async function handleLiveStreams(env, url) {
   try {
     const rows = await liveQuery(
       env,
-      "id,title,title_en,thumbnail_url,quality_label,storage_path,cover_path,frame_count",
+      "id,title,title_en,thumbnail_url,quality_label,storage_path,cover_path,frame_count,has_frame",
     );
     const streams = rows.map((r) => ({
       id: String(r.id),
@@ -4945,6 +4962,7 @@ async function handleLiveStreams(env, url) {
       thumbnail_url: r.thumbnail_url || null,
       quality_label: r.quality_label || null,
       remux_ready: !!r.storage_path,
+      has_frame: !!r.has_frame,
     }));
     return jsonResponse(
       { streams, cached: false },

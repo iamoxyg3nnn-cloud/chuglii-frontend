@@ -14,6 +14,8 @@ interface LiveStreamItem {
   quality_label?: string | null;
   /** Server-side remux finished — a real live frame can be served. */
   remux_ready?: boolean;
+  /** Worker-captured broadcast frame available (rotates per cycle). */
+  has_frame?: boolean;
 }
 
 async function fetchLiveStreams(): Promise<{ streams: LiveStreamItem[] }> {
@@ -225,7 +227,7 @@ export function LiveFeed() {
                     >
                       <div className="rounded-xl overflow-hidden bg-card border border-border hover:border-primary/40 transition-all duration-200">
                         <div className="relative aspect-video bg-muted">
-                          {s.remux_ready ? (
+                          {s.remux_ready || s.has_frame ? (
                             <img
                               src={liveThumbSrc(s.id, thumbTick, s.thumbnail_url)}
                               alt={s.title_en || s.title}
