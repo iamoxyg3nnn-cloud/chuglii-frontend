@@ -2022,6 +2022,14 @@ async function handleApi(request, env, url, ctx) {
               });
             }
           }
+          // Self-heal legacy rows where the bytea holds base64 TEXT (the
+          // worker used to double-encode): if the decoded bytes are the ASCII
+          // of a base64 JPEG, decode once more.
+          if (bin.length > 4 && bin[0] === 0x2f && bin[1] === 0x39 && bin[2] === 0x6a && bin[3] === 0x2f) {
+            const text = new TextDecoder().decode(bin);
+            bin = Uint8Array.from(atob(text), (c) => c.charCodeAt(0));
+            mode += "+b64";
+          }
           return new Response(bin, {
             headers: {
               "Content-Type": "image/jpeg",
