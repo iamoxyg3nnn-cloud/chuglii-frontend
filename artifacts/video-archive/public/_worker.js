@@ -1993,7 +1993,16 @@ async function handleApi(request, env, url, ctx) {
       if (rowRes.ok) {
         const row = (await rowRes.json())[0];
         if (row && row.has_frame && row.frame_jpeg) {
-          const bin = Uint8Array.from(atob(row.frame_jpeg), (c) => c.charCodeAt(0));
+          // PostgREST returns bytea as a Postgres hex string ("\x2f39...")
+          const raw = row.frame_jpeg;
+          let bin;
+          if (raw.startsWith("\\x")) {
+            const hex = raw.slice(2);
+            bin = new Uint8Array(hex.length / 2);
+            for (let i = 0; i < bin.length; i++) bin[i] = parseInt(hex.substr(i * 2, 2), 16);
+          } else {
+            bin = Uint8Array.from(atob(raw), (c) => c.charCodeAt(0));
+          }
           return new Response(bin, {
             headers: {
               "Content-Type": "image/jpeg",
