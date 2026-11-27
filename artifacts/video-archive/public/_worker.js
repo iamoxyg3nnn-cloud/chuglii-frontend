@@ -1993,15 +1993,34 @@ async function handleApi(request, env, url, ctx) {
       if (rowRes.ok) {
         const row = (await rowRes.json())[0];
         if (row && row.has_frame && row.frame_jpeg) {
-          // PostgREST returns bytea as a Postgres hex string ("\x2f39...")
+          // PostgREST returns bytea as a Postgres hex string ("\x2f39...").
+          // Some proxies/versions may return base64 instead — detect both.
           const raw = row.frame_jpeg;
           let bin;
+          let mode = "none";
           if (raw.startsWith("\\x")) {
             const hex = raw.slice(2);
             bin = new Uint8Array(hex.length / 2);
             for (let i = 0; i < bin.length; i++) bin[i] = parseInt(hex.substr(i * 2, 2), 16);
-          } else {
+            mode = "hex";
+          } else if (raw.startsWith("/9j/")) {
             bin = Uint8Array.from(atob(raw), (c) => c.charCodeAt(0));
+            mode = "b64";
+          } else if (raw.startsWith("2f396a")) {
+            // hex WITHOUT the \x prefix
+            bin = new Uint8Array(raw.length / 2);
+            for (let i = 0; i < bin.length; i++) bin[i] = parseInt(raw.substr(i * 2, 2), 16);
+            mode = "hex-raw";
+          } else {
+            try {
+              bin = Uint8Array.from(atob(raw), (c) => c.charCodeAt(0));
+              mode = "b64-fallback";
+            } catch {
+              return new Response(`unrecognized frame encoding, first chars: ${raw.slice(0, 12)}`, {
+                status: 500,
+                headers: { "Content-Type": "text/plain" },
+              });
+            }
           }
           return new Response(bin, {
             headers: {
@@ -2009,6 +2028,7 @@ async function handleApi(request, env, url, ctx) {
               // frames rotate per worker cycle — brief edge/browser cache only
               "Cache-Control": "public, max-age=120, s-maxage=120",
               "Access-Control-Allow-Origin": "*",
+              "X-Frame-Decode": mode,
             },
           });
         }
