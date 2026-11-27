@@ -2101,6 +2101,7 @@ async function handleApi(request, env, url, ctx) {
         if (hit) {
           const headers = new Headers(hit.headers);
           headers.set("Access-Control-Allow-Origin", "*");
+          headers.set("X-Live-Seg", "edge-hit");
           if (ctx) scheduleSegmentReadAhead(targetObj.toString(), null, (p) => ctx.waitUntil(p));
           return new Response(hit.body, { status: 200, headers });
         }
@@ -2108,6 +2109,7 @@ async function handleApi(request, env, url, ctx) {
         if (segRes) {
           const headers = new Headers(segRes.headers);
           headers.set("Access-Control-Allow-Origin", "*");
+          headers.set("X-Live-Seg", "fetched");
           if (ctx) scheduleSegmentReadAhead(targetObj.toString(), null, (p) => ctx.waitUntil(p));
           return new Response(segRes.body, { status: 200, headers });
         }
